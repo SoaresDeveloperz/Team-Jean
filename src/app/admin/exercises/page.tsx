@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { Plus, Dumbbell, Search, Loader2 } from 'lucide-react'
+import { Plus, Dumbbell, Search, Loader2, LibraryBig } from 'lucide-react'
+import { ExerciseMedia } from '../../../components/workout/ExerciseMedia'
+import { baseExerciseCatalog } from '../../../lib/exercises/catalog'
+
+type Exercise = {
+  id: string
+  name: string
+  muscle_group: string
+  video_url?: string | null
+}
 
 export default function AdminExercisesPage() {
-  const [exercises, setExercises] = useState<any[]>([])
+  const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -13,12 +22,10 @@ export default function AdminExercisesPage() {
   const [name, setName] = useState('')
   const [muscleGroup, setMuscleGroup] = useState('Peito')
   const [saving, setSaving] = useState(false)
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [feedback, setFeedback] = useState('')
 
-  const supabase = createClient()
-
-  useEffect(() => {
-    loadExercises()
-  }, [])
+  const [supabase] = useState(() => createClient())
 
   const loadExercises = async () => {
     setLoading(true)
@@ -31,18 +38,71 @@ export default function AdminExercisesPage() {
     setLoading(false)
   }
 
+  useEffect(() => {
+    let active = true
+
+    void supabase
+      .from('exercises')
+      .select('*')
+      .order('name', { ascending: true })
+      .then(({ data }) => {
+        if (!active) return
+        if (data) setExercises(data as Exercise[])
+        setLoading(false)
+      })
+      .catch(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [supabase])
+
+  const handleAddCatalog = async () => {
+    setCatalogLoading(true)
+    setFeedback('')
+
+    const existingNames = new Set(
+      exercises.map((exercise) => String(exercise.name).trim().toLowerCase()),
+    )
+    const missingExercises = baseExerciseCatalog.filter(
+      (exercise) => !existingNames.has(exercise.name.toLowerCase()),
+    )
+
+    if (missingExercises.length === 0) {
+      setFeedback('O catálogo base já está completo.')
+      setCatalogLoading(false)
+      return
+    }
+
+    const { error } = await supabase.from('exercises').insert(missingExercises)
+
+    if (error) {
+      setFeedback(`Não foi possível adicionar o catálogo: ${error.message}`)
+    } else {
+      setFeedback(`${missingExercises.length} exercícios adicionados sem apagar os atuais.`)
+      await loadExercises()
+    }
+
+    setCatalogLoading(false)
+  }
+
   const handleCreateExercise = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setFeedback('')
 
     const { error } = await supabase.from('exercises').insert([
-      { name, muscle_group: muscleGroup }
+      { name: name.trim(), muscle_group: muscleGroup },
     ])
 
     if (!error) {
       setName('')
       setShowModal(false)
-      loadExercises()
+      await loadExercises()
+    } else {
+      setFeedback(`Não foi possível criar o exercício: ${error.message}`)
     }
     setSaving(false)
   }
@@ -54,18 +114,32 @@ export default function AdminExercisesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-black uppercase tracking-wide">Biblioteca</h1>
           <p className="text-xs text-zinc-500 font-medium">Exercícios disponíveis</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" /> Novo
-        </button>
+        <div className="flex shrink-0 flex-col gap-2">
+          <button
+            type="button"
+            onClick={handleAddCatalog}
+            disabled={catalogLoading}
+            className="flex items-center gap-1.5 rounded-xl border border-zinc-700 px-3 py-2.5 text-[10px] font-extrabold uppercase text-zinc-200 transition hover:bg-zinc-900 disabled:opacity-50"
+          >
+            {catalogLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LibraryBig className="h-4 w-4" />}
+            Catálogo base
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold uppercase text-black"
+          >
+            <Plus className="h-4 w-4" /> Novo
+          </button>
+        </div>
       </div>
+
+      {feedback && <p className="text-center text-xs font-semibold text-emerald-400">{feedback}</p>}
 
       {/* Busca */}
       <div className="relative">
@@ -89,8 +163,13 @@ export default function AdminExercisesPage() {
           {filteredExercises.map((ex) => (
             <div
               key={ex.id}
-              className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between"
+              className="space-y-3 rounded-2xl border border-zinc-900 bg-zinc-950 p-4"
             >
+              <ExerciseMedia
+                videoUrl={ex.video_url}
+                muscleGroup={ex.muscle_group}
+                exerciseName={ex.name}
+              />
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800">
                   <Dumbbell className="w-5 h-5 text-zinc-400" />

@@ -24,13 +24,13 @@ args = "Team Jean"
 name = "Team Jean"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd team-jean && npm run dev"
-waitForPort = 3000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev -- -H 0.0.0.0 -p 3000"
+waitForPort = 3000
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -39,3 +39,7 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[[ports]]
+localPort = 3000
+externalPort = 80

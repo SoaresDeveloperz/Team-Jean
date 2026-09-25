@@ -35,7 +35,31 @@ export default function LoginPage() {
         return
       }
 
-      window.location.replace('/dashboard')
+      const user = data.session.user
+      const metadataRole = String(user.user_metadata?.role ?? '').toLowerCase()
+      let isAdmin = metadataRole === 'admin'
+
+      if (!isAdmin) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        isAdmin = String(profile?.role ?? '').toLowerCase() === 'admin'
+      }
+
+      if (!isAdmin && user.email) {
+        const { data: profileByEmail } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('email', user.email)
+          .maybeSingle()
+
+        isAdmin = String(profileByEmail?.role ?? '').toLowerCase() === 'admin'
+      }
+
+      window.location.replace(isAdmin ? '/admin/students' : '/dashboard')
     } catch {
       setError('Não foi possível conectar ao Supabase. Confira a conexão e tente novamente.')
     } finally {

@@ -12,26 +12,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [supabase] = useState(() => createClient())
   const router = useRouter()
-  
-  const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email, 
-      password 
-    })
-    
-    if (error) {
-      setError('E-mail ou senha incorretos.')
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+
+      if (error) {
+        setError(error.message)
+        return
+      }
+
+      router.replace('/dashboard')
+    } catch {
+      setError('Não foi possível conectar ao Supabase. Confira a conexão e tente novamente.')
+    } finally {
       setLoading(false)
-    } else {
-      router.push('/')
-      router.refresh()
     }
   }
 

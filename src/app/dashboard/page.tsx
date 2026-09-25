@@ -51,14 +51,16 @@ export default function DashboardPage() {
       }
 
       if (!isAdmin && data.session.user.email) {
-        const { data: profileByEmail } = await supabase
+        const { data: profilesByEmail } = await supabase
           .from('profiles')
           .select('role')
-          .eq('email', data.session.user.email)
-          .maybeSingle()
+          .ilike('email', data.session.user.email.trim())
+          .limit(20)
 
         if (!active) return
-        isAdmin = String(profileByEmail?.role ?? '').toLowerCase() === 'admin'
+        isAdmin = profilesByEmail?.some(
+          (profile) => String(profile.role ?? '').trim().toLowerCase() === 'admin',
+        ) ?? false
       }
 
       setDashboard({

@@ -50,13 +50,15 @@ export default function LoginPage() {
       }
 
       if (!isAdmin && user.email) {
-        const { data: profileByEmail } = await supabase
+        const { data: profilesByEmail } = await supabase
           .from('profiles')
           .select('role')
-          .eq('email', user.email)
-          .maybeSingle()
+          .ilike('email', user.email.trim())
+          .limit(20)
 
-        isAdmin = String(profileByEmail?.role ?? '').toLowerCase() === 'admin'
+        isAdmin = profilesByEmail?.some(
+          (profile) => String(profile.role ?? '').trim().toLowerCase() === 'admin',
+        ) ?? false
       }
 
       window.location.replace(isAdmin ? '/admin/students' : '/dashboard')

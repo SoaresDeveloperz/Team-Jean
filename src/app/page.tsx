@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 // Olha a mágica aqui: usando caminhos relativos (../) em vez de @/
 import { createClient } from '../lib/supabase/client'
 import { Logo } from '../components/ui/logo'
@@ -9,6 +9,7 @@ import { Logo } from '../components/ui/logo'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [supabase] = useState(() => createClient())
@@ -59,13 +60,25 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white focus:outline-none focus:border-white transition-all"
           />
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white focus:outline-none focus:border-white transition-all"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Senha"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 pr-12 text-white focus:outline-none focus:border-white transition-all"
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 rounded text-zinc-400 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              {showPassword ? <EyeOff aria-hidden="true" size={20} /> : <Eye aria-hidden="true" size={20} />}
+            </button>
+          </div>
           
           {error && <p className="text-red-500 text-sm text-center font-bold">{error}</p>}
           

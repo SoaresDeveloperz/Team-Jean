@@ -8,6 +8,7 @@ import { Logo } from '../../components/ui/logo'
 type DashboardState =
   | { status: 'loading' }
   | { status: 'ready'; email: string }
+  | { status: 'unauthenticated' }
   | { status: 'error' }
 
 export default function DashboardPage() {
@@ -20,7 +21,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true
 
-    void supabase.auth.getUser().then(({ data, error }) => {
+    void supabase.auth.getSession().then(({ data, error }) => {
       if (!active) return
 
       if (error) {
@@ -28,14 +29,14 @@ export default function DashboardPage() {
         return
       }
 
-      if (!data.user) {
-        router.replace('/')
+      if (!data.session) {
+        setDashboard({ status: 'unauthenticated' })
         return
       }
 
       setDashboard({
         status: 'ready',
-        email: data.user.email ?? 'Conta Team Jean',
+        email: data.session.user.email ?? 'Conta Team Jean',
       })
     }).catch(() => {
       if (active) setDashboard({ status: 'error' })
@@ -64,11 +65,24 @@ export default function DashboardPage() {
   if (dashboard.status !== 'ready') {
     return (
       <main className="min-h-screen bg-black px-6 text-white flex items-center justify-center">
-        <p className="text-sm text-zinc-400">
-          {dashboard.status === 'error'
-            ? 'Não foi possível verificar sua sessão. Tente entrar novamente.'
-            : 'Verificando seu acesso...'}
-        </p>
+        <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+          <p className="text-sm text-zinc-400">
+            {dashboard.status === 'error'
+              ? 'Não foi possível verificar sua sessão. Tente entrar novamente.'
+              : dashboard.status === 'unauthenticated'
+                ? 'O login não manteve uma sessão neste navegador. Confira se a URL e a chave do Supabase pertencem ao mesmo projeto.'
+                : 'Verificando seu acesso...'}
+          </p>
+          {dashboard.status === 'unauthenticated' && (
+            <button
+              type="button"
+              onClick={() => router.replace('/')}
+              className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-900"
+            >
+              Voltar ao login
+            </button>
+          )}
+        </div>
       </main>
     )
   }

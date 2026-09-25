@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 // Olha a mágica aqui: usando caminhos relativos (../) em vez de @/
 import { createClient } from '../lib/supabase/client'
@@ -13,7 +12,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [supabase] = useState(() => createClient())
-  const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,7 +19,7 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       })
@@ -31,7 +29,12 @@ export default function LoginPage() {
         return
       }
 
-      router.replace('/dashboard')
+      if (!data.session) {
+        setError('O Supabase não criou uma sessão para esta conta. Confira se o usuário está ativo no projeto correto.')
+        return
+      }
+
+      window.location.replace('/dashboard')
     } catch {
       setError('Não foi possível conectar ao Supabase. Confira a conexão e tente novamente.')
     } finally {

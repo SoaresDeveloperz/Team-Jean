@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { LayoutDashboard } from 'lucide-react'
 import { createClient } from '../../lib/supabase/client'
 import { Logo } from '../../components/ui/logo'
 
 type DashboardState =
   | { status: 'loading' }
-  | { status: 'ready'; email: string }
+  | { status: 'ready'; email: string; isAdmin: boolean }
   | { status: 'unauthenticated' }
   | { status: 'error' }
 
@@ -21,7 +23,7 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true
 
-    void supabase.auth.getSession().then(({ data, error }) => {
+    void supabase.auth.getSession().then(async ({ data, error }) => {
       if (!active) return
 
       if (error) {
@@ -34,9 +36,24 @@ export default function DashboardPage() {
         return
       }
 
+      const metadataRole = data.session.user.user_metadata?.role
+      let isAdmin = metadataRole === 'admin'
+
+      if (!isAdmin) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.session.user.id)
+          .maybeSingle()
+
+        if (!active) return
+        isAdmin = profile?.role === 'admin'
+      }
+
       setDashboard({
         status: 'ready',
         email: data.session.user.email ?? 'Conta Team Jean',
+        isAdmin,
       })
     }).catch(() => {
       if (active) setDashboard({ status: 'error' })
@@ -100,14 +117,26 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            disabled={signingOut}
-            className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-900 disabled:opacity-50"
-          >
-            {signingOut ? 'Saindo...' : 'Sair'}
-          </button>
+          <div className="flex items-center gap-2">
+            {dashboard.isAdmin && (
+              <Link
+                href="/admin"
+                className="flex items-center gap-2 rounded-xl border border-zinc-700 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-900"
+              >
+                <LayoutDashboard aria-hidden="true" size={16} />
+                <span className="hidden sm:inline">Painel Admin</span>
+                <span className="sm:hidden">Admin</span>
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-semibold transition hover:bg-zinc-900 disabled:opacity-50"
+            >
+              {signingOut ? 'Saindo...' : 'Sair'}
+            </button>
+          </div>
         </header>
 
         <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-7 sm:p-10">

@@ -1,0 +1,1 @@
+- [Next.js preview origins](next-preview-origins.md) — include `REPLIT_DEV_DOMAIN`; Replit preview hosts can be nested beyond a single-level wildcard.

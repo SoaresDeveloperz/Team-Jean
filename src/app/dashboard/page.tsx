@@ -36,7 +36,7 @@ export default function DashboardPage() {
         return
       }
 
-      const metadataRole = data.session.user.user_metadata?.role
+      const metadataRole = String(data.session.user.user_metadata?.role ?? '').toLowerCase()
       let isAdmin = metadataRole === 'admin'
 
       if (!isAdmin) {
@@ -47,7 +47,18 @@ export default function DashboardPage() {
           .maybeSingle()
 
         if (!active) return
-        isAdmin = profile?.role === 'admin'
+        isAdmin = String(profile?.role ?? '').toLowerCase() === 'admin'
+      }
+
+      if (!isAdmin && data.session.user.email) {
+        const { data: profileByEmail } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('email', data.session.user.email)
+          .maybeSingle()
+
+        if (!active) return
+        isAdmin = String(profileByEmail?.role ?? '').toLowerCase() === 'admin'
       }
 
       setDashboard({

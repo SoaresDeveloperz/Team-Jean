@@ -1,26 +1,44 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Play, Dumbbell, Loader2, CheckCircle2 } from 'lucide-react'
+import { Play, Dumbbell, Loader2 } from 'lucide-react'
+import { ExerciseMedia } from '../../../components/workout/ExerciseMedia'
+
+type AssignedExercise = {
+  id: string
+  sets_count?: number | null
+  target_reps?: string | number | null
+  set_type?: string | null
+  exercises?: {
+    name?: string | null
+    muscle_group?: string | null
+    image_url?: string | null
+    video_url?: string | null
+  } | null
+}
+
+type StudentWorkout = {
+  id: string
+  name: string
+}
 
 export default function StudentTodayPage() {
-  const [workout, setWorkout] = useState<any>(null)
-  const [exercises, setExercises] = useState<any[]>([])
+  const [workout, setWorkout] = useState<StudentWorkout | null>(null)
+  const [exercises, setExercises] = useState<AssignedExercise[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
-  useEffect(() => {
-    loadTodayWorkout()
-  }, [])
-
-  const loadTodayWorkout = async () => {
+  const loadTodayWorkout = useCallback(async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
 
     // Busca o treino ativo atual do aluno
     const { data: w } = await supabase
@@ -36,7 +54,7 @@ export default function StudentTodayPage() {
       // Busca os exercícios desse treino
       const { data: ex } = await supabase
         .from('assigned_workout_exercises')
-        .select('*, exercises(name, muscle_group, image_url)')
+        .select('*, exercises(*)')
         .eq('assigned_workout_id', w.id)
         .order('order', { ascending: true })
 
@@ -44,7 +62,15 @@ export default function StudentTodayPage() {
     }
 
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadTodayWorkout()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [loadTodayWorkout])
 
   if (loading) {
     return (
@@ -97,20 +123,27 @@ export default function StudentTodayPage() {
         {exercises.map((item, idx) => (
           <div
             key={item.id}
-            className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between"
+            className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-black text-zinc-600 w-5">#{idx + 1}</span>
-              <div>
-                <h3 className="font-bold text-sm text-white">{item.exercises?.name}</h3>
-                <p className="text-xs text-zinc-500">
-                  {item.sets_count} séries × {item.target_reps} reps
-                </p>
+            <ExerciseMedia
+              videoUrl={item.exercises?.image_url ?? item.exercises?.video_url}
+              muscleGroup={item.exercises?.muscle_group || 'Treino'}
+              exerciseName={item.exercises?.name || 'Exercício'}
+            />
+            <div className="flex items-center justify-between gap-3 p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="w-5 text-xs font-black text-zinc-600">#{idx + 1}</span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-bold text-white">{item.exercises?.name}</h3>
+                  <p className="text-xs text-zinc-500">
+                    {item.exercises?.muscle_group} · {item.sets_count} séries × {item.target_reps} reps
+                  </p>
+                </div>
               </div>
+              <span className="shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[10px] font-bold uppercase text-zinc-400">
+                {item.set_type || 'Normal'}
+              </span>
             </div>
-            <span className="text-[10px] font-bold uppercase text-zinc-400 bg-zinc-900 px-2.5 py-1 rounded-lg border border-zinc-800">
-              {item.set_type || 'Normal'}
-            </span>
           </div>
         ))}
       </div>

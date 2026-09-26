@@ -1,7 +1,7 @@
 'use client'
 
 import { StudentNav } from '../../components/layout/StudentNav'
-import { Logo } from '../../components/ui/Logo'
+import { Logo } from '../../components/ui/logo'
 import { createClient } from '../../lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'

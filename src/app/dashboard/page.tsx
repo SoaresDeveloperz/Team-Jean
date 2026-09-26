@@ -3,13 +3,32 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard } from 'lucide-react'
+import { Dumbbell, LayoutDashboard, Play } from 'lucide-react'
 import { createClient } from '../../lib/supabase/client'
 import { Logo } from '../../components/ui/logo'
+import { ExerciseMedia } from '../../components/workout/ExerciseMedia'
+
+type AssignedExercise = {
+  id: string
+  sets_count?: number | null
+  target_reps?: string | number | null
+  exercises?: {
+    name?: string | null
+    muscle_group?: string | null
+    image_url?: string | null
+    video_url?: string | null
+  } | null
+}
+
+type CurrentWorkout = {
+  id: string
+  name: string
+  exercises: AssignedExercise[]
+}
 
 type DashboardState =
   | { status: 'loading' }
-  | { status: 'ready'; email: string; isAdmin: boolean }
+  | { status: 'ready'; email: string; isAdmin: boolean; currentWorkout: CurrentWorkout | null }
   | { status: 'unauthenticated' }
   | { status: 'error' }
 
@@ -63,10 +82,35 @@ export default function DashboardPage() {
         ) ?? false
       }
 
+      let currentWorkout: CurrentWorkout | null = null
+      const { data: workout } = await supabase
+        .from('assigned_workouts')
+        .select('*')
+        .eq('student_id', data.session.user.id)
+        .eq('is_current', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (workout) {
+        const { data: assignedExercises } = await supabase
+          .from('assigned_workout_exercises')
+          .select('*, exercises(*)')
+          .eq('assigned_workout_id', workout.id)
+          .order('order', { ascending: true })
+
+        currentWorkout = {
+          id: workout.id,
+          name: workout.name,
+          exercises: (assignedExercises ?? []) as AssignedExercise[],
+        }
+      }
+
       setDashboard({
         status: 'ready',
         email: data.session.user.email ?? 'Conta Team Jean',
         isAdmin,
+        currentWorkout,
       })
     }).catch(() => {
       if (active) setDashboard({ status: 'error' })
@@ -174,6 +218,79 @@ export default function DashboardPage() {
             </p>
           )}
         </section>
+
+          {dashboard.currentWorkout ? (
+            <section className="space-y-4">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold tracking-[0.2em] text-zinc-500">
+                    TREINO ATUAL
+                  </p>
+                  <h2 className="mt-1 text-xl font-black uppercase tracking-wide">
+                    {dashboard.currentWorkout.name}
+                  </h2>
+                </div>
+                <Link
+                  href={`/student/workout/${dashboard.currentWorkout.id}`}
+                  className="flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black uppercase text-black transition active:scale-95"
+                >
+                  <Play className="h-4 w-4 fill-black" aria-hidden="true" />
+                  Iniciar
+                </Link>
+              </div>
+
+              {dashboard.currentWorkout.exercises.length > 0 ? (
+                <div className="space-y-3">
+                  {dashboard.currentWorkout.exercises.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950"
+                    >
+                      <ExerciseMedia
+                        videoUrl={item.exercises?.image_url ?? item.exercises?.video_url}
+                        muscleGroup={item.exercises?.muscle_group ?? 'Treino'}
+                        exerciseName={item.exercises?.name ?? 'Exercício'}
+                      />
+                      <div className="flex items-center gap-3 p-4">
+                        <span className="text-xs font-black text-zinc-600">
+                          #{index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-bold text-white">
+                            {item.exercises?.name ?? 'Exercício'}
+                          </h3>
+                          <p className="text-xs text-zinc-500">
+                            {item.exercises?.muscle_group ?? 'Grupo não informado'}
+                            {item.sets_count
+                              ? ` · ${item.sets_count} séries${item.target_reps ? ` × ${item.target_reps} reps` : ''}`
+                              : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-6 text-center">
+                  <Dumbbell className="mx-auto h-8 w-8 text-zinc-700" aria-hidden="true" />
+                  <p className="mt-3 text-sm font-semibold text-zinc-400">
+                    Seu treino ainda não tem exercícios.
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    Peça ao treinador para completar a ficha.
+                  </p>
+                </div>
+              )}
+            </section>
+          ) : (
+            <section className="rounded-3xl border border-zinc-800 bg-zinc-950 p-7 text-center">
+              <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
+              <h2 className="mt-4 text-lg font-black uppercase">Nenhum treino ativo</h2>
+              <p className="mt-2 text-sm text-zinc-500">
+                Quando o treinador atribuir seu próximo treino, ele aparecerá aqui.
+              </p>
+            </section>
+          )}
       </div>
     </main>
   )

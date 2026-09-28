@@ -1,0 +1,59 @@
+lockfileVersion: '6.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+dependencies:
+  '@supabase/ssr':
+    specifier: ^0.12.7
+    version: 0.12.7
+  '@supabase/supabase-js':
+    specifier: ^2.117.1
+    version: 2.117.1
+  clsx:
+    specifier: ^2.1.1
+    version: 2.1.1
+  lucide-react:
+    specifier: ^1.48.0
+    version: 1.48.0(react@19.2.8)
+  next:
+    specifier: 16.3.6
+    version: 16.3.6(react@19.2.8)(react-dom@19.2.8)
+  react:
+    specifier: 19.2.8
+    version: 19.2.8
+  react-dom:
+    specifier: 19.2.8
+    version: 19.2.8(react@19.2.8)
+  tailwind-merge:
+    specifier: ^3.7.0
+    version: 3.7.0
+
+devDependencies:
+  '@tailwindcss/postcss':
+    specifier: ^4
+    version: 4.0.8
+  '@types/node':
+    specifier: ^20
+    version: 20.16.5
+  '@types/react':
+    specifier: ^19
+    version: 19.0.4
+  '@types/react-dom':
+    specifier: ^19
+    version: 19.0.2
+  eslint:
+    specifier: ^9
+    version: 9.9.0
+  eslint-config-next:
+    specifier: 16.3.6
+    version: 16.3.6(eslint@9.9.0)(typescript@5.6.2)
+  tailwindcss:
+    specifier: ^4
+    version: 4.0.8
+  typescript:
+    specifier: ^5
+    version: 5.6.2
+
+packages: {}

@@ -1,43 +1,57 @@
 'use client'
 
-import { StudentNav } from '../../components/layout/StudentNav'
-import { Logo } from '../../components/ui/logo'
-import { createClient } from '../../lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { LogOut } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Dumbbell, Calendar, History, TrendingUp, User } from 'lucide-react'
+import { Logo } from '../../components/ui/Logo'
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const supabase = createClient()
+  const pathname = usePathname()
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
+  const navItems = [
+    { href: '/student/today', label: 'Hoje', icon: Dumbbell },
+    { href: '/student/week', label: 'Semana', icon: Calendar },
+    { href: '/student/history', label: 'Histórico', icon: History },
+    { href: '/student/progress', label: 'Evolução', icon: TrendingUp },
+    { href: '/student/profile', label: 'Perfil', icon: User },
+  ]
 
   return (
     <div className="min-h-screen bg-black text-white pb-24">
-      {/* Topo Aluno */}
-      <header className="sticky top-0 bg-black/80 backdrop-blur-md border-b border-zinc-900 px-6 py-4 flex items-center justify-between z-40">
+      {/* Topo Limpo do Aluno */}
+      <header className="sticky top-0 bg-black/90 backdrop-blur-md border-b border-zinc-900 px-6 py-4 flex items-center justify-between z-40">
         <div className="flex items-center gap-3">
-          <Logo className="w-7 h-7" />
-          <span className="font-black text-base tracking-wider">TEAM JEAN</span>
+          <Logo className="w-8 h-8" />
+          <span className="font-black text-lg tracking-widest uppercase">TEAM JEAN</span>
         </div>
-        <button
-          onClick={handleLogout}
-          className="p-2 text-zinc-500 hover:text-white transition-colors"
-          title="Sair"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
       </header>
 
-      {/* Conteúdo */}
+      {/* Conteúdo da Tela */}
       <main className="p-4 max-w-md mx-auto">{children}</main>
 
-      {/* Menu Fixo Embaixo */}
-      <StudentNav />
+      {/* Barra de Navegação Inferior (Fica fixa no rodapé) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-900 px-2 py-2 flex justify-around items-center z-50 pb-safe">
+        {navItems.map((item) => {
+          const Icon = item.icon
+          const isActive = pathname.startsWith(item.href)
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all ${
+                isActive ? 'text-white scale-105' : 'text-zinc-600 hover:text-zinc-400'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl ${isActive ? 'bg-zinc-900 border border-zinc-800' : ''}`}>
+                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5] text-emerald-400' : 'stroke-2'}`} />
+              </div>
+              <span className={`text-[9px] uppercase tracking-wider ${isActive ? 'font-black' : 'font-semibold'}`}>
+                {item.label}
+              </span>
+            </Link>
+          )
+        })}
+      </nav>
     </div>
   )
 }

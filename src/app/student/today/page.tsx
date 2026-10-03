@@ -127,6 +127,8 @@ export default function StudentTodayPage() {
           >
             <ExerciseMedia
               muscleGroup={item.exercises?.muscle_group || 'Treino'}
+              exerciseName={item.exercises?.name || 'Exercício'}
+              imageUrl={item.exercises?.image_url}
             />
             <div className="flex items-center justify-between gap-3 p-4">
               <div className="flex min-w-0 items-center gap-3">

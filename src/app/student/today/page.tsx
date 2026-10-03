@@ -126,7 +126,8 @@ export default function StudentTodayPage() {
             className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950"
           >
             <ExerciseMedia
-              videoUrl={item.exercises?.image_url ?? item.exercises?.video_url}
+              imageUrl={item.exercises?.image_url}
+              videoUrl={item.exercises?.video_url}
               muscleGroup={item.exercises?.muscle_group || 'Treino'}
               exerciseName={item.exercises?.name || 'Exercício'}
             />

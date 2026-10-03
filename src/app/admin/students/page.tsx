@@ -1,28 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { Plus, User, Search, Loader2, CheckCircle2 } from 'lucide-react'
+import { Plus, User, Loader2, Pencil } from 'lucide-react'
+
+type Student = {
+  id: string
+  full_name: string | null
+  email: string | null
+}
 
 export default function AdminStudentsPage() {
-  const [students, setStudents] = useState<any[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
   
   // Formulário do novo aluno
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [saving, setLoadingSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
-  useEffect(() => {
-    loadStudents()
-  }, [])
-
-  const loadStudents = async () => {
+  const loadStudents = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('profiles')
@@ -30,38 +33,87 @@ export default function AdminStudentsPage() {
       .eq('role', 'student')
       .order('created_at', { ascending: false })
 
-    if (data) setStudents(data)
+    if (data) setStudents(data as Student[])
     setLoading(false)
+  }, [supabase])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadStudents()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [loadStudents])
+
+  const openCreateModal = () => {
+    setEditingStudentId(null)
+    setFullName('')
+    setEmail('')
+    setPassword('')
+    setMsg('')
+    setShowModal(true)
+  }
+
+  const openEditModal = (student: Student) => {
+    setEditingStudentId(student.id)
+    setFullName(student.full_name ?? '')
+    setEmail(student.email ?? '')
+    setPassword('')
+    setMsg('')
+    setShowModal(true)
+  }
+
+  const closeModal = () => {
+    setShowModal(false)
+    setEditingStudentId(null)
+    setFullName('')
+    setEmail('')
+    setPassword('')
+    setMsg('')
   }
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoadingSaving(true)
+    setSaving(true)
     setMsg('')
 
-    // Criar conta de usuário do aluno no Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          role: 'student',
-        },
-      },
-    })
+    try {
+      if (editingStudentId) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ full_name: fullName.trim() })
+          .eq('id', editingStudentId)
+          .eq('role', 'student')
 
-    if (error) {
-      setMsg('Erro ao cadastrar: ' + error.message)
-    } else {
-      setMsg('Aluno cadastrado com sucesso!')
-      setFullName('')
-      setEmail('')
-      setPassword('')
-      setShowModal(false)
-      loadStudents()
+        if (error) {
+          setMsg(`Não foi possível atualizar o aluno: ${error.message}`)
+          return
+        }
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              role: 'student',
+            },
+          },
+        })
+
+        if (error) {
+          setMsg('Erro ao cadastrar: ' + error.message)
+          return
+        }
+      }
+
+      closeModal()
+      await loadStudents()
+    } catch {
+      setMsg('Não foi possível salvar agora. Tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    setLoadingSaving(false)
   }
 
   return (
@@ -73,7 +125,7 @@ export default function AdminStudentsPage() {
           <p className="text-xs text-zinc-500 font-medium">Gerencie sua consultoria</p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreateModal}
           className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all"
         >
           <Plus className="w-4 h-4" /> Cadastrar
@@ -88,7 +140,7 @@ export default function AdminStudentsPage() {
       ) : students.length === 0 ? (
         <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-8 text-center space-y-3">
           <User className="w-10 h-10 text-zinc-700 mx-auto" />
-ext-sm    <p className="text-xs text-zinc-600">Clique em "Cadastrar" para adicionar seu primeiro aluno.</p>
+          <p className="text-xs text-zinc-600">Clique em &quot;Cadastrar&quot; para adicionar seu primeiro aluno.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -106,9 +158,20 @@ ext-sm    <p className="text-xs text-zinc-600">Clique em "Cadastrar" para adicio
                   <p className="text-xs text-zinc-500">{student.email}</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold uppercase text-emerald-400 bg-emerald-950/50 border border-emerald-800/40 px-2 py-1 rounded-lg">
-                Ativo
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase text-emerald-400 bg-emerald-950/50 border border-emerald-800/40 px-2 py-1 rounded-lg">
+                  Ativo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => openEditModal(student)}
+                  aria-label={`Editar aluno ${student.full_name || student.email || ''}`}
+                  title="Editar aluno"
+                  className="rounded-lg border border-zinc-800 p-2 text-zinc-400 transition hover:border-emerald-500/50 hover:text-emerald-300"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -118,7 +181,9 @@ ext-sm    <p className="text-xs text-zinc-600">Clique em "Cadastrar" para adicio
       {showModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 w-full max-w-sm space-y-4">
-            <h2 className="text-lg font-black uppercase">Cadastrar Aluno</h2>
+            <h2 className="text-lg font-black uppercase">
+              {editingStudentId ? 'Editar Aluno' : 'Cadastrar Aluno'}
+            </h2>
             
             <form onSubmit={handleCreateStudent} className="space-y-3">
               <div>
@@ -137,32 +202,35 @@ ext-sm    <p className="text-xs text-zinc-600">Clique em "Cadastrar" para adicio
                 <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">E-mail do Aluno</label>
                 <input
                   type="email"
-                  required
+                  required={!editingStudentId}
+                  readOnly={Boolean(editingStudentId)}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="joao@email.com"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-white"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white read-only:cursor-not-allowed read-only:text-zinc-500 focus:outline-none focus:border-white"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">Senha Provisória</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-white"
-                />
-              </div>
+              {!editingStudentId && (
+                <div>
+                  <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">Senha Provisória</label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-white"
+                  />
+                </div>
+              )}
 
               {msg && <p className="text-xs font-medium text-emerald-400 text-center">{msg}</p>}
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={closeModal}
                   className="w-1/2 bg-zinc-900 text-zinc-400 font-bold p-3 rounded-xl text-xs uppercase"
                 >
                   Cancelar

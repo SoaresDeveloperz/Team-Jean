@@ -10,6 +10,7 @@ type Exercise = {
   id: string
   name: string
   muscle_group: string
+  image_url?: string | null
   video_url?: string | null
 }
 
@@ -165,6 +166,7 @@ export default function AdminExercisesPage() {
               className="space-y-3 rounded-2xl border border-zinc-900 bg-zinc-950 p-4"
             >
               <ExerciseMedia
+                imageUrl={ex.image_url}
                 videoUrl={ex.video_url}
                 muscleGroup={ex.muscle_group}
                 exerciseName={ex.name}

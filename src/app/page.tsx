@@ -44,33 +44,39 @@ export default function LoginPage() {
         </div>
 
         {/* Card de Formulário */}
-        <form onSubmit={handleLogin} className="w-full bg-zinc-950 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-2xl">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">E-mail</label>
+        <form onSubmit={handleLogin} className="w-full flex flex-col gap-5">
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-xs font-semibold text-zinc-300">E-mail</label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-zinc-500 absolute left-4 top-4" />
+              <Mail aria-hidden="true" className="w-4 h-4 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 transition-colors peer-focus:text-emerald-400" />
               <input
+                id="email"
                 type="email"
+                name="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-white transition-all placeholder:text-zinc-600 font-medium"
+                className="peer h-14 w-full rounded-xl border border-zinc-800 bg-zinc-950 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
               />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">Senha</label>
+          <div className="space-y-2">
+            <label htmlFor="password" className="text-xs font-semibold text-zinc-300">Senha</label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-zinc-500 absolute left-4 top-4" />
+              <Lock aria-hidden="true" className="w-4 h-4 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 transition-colors peer-focus:text-emerald-400" />
               <input
+                id="password"
                 type="password"
+                name="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-white transition-all placeholder:text-zinc-600 font-medium"
+                className="peer h-14 w-full rounded-xl border border-zinc-800 bg-zinc-950 pl-12 pr-4 text-base text-white outline-none transition placeholder:text-zinc-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
               />
             </div>
           </div>

@@ -49,8 +49,7 @@ export default function AdminExercisesPage() {
         if (!active) return
         if (data) setExercises(data as Exercise[])
         setLoading(false)
-      })
-      .catch(() => {
+      }, () => {
         if (active) setLoading(false)
       })
 

@@ -365,8 +365,6 @@ export default function WorkoutExecutionPage() {
 
             <ExerciseMedia
               muscleGroup={exItem.exercises?.muscle_group || 'Treino'}
-              exerciseName={exItem.exercises?.name || 'Exercício'}
-              imageUrl={exItem.exercises?.image_url}
             />
 
             {/* Observação do Treinador */}

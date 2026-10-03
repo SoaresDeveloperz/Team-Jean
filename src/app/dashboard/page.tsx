@@ -248,8 +248,6 @@ export default function DashboardPage() {
                     >
                       <ExerciseMedia
                         muscleGroup={item.exercises?.muscle_group ?? 'Treino'}
-                        exerciseName={item.exercises?.name ?? 'Exercício'}
-                        imageUrl={item.exercises?.image_url}
                       />
                       <div className="flex items-center gap-3 p-4">
                         <span className="text-xs font-black text-zinc-600">

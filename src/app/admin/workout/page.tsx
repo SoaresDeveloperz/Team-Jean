@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase/client'
+import { WeeklyTrainingInsights } from '../../../components/workout/WeeklyTrainingInsights'
 import {
   ClipboardList,
   Plus,
@@ -301,6 +302,8 @@ export default function AdminWorkoutsPage() {
 
   return (
     <div className="space-y-6">
+      <WeeklyTrainingInsights mode="admin" />
+
       {/* Topo */}
       <div className="flex items-center justify-between">
         <div>
@@ -419,6 +422,26 @@ export default function AdminWorkoutsPage() {
                   placeholder="Ex: Treino A - Peito, Ombro e Tríceps"
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-white"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="workout-day" className="text-xs font-semibold text-zinc-400 uppercase block mb-1">
+                  Dia da semana
+                </label>
+                <select
+                  id="workout-day"
+                  value={dayOfWeek}
+                  onChange={(event) => setDayOfWeek(Number(event.target.value))}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-white"
+                >
+                  <option value={1}>Segunda-feira</option>
+                  <option value={2}>Terça-feira</option>
+                  <option value={3}>Quarta-feira</option>
+                  <option value={4}>Quinta-feira</option>
+                  <option value={5}>Sexta-feira</option>
+                  <option value={6}>Sábado</option>
+                  <option value={7}>Domingo</option>
+                </select>
               </div>
 
               {/* Lista de Exercícios Adicionados ao Treino */}

@@ -7,6 +7,7 @@ import { Dumbbell, LayoutDashboard, Play } from 'lucide-react'
 import { createClient } from '../../lib/supabase/client'
 import { Logo } from '../../components/ui/logo'
 import { ExerciseMedia } from '../../components/workout/ExerciseMedia'
+import { WeeklyTrainingInsights } from '../../components/workout/WeeklyTrainingInsights'
 
 type AssignedExercise = {
   id: string
@@ -218,6 +219,8 @@ export default function DashboardPage() {
             </p>
           )}
         </section>
+
+        <WeeklyTrainingInsights mode={dashboard.isAdmin ? 'admin' : 'student'} />
 
           {dashboard.currentWorkout ? (
             <section className="space-y-4">

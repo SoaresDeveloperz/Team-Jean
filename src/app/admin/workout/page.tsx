@@ -1,47 +1,84 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import {
   ClipboardList,
   Plus,
   Trash2,
+  Pencil,
   Dumbbell,
   Loader2,
   Search,
   X,
   CheckCircle2,
-  Sparkles,
 } from 'lucide-react'
 
+type WorkoutRecord = {
+  id: string
+  name: string
+  student_id: string
+  day_of_week?: number | null
+  created_at?: string | null
+  profiles?: { full_name: string | null; email: string | null } | null
+}
+
+type StudentRecord = {
+  id: string
+  full_name: string | null
+  email: string | null
+}
+
+type ExerciseRecord = {
+  id: string
+  name: string
+  muscle_group: string | null
+}
+
+type WorkoutExerciseDraft = {
+  id?: string
+  exercise_id: string
+  name: string
+  muscle_group: string
+  sets_count: number | string
+  target_reps: string
+  target_rir: number | string
+  set_type: string
+  notes: string
+}
+
+type AssignedExerciseRecord = Omit<WorkoutExerciseDraft, 'name' | 'muscle_group'> & {
+  id: string
+  notes: string | null
+  exercises?: { name: string | null; muscle_group: string | null } | null
+}
+
 export default function AdminWorkoutsPage() {
-  const [workouts, setWorkouts] = useState<any[]>([])
-  const [students, setStudents] = useState<any[]>([])
-  const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
+  const [workouts, setWorkouts] = useState<WorkoutRecord[]>([])
+  const [students, setStudents] = useState<StudentRecord[]>([])
+  const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseRecord[]>([])
   const [loading, setLoading] = useState(true)
 
   // Estados do Modal Construtor de Treino
   const [showBuilder, setShowBuilder] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [existingExerciseIds, setExistingExerciseIds] = useState<string[]>([])
   const [selectedStudent, setSelectedStudent] = useState('')
   const [workoutName, setWorkoutName] = useState('')
   const [dayOfWeek, setDayOfWeek] = useState<number>(1)
   
   // Lista de exercícios adicionados ao novo treino
   // Array de: { exercise_id, name, muscle_group, sets_count, target_reps, target_rir, set_type, notes }
-  const [selectedExercises, setSelectedExercises] = useState<any[]>([])
+  const [selectedExercises, setSelectedExercises] = useState<WorkoutExerciseDraft[]>([])
   
   // Modal auxiliar para buscar e escolher exercício
   const [showExPicker, setShowExPicker] = useState(false)
   const [exSearch, setExSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     // 1. Busca treinos atribuídos
     const { data: w } = await supabase
@@ -55,14 +92,74 @@ export default function AdminWorkoutsPage() {
     // 3. Busca biblioteca de exercícios
     const { data: ex } = await supabase.from('exercises').select('*').order('name')
 
-    if (w) setWorkouts(w)
-    if (s) setStudents(s)
-    if (ex) setExerciseLibrary(ex)
+    if (w) setWorkouts(w as WorkoutRecord[])
+    if (s) setStudents(s as StudentRecord[])
+    if (ex) setExerciseLibrary(ex as ExerciseRecord[])
     setLoading(false)
+  }, [supabase])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadData()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [loadData])
+
+  const handleCreateNew = () => {
+    setEditingId(null)
+    setExistingExerciseIds([])
+    setSelectedStudent('')
+    setWorkoutName('')
+    setDayOfWeek(1)
+    setSelectedExercises([])
+    setShowBuilder(true)
+  }
+
+  const handleCloseBuilder = () => {
+    setShowBuilder(false)
+    setEditingId(null)
+    setExistingExerciseIds([])
+    setSelectedStudent('')
+    setWorkoutName('')
+    setDayOfWeek(1)
+    setSelectedExercises([])
+  }
+
+  const handleEditWorkout = async (workout: WorkoutRecord) => {
+    const { data: exercises, error } = await supabase
+      .from('assigned_workout_exercises')
+      .select('*, exercises(name, muscle_group)')
+      .eq('assigned_workout_id', workout.id)
+      .order('order', { ascending: true })
+
+    if (error) {
+      alert(`Não foi possível carregar os exercícios: ${error.message}`)
+      return
+    }
+
+    const assignedExercises = (exercises ?? []) as AssignedExerciseRecord[]
+    setEditingId(workout.id)
+    setExistingExerciseIds(assignedExercises.map((item) => item.id))
+    setSelectedStudent(workout.student_id)
+    setWorkoutName(workout.name)
+    setDayOfWeek(Number(workout.day_of_week) || 1)
+    setSelectedExercises(assignedExercises.map((item) => ({
+      id: item.id,
+      exercise_id: item.exercise_id,
+      name: item.exercises?.name ?? 'Exercício',
+      muscle_group: item.exercises?.muscle_group ?? '',
+      sets_count: item.sets_count ?? 3,
+      target_reps: item.target_reps ?? '8-12',
+      target_rir: item.target_rir ?? 2,
+      set_type: item.set_type ?? 'normal',
+      notes: item.notes ?? '',
+    })))
+    setShowBuilder(true)
   }
 
   // Adiciona um exercício à lista do treino sendo construído
-  const handleAddExerciseToWorkout = (ex: any) => {
+  const handleAddExerciseToWorkout = (ex: ExerciseRecord) => {
     const newItem = {
       exercise_id: ex.id,
       name: ex.name,
@@ -78,10 +175,14 @@ export default function AdminWorkoutsPage() {
   }
 
   // Atualiza campo de um exercício selecionado
-  const handleUpdateItem = (index: number, field: string, value: any) => {
-    const updated = [...selectedExercises]
-    updated[index] = { ...updated[index], [field]: value }
-    setSelectedExercises(updated)
+  const handleUpdateItem = (
+    index: number,
+    field: keyof WorkoutExerciseDraft,
+    value: string | number,
+  ) => {
+    setSelectedExercises((current) => current.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, [field]: value } : item
+    )))
   }
 
   // Remove um exercício da lista em construção
@@ -96,29 +197,41 @@ export default function AdminWorkoutsPage() {
 
     setSaving(true)
 
-    // 1. Cria o registro do Treino Atribuído
-    const { data: newWorkout, error: wError } = await supabase
-      .from('assigned_workouts')
-      .insert([
-        {
+    let workoutId = editingId
+
+    if (workoutId) {
+      const { error } = await supabase
+        .from('assigned_workouts')
+        .update({
           student_id: selectedStudent,
           name: workoutName,
           day_of_week: dayOfWeek,
-          is_current: true,
-        },
-      ])
-      .select()
-      .single()
+        })
+        .eq('id', workoutId)
 
-    if (wError || !newWorkout) {
-      alert('Erro ao criar treino: ' + wError?.message)
-      setSaving(false)
-      return
+      if (error) {
+        alert(`Erro ao atualizar treino: ${error.message}`)
+        setSaving(false)
+        return
+      }
+    } else {
+      const { data: newWorkout, error } = await supabase
+        .from('assigned_workouts')
+        .insert([{ student_id: selectedStudent, name: workoutName, day_of_week: dayOfWeek, is_current: true }])
+        .select()
+        .single()
+
+      if (error || !newWorkout) {
+        alert(`Erro ao criar treino: ${error?.message ?? 'treino não retornado'}`)
+        setSaving(false)
+        return
+      }
+      workoutId = newWorkout.id
     }
 
-    // 2. Cria os exercícios do treino (assigned_workout_exercises)
     const exerciseRows = selectedExercises.map((item, idx) => ({
-      assigned_workout_id: newWorkout.id,
+      ...(item.id ? { id: item.id } : {}),
+      assigned_workout_id: workoutId,
       exercise_id: item.exercise_id,
       order: idx + 1,
       sets_count: Number(item.sets_count) || 3,
@@ -130,29 +243,46 @@ export default function AdminWorkoutsPage() {
 
     const { error: exError } = await supabase
       .from('assigned_workout_exercises')
-      .insert(exerciseRows)
+      .upsert(exerciseRows)
 
-    if (!exError) {
-      // 3. Envia notificação para o aluno: "Treino Atualizado"
-      await supabase.from('notifications').insert([
-        {
-          recipient_id: selectedStudent,
-          type: 'workout_updated',
-          title: 'Treino Atualizado! 💪',
-          message: `O treinador Jean lançou o seu novo treino: ${workoutName}.`,
-        },
-      ])
-
-      // Reseta formulário
-      setWorkoutName('')
-      setSelectedStudent('')
-      setSelectedExercises([])
-      setShowBuilder(false)
-      loadData()
-    } else {
+    if (exError) {
       alert('Erro ao salvar exercícios: ' + exError.message)
+      setSaving(false)
+      return
     }
 
+    const removedExerciseIds = existingExerciseIds.filter(
+      (id) => !selectedExercises.some((item) => item.id === id),
+    )
+    let cleanupError: string | null = null
+    if (removedExerciseIds.length > 0) {
+      const { error } = await supabase
+        .from('assigned_workout_exercises')
+        .delete()
+        .eq('assigned_workout_id', workoutId)
+        .in('id', removedExerciseIds)
+      cleanupError = error?.message ?? null
+    }
+
+    await supabase.from('notifications').insert([
+      {
+        recipient_id: selectedStudent,
+        type: 'workout_updated',
+        title: 'Treino Atualizado! 💪',
+        message: `O treinador Jean ${editingId ? 'atualizou' : 'lançou'} o seu treino: ${workoutName}.`,
+      },
+    ])
+
+    setWorkoutName('')
+    setSelectedStudent('')
+    setSelectedExercises([])
+    setExistingExerciseIds([])
+    setEditingId(null)
+    setShowBuilder(false)
+    void loadData()
+    if (cleanupError) {
+      alert(`Treino salvo, mas não foi possível remover alguns exercícios: ${cleanupError}`)
+    }
     setSaving(false)
   }
 
@@ -166,7 +296,7 @@ export default function AdminWorkoutsPage() {
   const filteredLibrary = exerciseLibrary.filter(
     (ex) =>
       ex.name.toLowerCase().includes(exSearch.toLowerCase()) ||
-      ex.muscle_group.toLowerCase().includes(exSearch.toLowerCase())
+      ex.muscle_group?.toLowerCase().includes(exSearch.toLowerCase())
   )
 
   return (
@@ -178,7 +308,7 @@ export default function AdminWorkoutsPage() {
           <p className="text-xs text-zinc-500 font-medium">Monte e lance treinos</p>
         </div>
         <button
-          onClick={() => setShowBuilder(true)}
+          onClick={handleCreateNew}
           className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5 active:scale-95 transition-all shadow-lg"
         >
           <Plus className="w-4 h-4" /> Montar Treino
@@ -194,7 +324,7 @@ export default function AdminWorkoutsPage() {
         <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-2">
           <ClipboardList className="w-10 h-10 text-zinc-700 mx-auto" />
           <p className="text-sm font-semibold text-zinc-400">Nenhum treino montado ainda.</p>
-          <p className="text-xs text-zinc-600">Clique em "Montar Treino" para prescrever.</p>
+          <p className="text-xs text-zinc-600">Clique em &quot;Montar Treino&quot; para prescrever.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -213,6 +343,14 @@ export default function AdminWorkoutsPage() {
                 </p>
               </div>
 
+              <button
+                onClick={() => handleEditWorkout(w)}
+                className="p-2 text-emerald-400 hover:text-emerald-300 transition-colors"
+                title="Editar treino"
+                aria-label={`Editar treino ${w.name}`}
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => handleDeleteWorkout(w.id)}
                 className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
@@ -234,11 +372,13 @@ export default function AdminWorkoutsPage() {
             {/* Cabeçalho do Construtor */}
             <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
               <div>
-                <h2 className="text-lg font-black uppercase">Montar Novo Treino</h2>
+                <h2 className="text-lg font-black uppercase">
+                  {editingId ? 'Editar Treino' : 'Montar Novo Treino'}
+                </h2>
                 <p className="text-xs text-zinc-500">Prescreva séries, reps e técnicas</p>
               </div>
               <button
-                onClick={() => setShowBuilder(false)}
+                onClick={handleCloseBuilder}
                 className="p-2 text-zinc-400 hover:text-white"
               >
                 <X className="w-6 h-6" />
@@ -301,7 +441,7 @@ export default function AdminWorkoutsPage() {
                     <Dumbbell className="w-8 h-8 text-zinc-700 mx-auto" />
                     <p className="text-xs text-zinc-500">Nenhum exercício adicionado ainda.</p>
                     <p className="text-[10px] text-zinc-600">
-                      Clique em "+ Adicionar" para buscar na biblioteca.
+                      Clique em &quot;+ Adicionar&quot; para buscar na biblioteca.
                     </p>
                   </div>
                 ) : (
@@ -405,7 +545,7 @@ export default function AdminWorkoutsPage() {
                 {saving ? (
                   <Loader2 className="animate-spin w-5 h-5" />
                 ) : (
-                  <>
+                  <> 
                     <CheckCircle2 className="w-5 h-5" /> SALVAR E ENVIAR AO ALUNO
                   </>
                 )}

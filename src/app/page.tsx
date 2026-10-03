@@ -12,21 +12,60 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
 
-    if (error) {
-      setError('E-mail ou senha incorretos.')
-      setLoading(false)
-    } else {
-      router.push('/')
+      if (error) {
+        setError('E-mail ou senha incorretos.')
+        return
+      }
+
+      if (!data.session) {
+        setError('O Supabase não criou uma sessão para esta conta. Confira se o usuário está ativo.')
+        return
+      }
+
+      const user = data.session.user
+      let isAdmin = String(user.user_metadata?.role ?? '').trim().toLowerCase() === 'admin'
+
+      if (!isAdmin) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        isAdmin = String(profile?.role ?? '').trim().toLowerCase() === 'admin'
+      }
+
+      if (!isAdmin && user.email) {
+        const { data: profilesByEmail } = await supabase
+          .from('profiles')
+          .select('role')
+          .ilike('email', user.email.trim())
+          .limit(20)
+
+        isAdmin = profilesByEmail?.some(
+          (profile) => String(profile.role ?? '').trim().toLowerCase() === 'admin',
+        ) ?? false
+      }
+
+      router.replace(isAdmin ? '/admin/students' : '/dashboard')
       router.refresh()
+    } catch {
+      setError('Não foi possível conectar ao Supabase. Confira a conexão e tente novamente.')
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { WeeklyTrainingInsights } from '../../../components/workout/WeeklyTrainingInsights'
 import {
   ClipboardList,
   Plus,
@@ -13,283 +12,216 @@ import {
   Search,
   X,
   CheckCircle2,
+  Flame,
 } from 'lucide-react'
 
-type WorkoutRecord = {
-  id: string
-  name: string
-  student_id: string
-  day_of_week?: number | null
-  created_at?: string | null
-  profiles?: { full_name: string | null; email: string | null } | null
-}
-
-type StudentRecord = {
-  id: string
-  full_name: string | null
-  email: string | null
-}
-
-type ExerciseRecord = {
-  id: string
-  name: string
-  muscle_group: string | null
-}
-
-type WorkoutExerciseDraft = {
-  id?: string
-  exercise_id: string
-  name: string
-  muscle_group: string
-  sets_count: number | string
-  target_reps: string
-  target_rir: number | string
-  set_type: string
-  notes: string
-}
-
-type AssignedExerciseRecord = Omit<WorkoutExerciseDraft, 'name' | 'muscle_group'> & {
-  id: string
-  notes: string | null
-  exercises?: { name: string | null; muscle_group: string | null } | null
-}
-
 export default function AdminWorkoutsPage() {
-  const [workouts, setWorkouts] = useState<WorkoutRecord[]>([])
-  const [students, setStudents] = useState<StudentRecord[]>([])
-  const [exerciseLibrary, setExerciseLibrary] = useState<ExerciseRecord[]>([])
+  const [workouts, setWorkouts] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
+  const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Estados do Modal Construtor de Treino
+  // Modais e edição
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [existingExerciseIds, setExistingExerciseIds] = useState<string[]>([])
   const [selectedStudent, setSelectedStudent] = useState('')
   const [workoutName, setWorkoutName] = useState('')
-  const [dayOfWeek, setDayOfWeek] = useState<number>(1)
-  
-  // Lista de exercícios adicionados ao novo treino
-  // Array de: { exercise_id, name, muscle_group, sets_count, target_reps, target_rir, set_type, notes }
-  const [selectedExercises, setSelectedExercises] = useState<WorkoutExerciseDraft[]>([])
-  
-  // Modal auxiliar para buscar e escolher exercício
+  const [selectedExercises, setSelectedExercises] = useState<any[]>([])
+
   const [showExPicker, setShowExPicker] = useState(false)
   const [exSearch, setExSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const [supabase] = useState(() => createClient())
+  const supabase = createClient()
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
     setLoading(true)
-    // 1. Busca treinos atribuídos
     const { data: w } = await supabase
       .from('assigned_workouts')
       .select('*, profiles(full_name, email)')
       .order('created_at', { ascending: false })
+    const { data: s } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'student')
+    const { data: ex } = await supabase
+      .from('exercises')
+      .select('*')
+      .order('name')
 
-    // 2. Busca alunos
-    const { data: s } = await supabase.from('profiles').select('*').eq('role', 'student')
-
-    // 3. Busca biblioteca de exercícios
-    const { data: ex } = await supabase.from('exercises').select('*').order('name')
-
-    if (w) setWorkouts(w as WorkoutRecord[])
-    if (s) setStudents(s as StudentRecord[])
-    if (ex) setExerciseLibrary(ex as ExerciseRecord[])
+    if (w) setWorkouts(w)
+    if (s) setStudents(s)
+    if (ex) setExerciseLibrary(ex)
     setLoading(false)
-  }, [supabase])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData()
-    }, 0)
-
-    return () => window.clearTimeout(timer)
-  }, [loadData])
-
-  const handleCreateNew = () => {
-    setEditingId(null)
-    setExistingExerciseIds([])
-    setSelectedStudent('')
-    setWorkoutName('')
-    setDayOfWeek(1)
-    setSelectedExercises([])
-    setShowBuilder(true)
   }
 
-  const handleCloseBuilder = () => {
-    setShowBuilder(false)
-    setEditingId(null)
-    setExistingExerciseIds([])
-    setSelectedStudent('')
-    setWorkoutName('')
-    setDayOfWeek(1)
-    setSelectedExercises([])
-  }
+  // ABRIR MODAL PARA EDITAR
+  const handleEditWorkout = async (workout: any) => {
+    setEditingId(workout.id)
+    setSelectedStudent(workout.student_id)
+    setWorkoutName(workout.name)
 
-  const handleEditWorkout = async (workout: WorkoutRecord) => {
-    const { data: exercises, error } = await supabase
+    const { data: ex } = await supabase
       .from('assigned_workout_exercises')
-      .select('*, exercises(name, muscle_group)')
+      .select('*, exercises(name, muscle_group, secondary_muscle)')
       .eq('assigned_workout_id', workout.id)
       .order('order', { ascending: true })
 
-    if (error) {
-      alert(`Não foi possível carregar os exercícios: ${error.message}`)
-      return
+    if (ex) {
+      const mapped = ex.map((item) => ({
+        exercise_id: item.exercise_id,
+        name: item.exercises?.name,
+        muscle_group: item.exercises?.muscle_group,
+        secondary_muscle: item.exercises?.secondary_muscle,
+        notes: item.notes || '',
+        // Carrega as séries individuais salvas ou gera padrão
+        planned_sets: item.planned_sets || [
+          { type: 'warmup', reps: '15-20', rir: 4 },
+          { type: 'feeder', reps: '10-12', rir: 2 },
+          { type: 'working', reps: '6-8', rir: 0 },
+        ],
+      }))
+      setSelectedExercises(mapped)
     }
-
-    const assignedExercises = (exercises ?? []) as AssignedExerciseRecord[]
-    setEditingId(workout.id)
-    setExistingExerciseIds(assignedExercises.map((item) => item.id))
-    setSelectedStudent(workout.student_id)
-    setWorkoutName(workout.name)
-    setDayOfWeek(Number(workout.day_of_week) || 1)
-    setSelectedExercises(assignedExercises.map((item) => ({
-      id: item.id,
-      exercise_id: item.exercise_id,
-      name: item.exercises?.name ?? 'Exercício',
-      muscle_group: item.exercises?.muscle_group ?? '',
-      sets_count: item.sets_count ?? 3,
-      target_reps: item.target_reps ?? '8-12',
-      target_rir: item.target_rir ?? 2,
-      set_type: item.set_type ?? 'normal',
-      notes: item.notes ?? '',
-    })))
     setShowBuilder(true)
   }
 
-  // Adiciona um exercício à lista do treino sendo construído
-  const handleAddExerciseToWorkout = (ex: ExerciseRecord) => {
-    const newItem = {
-      exercise_id: ex.id,
-      name: ex.name,
-      muscle_group: ex.muscle_group,
-      sets_count: 3,
-      target_reps: '8-12',
-      target_rir: 2,
-      set_type: 'normal',
-      notes: '',
-    }
-    setSelectedExercises([...selectedExercises, newItem])
+  const handleCreateNew = () => {
+    setEditingId(null)
+    setSelectedStudent('')
+    setWorkoutName('')
+    setSelectedExercises([])
+    setShowBuilder(true)
+  }
+
+  // ADICIONAR EXERCÍCIO COM SÉRIES PADRÃO
+  const handleAddExerciseToWorkout = (ex: any) => {
+    setSelectedExercises([
+      ...selectedExercises,
+      {
+        exercise_id: ex.id,
+        name: ex.name,
+        muscle_group: ex.muscle_group,
+        secondary_muscle: ex.secondary_muscle,
+        notes: '',
+        planned_sets: [
+          { type: 'warmup', reps: '15-20', rir: 4 },
+          { type: 'feeder', reps: '10-12', rir: 2 },
+          { type: 'working', reps: '8-10', rir: 0 },
+        ],
+      },
+    ])
     setShowExPicker(false)
   }
 
-  // Atualiza campo de um exercício selecionado
-  const handleUpdateItem = (
-    index: number,
-    field: keyof WorkoutExerciseDraft,
-    value: string | number,
-  ) => {
-    setSelectedExercises((current) => current.map((item, itemIndex) => (
-      itemIndex === index ? { ...item, [field]: value } : item
-    )))
+  // ADICIONAR UMA NOVA SÉRIE A UM EXERCÍCIO ESPECÍFICO
+  const handleAddSetToExercise = (exIdx: number) => {
+    const updated = [...selectedExercises]
+    const currentSets = updated[exIdx].planned_sets || []
+    updated[exIdx].planned_sets = [
+      ...currentSets,
+      { type: 'working', reps: '8-12', rir: 1 },
+    ]
+    setSelectedExercises(updated)
   }
 
-  // Remove um exercício da lista em construção
-  const handleRemoveItem = (index: number) => {
+  // REMOVER UMA SÉRIE ESPECÍFICA DE UM EXERCÍCIO
+  const handleRemoveSetFromExercise = (exIdx: number, setIdx: number) => {
+    const updated = [...selectedExercises]
+    updated[exIdx].planned_sets = updated[exIdx].planned_sets.filter(
+      (_: any, i: number) => i !== setIdx
+    )
+    setSelectedExercises(updated)
+  }
+
+  // ATUALIZAR UMA SÉRIE INDIVIDUAL (TIPO, REPS OU RIR)
+  const handleUpdateIndividualSet = (
+    exIdx: number,
+    setIdx: number,
+    field: string,
+    value: any
+  ) => {
+    const updated = [...selectedExercises]
+    updated[exIdx].planned_sets[setIdx][field] = value
+    setSelectedExercises(updated)
+  }
+
+  const handleRemoveExercise = (index: number) => {
     setSelectedExercises(selectedExercises.filter((_, i) => i !== index))
   }
 
-  // Salva o treino completo no banco
+  // SALVAR TREINO NO SUPABASE
   const handleSaveWorkout = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedStudent || !workoutName || selectedExercises.length === 0) return
-
+    if (!selectedStudent || !workoutName || selectedExercises.length === 0)
+      return
     setSaving(true)
 
-    let workoutId = editingId
+    let currentWorkoutId = editingId
 
-    if (workoutId) {
-      const { error } = await supabase
+    if (currentWorkoutId) {
+      await supabase
         .from('assigned_workouts')
-        .update({
-          student_id: selectedStudent,
-          name: workoutName,
-          day_of_week: dayOfWeek,
-        })
-        .eq('id', workoutId)
-
-      if (error) {
-        alert(`Erro ao atualizar treino: ${error.message}`)
-        setSaving(false)
-        return
-      }
+        .update({ name: workoutName, student_id: selectedStudent })
+        .eq('id', currentWorkoutId)
+      await supabase
+        .from('assigned_workout_exercises')
+        .delete()
+        .eq('assigned_workout_id', currentWorkoutId)
     } else {
-      const { data: newWorkout, error } = await supabase
+      const { data: newW } = await supabase
         .from('assigned_workouts')
-        .insert([{ student_id: selectedStudent, name: workoutName, day_of_week: dayOfWeek, is_current: true }])
+        .insert([
+          {
+            student_id: selectedStudent,
+            name: workoutName,
+            is_current: true,
+          },
+        ])
         .select()
         .single()
 
-      if (error || !newWorkout) {
-        alert(`Erro ao criar treino: ${error?.message ?? 'treino não retornado'}`)
-        setSaving(false)
-        return
+      if (newW) currentWorkoutId = newW.id
+    }
+
+    if (currentWorkoutId) {
+      const rows = selectedExercises.map((item, idx) => ({
+        assigned_workout_id: currentWorkoutId,
+        exercise_id: item.exercise_id,
+        order: idx + 1,
+        sets_count: item.planned_sets.length,
+        target_reps: item.planned_sets[0]?.reps || '8-12',
+        target_rir: item.planned_sets[0]?.rir || 2,
+        set_type: item.planned_sets[0]?.type || 'working',
+        planned_sets: item.planned_sets, // Salva o array JSONB com cada série
+        notes: item.notes || null,
+      }))
+
+      await supabase.from('assigned_workout_exercises').insert(rows)
+
+      if (!editingId) {
+        await supabase.from('notifications').insert([
+          {
+            recipient_id: selectedStudent,
+            type: 'workout_updated',
+            title: 'Novo Treino Prescrito! 💪',
+            message: `O treinador Jean lançou seu novo treino: ${workoutName}.`,
+          },
+        ])
       }
-      workoutId = newWorkout.id
     }
 
-    const exerciseRows = selectedExercises.map((item, idx) => ({
-      ...(item.id ? { id: item.id } : {}),
-      assigned_workout_id: workoutId,
-      exercise_id: item.exercise_id,
-      order: idx + 1,
-      sets_count: Number(item.sets_count) || 3,
-      target_reps: item.target_reps || '8-12',
-      target_rir: item.target_rir ? Number(item.target_rir) : null,
-      set_type: item.set_type || 'normal',
-      notes: item.notes || null,
-    }))
-
-    const { error: exError } = await supabase
-      .from('assigned_workout_exercises')
-      .upsert(exerciseRows)
-
-    if (exError) {
-      alert('Erro ao salvar exercícios: ' + exError.message)
-      setSaving(false)
-      return
-    }
-
-    const removedExerciseIds = existingExerciseIds.filter(
-      (id) => !selectedExercises.some((item) => item.id === id),
-    )
-    let cleanupError: string | null = null
-    if (removedExerciseIds.length > 0) {
-      const { error } = await supabase
-        .from('assigned_workout_exercises')
-        .delete()
-        .eq('assigned_workout_id', workoutId)
-        .in('id', removedExerciseIds)
-      cleanupError = error?.message ?? null
-    }
-
-    await supabase.from('notifications').insert([
-      {
-        recipient_id: selectedStudent,
-        type: 'workout_updated',
-        title: 'Treino Atualizado! 💪',
-        message: `O treinador Jean ${editingId ? 'atualizou' : 'lançou'} o seu treino: ${workoutName}.`,
-      },
-    ])
-
-    setWorkoutName('')
-    setSelectedStudent('')
-    setSelectedExercises([])
-    setExistingExerciseIds([])
-    setEditingId(null)
     setShowBuilder(false)
-    void loadData()
-    if (cleanupError) {
-      alert(`Treino salvo, mas não foi possível remover alguns exercícios: ${cleanupError}`)
-    }
+    loadData()
     setSaving(false)
   }
 
-  // Deletar um treino
   const handleDeleteWorkout = async (workoutId: string) => {
-    if (!confirm('Deseja realmente apagar este treino?')) return
+    if (!confirm('Deseja apagar este treino?')) return
     await supabase.from('assigned_workouts').delete().eq('id', workoutId)
     loadData()
   }
@@ -297,28 +229,49 @@ export default function AdminWorkoutsPage() {
   const filteredLibrary = exerciseLibrary.filter(
     (ex) =>
       ex.name.toLowerCase().includes(exSearch.toLowerCase()) ||
-      ex.muscle_group?.toLowerCase().includes(exSearch.toLowerCase())
+      ex.muscle_group.toLowerCase().includes(exSearch.toLowerCase())
   )
 
-  return (
-    <div className="space-y-6">
-      <WeeklyTrainingInsights mode="admin" />
+  // Rótulos e cores dos Tipos de Série
+  const getSetTypeBadge = (type: string) => {
+    switch (type) {
+      case 'warmup':
+        return { label: 'AQUECIMENTO', color: 'text-amber-400 bg-amber-950/50 border-amber-800/40' }
+      case 'feeder':
+        return { label: 'FEEDER SET', color: 'text-sky-400 bg-sky-950/50 border-sky-800/40' }
+      case 'top':
+        return { label: 'TOP SET', color: 'text-rose-400 bg-rose-950/50 border-rose-800/40' }
+      case 'backoff':
+        return { label: 'BACK-OFF SET', color: 'text-purple-400 bg-purple-950/50 border-purple-800/40' }
+      case 'cluster':
+        return { label: 'CLUSTER SET', color: 'text-indigo-400 bg-indigo-950/50 border-indigo-800/40' }
+      case 'myo_reps':
+        return { label: 'MYO REPS', color: 'text-emerald-400 bg-emerald-950/50 border-emerald-800/40' }
+      default:
+        return { label: 'WORKING SET', color: 'text-zinc-300 bg-zinc-800 border-zinc-700' }
+    }
+  }
 
-      {/* Topo */}
+  return (
+    <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wide">Treinos dos Alunos</h1>
-          <p className="text-xs text-zinc-500 font-medium">Monte e lance treinos</p>
+          <h1 className="text-xl font-black uppercase tracking-wide">
+            Treinos dos Alunos
+          </h1>
+          <p className="text-xs text-zinc-500 font-medium">
+            Monte e prescreva séries individuais
+          </p>
         </div>
         <button
           onClick={handleCreateNew}
-          className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5 active:scale-95 transition-all shadow-lg"
+          className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
         >
           <Plus className="w-4 h-4" /> Montar Treino
         </button>
       </div>
 
-      {/* Lista de Treinos Criados */}
+      {/* Lista de Treinos */}
       {loading ? (
         <div className="flex justify-center py-12 text-zinc-500">
           <Loader2 className="animate-spin w-8 h-8" />
@@ -326,8 +279,9 @@ export default function AdminWorkoutsPage() {
       ) : workouts.length === 0 ? (
         <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-2">
           <ClipboardList className="w-10 h-10 text-zinc-700 mx-auto" />
-          <p className="text-sm font-semibold text-zinc-400">Nenhum treino montado ainda.</p>
-          <p className="text-xs text-zinc-600">Clique em &quot;Montar Treino&quot; para prescrever.</p>
+          <p className="text-sm font-semibold text-zinc-400">
+            Nenhum treino montado ainda.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -340,65 +294,63 @@ export default function AdminWorkoutsPage() {
                 <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-md">
                   Aluno: {w.profiles?.full_name || w.profiles?.email}
                 </span>
-                <h3 className="font-extrabold text-base text-white">{w.name}</h3>
-                <p className="text-[10px] text-zinc-500">
-                  Criado em {new Date(w.created_at).toLocaleDateString('pt-BR')}
-                </p>
+                <h3 className="font-extrabold text-base text-white">
+                  {w.name}
+                </h3>
               </div>
 
-              <button
-                onClick={() => handleEditWorkout(w)}
-                className="p-2 text-emerald-400 hover:text-emerald-300 transition-colors"
-                title="Editar treino"
-                aria-label={`Editar treino ${w.name}`}
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleDeleteWorkout(w.id)}
-                className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
-                title="Excluir"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleEditWorkout(w)}
+                  className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white hover:bg-zinc-800 transition-all"
+                  title="Editar Treino"
+                >
+                  <Pencil className="w-4 h-4 text-emerald-400" />
+                </button>
+                <button
+                  onClick={() => handleDeleteWorkout(w.id)}
+                  className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 hover:text-red-400 transition-all"
+                  title="Excluir Treino"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL CONSTRUTOR DE TREINO COMPLETO (MOBILE FIRST)         */}
-      {/* ========================================================= */}
+      {/* MODAL CONSTRUTOR COM SÉRIES INDIVIDUAIS */}
       {showBuilder && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex flex-col justify-between p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-4 overflow-y-auto">
           <div className="max-w-md mx-auto w-full space-y-6 pb-20">
-            {/* Cabeçalho do Construtor */}
             <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
               <div>
                 <h2 className="text-lg font-black uppercase">
-                  {editingId ? 'Editar Treino' : 'Montar Novo Treino'}
+                  {editingId ? '✏️ Editar Prescrição' : '⚡ Prescrever Treino'}
                 </h2>
-                <p className="text-xs text-zinc-500">Prescreva séries, reps e técnicas</p>
+                <p className="text-xs text-zinc-500">
+                  Configure cada série individualmente
+                </p>
               </div>
               <button
-                onClick={handleCloseBuilder}
+                onClick={() => setShowBuilder(false)}
                 className="p-2 text-zinc-400 hover:text-white"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveWorkout} className="space-y-4">
-              {/* Seleção de Aluno */}
+            <form onSubmit={handleSaveWorkout} className="space-y-5">
               <div>
                 <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">
-                  Selecione o Aluno
+                  Atleta / Aluno
                 </label>
                 <select
                   required
                   value={selectedStudent}
                   onChange={(e) => setSelectedStudent(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-white"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:border-white"
                 >
                   <option value="">Selecione um aluno...</option>
                   {students.map((s) => (
@@ -409,7 +361,6 @@ export default function AdminWorkoutsPage() {
                 </select>
               </div>
 
-              {/* Nome do Treino */}
               <div>
                 <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">
                   Nome do Treino
@@ -419,207 +370,142 @@ export default function AdminWorkoutsPage() {
                   required
                   value={workoutName}
                   onChange={(e) => setWorkoutName(e.target.value)}
-                  placeholder="Ex: Treino A - Peito, Ombro e Tríceps"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-white"
+                  placeholder="Ex: Treino A - Peitoral e Deltoides"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:border-white"
                 />
               </div>
 
-              <div>
-                <label htmlFor="workout-day" className="text-xs font-semibold text-zinc-400 uppercase block mb-1">
-                  Dia da semana
-                </label>
-                <select
-                  id="workout-day"
-                  value={dayOfWeek}
-                  onChange={(event) => setDayOfWeek(Number(event.target.value))}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-white"
-                >
-                  <option value={1}>Segunda-feira</option>
-                  <option value={2}>Terça-feira</option>
-                  <option value={3}>Quarta-feira</option>
-                  <option value={4}>Quinta-feira</option>
-                  <option value={5}>Sexta-feira</option>
-                  <option value={6}>Sábado</option>
-                  <option value={7}>Domingo</option>
-                </select>
-              </div>
-
-              {/* Lista de Exercícios Adicionados ao Treino */}
-              <div className="space-y-3 pt-2">
+              {/* LISTA DE EXERCÍCIOS */}
+              <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-extrabold uppercase text-zinc-300 tracking-wider">
-                    Exercícios do Treino ({selectedExercises.length})
+                  <label className="text-xs font-extrabold uppercase text-zinc-300">
+                    Exercícios Prescritos ({selectedExercises.length})
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowExPicker(true)}
-                    className="bg-white text-black font-bold text-xs uppercase px-3 py-1.5 rounded-lg flex items-center gap-1"
+                    className="bg-white text-black font-bold text-xs uppercase px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Adicionar
+                    <Plus className="w-3.5 h-3.5" /> Adicionar Exercício
                   </button>
                 </div>
 
-                {selectedExercises.length === 0 ? (
-                  <div className="bg-zinc-900/50 border border-dashed border-zinc-800 rounded-2xl p-6 text-center space-y-2">
-                    <Dumbbell className="w-8 h-8 text-zinc-700 mx-auto" />
-                    <p className="text-xs text-zinc-500">Nenhum exercício adicionado ainda.</p>
-                    <p className="text-[10px] text-zinc-600">
-                      Clique em &quot;+ Adicionar&quot; para buscar na biblioteca.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {selectedExercises.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3 relative"
-                      >
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                          <div>
-                            <span className="text-[10px] font-black text-zinc-500">
-                              #{idx + 1}
-                            </span>
-                            <h4 className="font-extrabold text-sm text-white ml-2 inline">
-                              {item.name}
-                            </h4>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            className="text-zinc-500 hover:text-red-400 p-1"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {/* Campos de Configuração do Exercício */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="text-[9px] font-bold text-zinc-500 uppercase block mb-1">
-                              Séries
-                            </label>
-                            <input
-                              type="number"
-                              value={item.sets_count}
-                              onChange={(e) =>
-                                handleUpdateItem(idx, 'sets_count', e.target.value)
-                              }
-                              className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-center text-xs font-bold text-white"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[9px] font-bold text-zinc-500 uppercase block mb-1">
-                              Reps Alvo
-                            </label>
-                            <input
-                              type="text"
-                              value={item.target_reps}
-                              onChange={(e) =>
-                                handleUpdateItem(idx, 'target_reps', e.target.value)
-                              }
-                              placeholder="8-12"
-                              className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-center text-xs font-bold text-white"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[9px] font-bold text-zinc-500 uppercase block mb-1">
-                              Técnica
-                            </label>
-                            <select
-                              value={item.set_type}
-                              onChange={(e) =>
-                                handleUpdateItem(idx, 'set_type', e.target.value)
-                              }
-                              className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-center text-[10px] font-bold text-white"
-                            >
-                              <option value="normal">Normal</option>
-                              <option value="cluster">Cluster Set</option>
-                              <option value="myo_reps">Myo Reps</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Observação / Instrução do Treinador */}
+                <div className="space-y-6">
+                  {selectedExercises.map((item, exIdx) => (
+                    <div
+                      key={exIdx}
+                      className="bg-zinc-950 border border-zinc-800 rounded-3xl p-4 space-y-4 shadow-xl"
+                    >
+                      {/* Cabeçalho do Exercício */}
+                      <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
                         <div>
-                          <input
-                            type="text"
-                            value={item.notes}
-                            onChange={(e) =>
-                              handleUpdateItem(idx, 'notes', e.target.value)
-                            }
-                            placeholder="Obs do treinador (ex: Pausa de 2s no pico de contração)"
-                            className="w-full bg-black/50 border border-zinc-800/80 rounded-lg p-2.5 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none"
-                          />
+                          <h4 className="font-extrabold text-base text-white">
+                            #{exIdx + 1} {item.name}
+                          </h4>
+                          <p className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                            <span className="text-emerald-400 font-bold">
+                              Alvo:
+                            </span>{' '}
+                            {item.muscle_group}
+                          </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExercise(exIdx)}
+                          className="text-zinc-500 hover:text-red-400 p-1"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              {/* Botão de Salvar Treino Completo */}
-              <button
-                type="submit"
-                disabled={saving || selectedExercises.length === 0}
-                className="w-full bg-white text-black font-extrabold text-sm uppercase py-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl disabled:opacity-50 mt-6"
-              >
-                {saving ? (
-                  <Loader2 className="animate-spin w-5 h-5" />
-                ) : (
-                  <> 
-                    <CheckCircle2 className="w-5 h-5" /> SALVAR E ENVIAR AO ALUNO
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+                      {/* TABELA DE SÉRIES INDIVIDUAIS DO EXERCÍCIO */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                            SÉRIES INDIVIDUAIS ({item.planned_sets.length})
+                          </span>
+                        </div>
 
-      {/* MODAL AUXILIAR: BUSCAR E SELECIONAR EXERCÍCIO DA BIBLIOTECA */}
-      {showExPicker && (
-        <div className="fixed inset-0 bg-black/95 z-50 p-4 flex flex-col justify-between">
-          <div className="max-w-md mx-auto w-full space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black uppercase text-sm">Selecionar Exercício</h3>
-              <button onClick={() => setShowExPicker(false)} className="p-2 text-zinc-400">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+                        {item.planned_sets.map((s: any, setIdx: number) => {
+                          const badge = getSetTypeBadge(s.type)
+                          return (
+                            <div
+                              key={setIdx}
+                              className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-zinc-400">
+                                    0{setIdx + 1}
+                                  </span>
+                                  <span
+                                    className={`text-[9px] font-black uppercase border px-2 py-0.5 rounded-md ${badge.color}`}
+                                  >
+                                    {badge.label}
+                                  </span>
+                                </div>
+                                {item.planned_sets.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveSetFromExercise(
+                                        exIdx,
+                                        setIdx
+                                      )
+                                    }
+                                    className="text-zinc-600 hover:text-red-400 p-1"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
 
-            <div className="relative">
-              <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
-              <input
-                type="text"
-                value={exSearch}
-                onChange={(e) => setExSearch(e.target.value)}
-                placeholder="Buscar por nome ou músculo..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none"
-              />
-            </div>
+                              {/* CONFIGURAÇÃO DA SÉRIE INDIVIDUAL */}
+                              <div className="grid grid-cols-3 gap-2 pt-1">
+                                <div>
+                                  <label className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">
+                                    Tipo
+                                  </label>
+                                  <select
+                                    value={s.type}
+                                    onChange={(e) =>
+                                      handleUpdateIndividualSet(
+                                        exIdx,
+                                        setIdx,
+                                        'type',
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-[10px] font-bold text-white focus:outline-none"
+                                  >
+                                    <option value="warmup">Aquecimento</option>
+                                    <option value="feeder">Feeder Set</option>
+                                    <option value="working">
+                                      Working Set (Normal)
+                                    </option>
+                                    <option value="top">Top Set</option>
+                                    <option value="backoff">
+                                      Back-off Set
+                                    </option>
+                                    <option value="cluster">Cluster Set</option>
+                                    <option value="myo_reps">Myo Reps</option>
+                                  </select>
+                                </div>
 
-            <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
-              {filteredLibrary.map((ex) => (
-                <div
-                  key={ex.id}
-                  onClick={() => handleAddExerciseToWorkout(ex)}
-                  className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-center justify-between active:scale-98 transition-all cursor-pointer hover:border-zinc-700"
-                >
-                  <div>
-                    <h4 className="font-bold text-xs text-white">{ex.name}</h4>
-                    <span className="text-[9px] font-extrabold text-zinc-500 uppercase">
-                      {ex.muscle_group}
-                    </span>
-                  </div>
-                  <Plus className="w-4 h-4 text-zinc-400" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+                                <div>
+                                  <label className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">
+                                    Reps Alvo
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={s.reps}
+                                    onChange={(e) =>
+                                      handleUpdateIndividualSet(
+                                        exIdx,
+                                        setIdx,
+                                        'reps',
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Ex: 8-10"
+  

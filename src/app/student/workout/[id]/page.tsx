@@ -1,192 +1,88 @@
 'use client'
 
-import { useCallback, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '../../../../lib/supabase/client'
-import { Check, ArrowLeft, Loader2, Info, AlertCircle } from 'lucide-react'
-import { ExerciseMedia } from '../../../../components/workout/ExerciseMedia'
-
-type Workout = {
-  id: string
-  name: string
-}
-
-type ExerciseDetails = {
-  name?: string | null
-  muscle_group?: string | null
-  image_url?: string | null
-  video_url?: string | null
-}
-
-type AssignedExercise = {
-  id: string
-  exercise_id: string
-  sets_count?: number | null
-  target_reps?: string | number | null
-  target_rir?: string | number | null
-  set_type?: string | null
-  notes?: string | null
-  exercises?: ExerciseDetails | null
-}
-
-type WorkoutSession = {
-  id: string
-}
-
-type WorkoutSet = {
-  set_number: number
-  weight_kg: string
-  reps: string
-  rir: string | number
-  set_type: string
-  completed: boolean
-}
-
-type LastRecord = {
-  weight_kg: number | null
-  reps: number | null
-}
+import { Check, ArrowLeft, Loader2, Info } from 'lucide-react'
 
 export default function WorkoutExecutionPage() {
   const { id } = useParams()
   const router = useRouter()
-  const [supabase] = useState(() => createClient())
+  const supabase = createClient()
 
-  const [workout, setWorkout] = useState<Workout | null>(null)
-  const [assignedExercises, setAssignedExercises] = useState<AssignedExercise[]>([])
-  const [session, setSession] = useState<WorkoutSession | null>(null)
+  const [workout, setWorkout] = useState<any>(null)
+  const [assignedExercises, setAssignedExercises] = useState<any[]>([])
+  const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
 
-  // Armazena os registros de cada série digitada na tela
-  // Estrutura: { [assigned_ex_id]: [ { set_num: 1, weight: 80, reps: 10, rir: 2, completed: true } ] }
-  const [setsData, setSetsData] = useState<Record<string, WorkoutSet[]>>({})
-  const [lastRecords, setLastRecords] = useState<Record<string, LastRecord>>({})
-
-  // Modal de Finalização
+  const [setsData, setSetsData] = useState<Record<string, any[]>>({})
+  const [lastRecords, setLastRecords] = useState<Record<string, any>>({})
   const [showFinishModal, setShowModal] = useState(false)
   const [sessionRpe, setSessionRpe] = useState(8)
   const [finishing, setFinishing] = useState(false)
 
-  const initWorkoutSession = useCallback(async () => {
-    setLoading(true)
-    setLoadError('')
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoadError('Faça login para acessar este treino.')
-      setLoading(false)
-      return
-    }
+  useEffect(() => {
+    initWorkoutSession()
+  }, [])
 
-    // 1. Carrega dados do treino
-    const { data: w, error: workoutError } = await supabase
+  const initWorkoutSession = async () => {
+    setLoading(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: w } = await supabase
       .from('assigned_workouts')
       .select('*')
       .eq('id', id)
-      .eq('student_id', user.id)
       .single()
-
-    if (workoutError || !w) {
-      setLoadError('Este treino não está disponível para a sua conta.')
-      setLoading(false)
-      return
-    }
-
-    const { data: ex, error: exercisesError } = await supabase
+    const { data: ex } = await supabase
       .from('assigned_workout_exercises')
-      .select('*, exercises(*)')
+      .select('*, exercises(name, muscle_group, video_url)')
       .eq('assigned_workout_id', id)
       .order('order', { ascending: true })
 
-    if (exercisesError) {
-      setLoadError(`Não foi possível carregar os exercícios: ${exercisesError.message}`)
-      setLoading(false)
-      return
-    }
+    setWorkout(w)
+    setAssignedExercises(ex || [])
 
-    const assignedExerciseRows = (ex ?? []) as AssignedExercise[]
-    setWorkout(w as Workout)
-    setAssignedExercises(assignedExerciseRows)
-
-    // 2. Reutiliza a sessão em andamento para que atualizar a página não
-    // descarte o progresso nem crie uma sessão duplicada.
-    const { data: existingSession } = await supabase
+    const { data: newSession } = await supabase
       .from('workout_sessions')
-      .select('*')
-      .eq('assigned_workout_id', id)
-      .eq('student_id', user.id)
-      .eq('status', 'in_progress')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .insert([
+        {
+          assigned_workout_id: id,
+          student_id: user.id,
+          status: 'in_progress',
+        },
+      ])
+      .select()
+      .single()
+    setSession(newSession)
 
-    let activeSession = existingSession as WorkoutSession | null
-    if (!activeSession) {
-      const { data: newSession, error: sessionError } = await supabase
-        .from('workout_sessions')
-        .insert([
-          {
-            assigned_workout_id: id,
-            student_id: user.id,
-            status: 'in_progress',
-          },
-        ])
-        .select()
-        .single()
+    const initialSets: Record<string, any[]> = {}
+    const pastRecords: Record<string, any> = {}
 
-      if (sessionError || !newSession) {
-        setLoadError(`Não foi possível iniciar a sessão: ${sessionError?.message ?? 'erro desconhecido'}`)
-        setLoading(false)
-        return
-      }
-      activeSession = newSession as WorkoutSession
-    }
+    if (ex) {
+      for (const item of ex) {
+        // Se houver séries planejadas individuais, usa elas! Se não, fallback
+        const planned = item.planned_sets || []
+        const setsCount = planned.length > 0 ? planned.length : item.sets_count
 
-    setSession(activeSession)
-
-    // 3. Carrega as séries salvas na sessão atual.
-    const { data: savedSets } = await supabase
-      .from('session_sets')
-      .select('*')
-      .eq('session_id', activeSession.id)
-
-    const savedByKey = new Map<string, {
-      weight_kg: number | null
-      reps: number | null
-      rir: number | null
-      set_type: string | null
-      completed: boolean
-    }>()
-    for (const savedSet of savedSets ?? []) {
-      savedByKey.set(
-        `${savedSet.assigned_exercise_id}:${savedSet.set_number}`,
-        savedSet,
-      )
-    }
-
-    // 4. Monta a estrutura de séries e carrega o último registro histórico.
-    const initialSets: Record<string, WorkoutSet[]> = {}
-    const pastRecords: Record<string, LastRecord> = {}
-
-    if (assignedExerciseRows.length > 0) {
-      for (const item of assignedExerciseRows) {
-        // Inicializa as séries do treino atual
         const setsArray = []
-        const setCount = Math.max(1, Number(item.sets_count) || 1)
-        for (let i = 1; i <= setCount; i++) {
-          const savedSet = savedByKey.get(`${item.id}:${i}`)
+        for (let i = 0; i < setsCount; i++) {
+          const currentPlan = planned[i] || {}
           setsArray.push({
-            set_number: i,
-            weight_kg: savedSet?.weight_kg == null ? '' : String(savedSet.weight_kg),
-            reps: savedSet?.reps == null ? '' : String(savedSet.reps),
-            rir: savedSet?.rir == null ? item.target_rir || '' : String(savedSet.rir),
-            set_type: savedSet?.set_type || item.set_type || 'normal',
-            completed: Boolean(savedSet?.completed),
+            set_number: i + 1,
+            weight_kg: '',
+            reps: '',
+            target_reps: currentPlan.reps || item.target_reps || '8-12',
+            rir: currentPlan.rir !== undefined ? currentPlan.rir : item.target_rir,
+            type: currentPlan.type || item.set_type || 'working',
+            completed: false,
           })
         }
         initialSets[item.id] = setsArray
 
-        // Busca o último registro de série desse exercício para o aluno
         const { data: pastSet } = await supabase
           .from('session_sets')
           .select('weight_kg, reps')
@@ -195,32 +91,19 @@ export default function WorkoutExecutionPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .single()
-
-        if (pastSet) {
-          pastRecords[item.id] = pastSet
-        }
+        if (pastSet) pastRecords[item.id] = pastSet
       }
     }
-
     setSetsData(initialSets)
     setLastRecords(pastRecords)
     setLoading(false)
-  }, [id, supabase])
+  }
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void initWorkoutSession()
-    }, 0)
-
-    return () => window.clearTimeout(timer)
-  }, [initWorkoutSession])
-
-  // Atualiza um campo de uma série específica na memória e no banco
   const handleUpdateSet = (
     assignedExId: string,
     setIdx: number,
-    field: keyof WorkoutSet,
-    value: string | number | boolean,
+    field: string,
+    value: any
   ) => {
     setSetsData((prev) => {
       const updatedExSets = [...(prev[assignedExId] || [])]
@@ -229,54 +112,35 @@ export default function WorkoutExecutionPage() {
     })
   }
 
-  // Alterna o estado de concluído de uma série
-  const toggleCompleteSet = async (assignedExId: string, exerciseId: string, setIdx: number) => {
+  const toggleCompleteSet = async (
+    assignedExId: string,
+    exerciseId: string,
+    setIdx: number
+  ) => {
     const currentSet = setsData[assignedExId][setIdx]
     const newCompleted = !currentSet.completed
-
     handleUpdateSet(assignedExId, setIdx, 'completed', newCompleted)
 
-    if (session) {
-      const { error: deleteError } = await supabase
-        .from('session_sets')
-        .delete()
-        .eq('session_id', session.id)
-        .eq('assigned_exercise_id', assignedExId)
-        .eq('set_number', currentSet.set_number)
-
-      if (deleteError) {
-        handleUpdateSet(assignedExId, setIdx, 'completed', currentSet.completed)
-        return
-      }
-
-      if (newCompleted) {
-        const { error: insertError } = await supabase.from('session_sets').insert([
-          {
-            session_id: session.id,
-            exercise_id: exerciseId,
-            assigned_exercise_id: assignedExId,
-            set_number: currentSet.set_number,
-            weight_kg: Number(currentSet.weight_kg) || 0,
-            reps: Number(currentSet.reps) || 0,
-            rir: currentSet.rir ? Number(currentSet.rir) : null,
-            set_type: currentSet.set_type,
-            completed: true,
-          },
-        ])
-
-        if (insertError) {
-          handleUpdateSet(assignedExId, setIdx, 'completed', currentSet.completed)
-        }
-      }
+    if (session && newCompleted) {
+      await supabase.from('session_sets').insert([
+        {
+          session_id: session.id,
+          exercise_id: exerciseId,
+          assigned_exercise_id: assignedExId,
+          set_number: currentSet.set_number,
+          weight_kg: Number(currentSet.weight_kg) || 0,
+          reps: Number(currentSet.reps) || 0,
+          rir: currentSet.rir ? Number(currentSet.rir) : null,
+          set_type: currentSet.type,
+          completed: true,
+        },
+      ])
     }
   }
 
-  // Finalizar a sessão completa
   const handleFinishWorkout = async () => {
     if (!session) return
     setFinishing(true)
-
-    // Atualiza a sessão para concluída com o RPE final informado
     await supabase
       .from('workout_sessions')
       .update({
@@ -285,43 +149,42 @@ export default function WorkoutExecutionPage() {
         status: 'completed',
       })
       .eq('id', session.id)
-
     setFinishing(false)
     router.push('/student/today')
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-zinc-500 gap-3">
-        <Loader2 className="animate-spin w-8 h-8 text-white" />
-        <p className="text-xs uppercase font-bold tracking-widest">Preparando treino...</p>
-      </div>
-    )
+  const getSetBadge = (type: string) => {
+    switch (type) {
+      case 'warmup':
+        return { label: 'AQUECIMENTO', color: 'text-amber-400 bg-amber-950/40 border-amber-800/40' }
+      case 'feeder':
+        return { label: 'FEEDER SET', color: 'text-sky-400 bg-sky-950/40 border-sky-800/40' }
+      case 'top':
+        return { label: 'TOP SET', color: 'text-rose-400 bg-rose-950/40 border-rose-800/40' }
+      case 'backoff':
+        return { label: 'BACK-OFF SET', color: 'text-purple-400 bg-purple-950/40 border-purple-800/40' }
+      case 'cluster':
+        return { label: 'CLUSTER', color: 'text-indigo-400 bg-indigo-950/40 border-indigo-800/40' }
+      case 'myo_reps':
+        return { label: 'MYO REPS', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40' }
+      default:
+        return { label: 'WORKING SET', color: 'text-zinc-400 bg-zinc-900 border-zinc-800' }
+    }
   }
 
-  if (loadError) {
+  if (loading)
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-        <AlertCircle className="h-10 w-10 text-red-400" aria-hidden="true" />
-        <p className="max-w-sm text-sm font-semibold text-zinc-300">{loadError}</p>
-        <button
-          type="button"
-          onClick={() => router.push('/dashboard')}
-          className="rounded-xl border border-zinc-700 px-4 py-2 text-xs font-bold uppercase text-white"
-        >
-          Voltar ao dashboard
-        </button>
+      <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
+        <Loader2 className="animate-spin w-8 h-8 text-white" />
       </div>
     )
-  }
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Topo do Treino */}
       <div className="flex items-center justify-between border-b border-zinc-900 pb-4">
         <button
           onClick={() => router.back()}
-          className="p-2 text-zinc-400 hover:text-white transition-colors"
+          className="p-2 text-zinc-400 hover:text-white"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
@@ -336,26 +199,46 @@ export default function WorkoutExecutionPage() {
         </button>
       </div>
 
-      {/* Lista de Exercícios para Execução */}
       {assignedExercises.map((exItem) => {
         const last = lastRecords[exItem.id]
         const sets = setsData[exItem.id] || []
 
         return (
-          <div key={exItem.id} className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 space-y-4">
-            {/* Nome do Exercício + Carga Anterior */}
-            <div className="flex items-start justify-between border-b border-zinc-900/80 pb-3">
+          <div
+            key={exItem.id}
+            className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 space-y-4 overflow-hidden"
+          >
+            {/* VÍDEO DO EXERCÍCIO */}
+            {exItem.exercises?.video_url ? (
+              <div className="w-full h-40 bg-zinc-900 rounded-2xl overflow-hidden mb-4 relative">
+                <img
+                  src={exItem.exercises.video_url}
+                  alt="Execução"
+                  className="w-full h-full object-cover opacity-80"
+                />
+              </div>
+            ) : (
+              <div className="w-full h-20 bg-zinc-900/60 rounded-2xl flex items-center justify-center mb-2 border border-zinc-800">
+                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">
+                  Foco: {exItem.exercises?.muscle_group}
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
               <div>
-                <h3 className="font-black text-base text-white">{exItem.exercises?.name}</h3>
+                <h3 className="font-black text-base text-white">
+                  {exItem.exercises?.name}
+                </h3>
                 <p className="text-xs font-bold uppercase text-zinc-500 mt-0.5">
                   {exItem.exercises?.muscle_group}
                 </p>
               </div>
-
-              {/* Indicador de Último Registro */}
               {last && (
                 <div className="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl text-right">
-                  <span className="text-[9px] font-bold text-zinc-500 uppercase block">Anterior</span>
+                  <span className="text-[9px] font-bold text-zinc-500 uppercase block">
+                    Anterior
+                  </span>
                   <span className="text-xs font-extrabold text-emerald-400">
                     {last.weight_kg}kg × {last.reps}
                   </span>
@@ -363,101 +246,124 @@ export default function WorkoutExecutionPage() {
               )}
             </div>
 
-            <ExerciseMedia
-              muscleGroup={exItem.exercises?.muscle_group || 'Treino'}
-            />
-
-            {/* Observação do Treinador */}
             {exItem.notes && (
               <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-zinc-300 font-medium">{exItem.notes}</p>
+                <p className="text-xs text-zinc-300 font-medium">
+                  {exItem.notes}
+                </p>
               </div>
             )}
 
+            {/* TABELA DE EXECUÇÃO DAS SÉRIES */}
             <div className="space-y-3">
-              <h4 className="text-xs font-extrabold uppercase tracking-wide text-zinc-400">
-                Séries ({sets.length})
-              </h4>
-              {sets.map((s, idx) => (
-                <div
-                  key={s.set_number}
-                  className={`space-y-3 rounded-2xl border p-3 transition-colors ${
-                    s.completed
-                      ? 'border-emerald-700/60 bg-emerald-950/20'
-                      : 'border-zinc-800 bg-zinc-900/70'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-black text-white">Série {s.set_number}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleCompleteSet(exItem.id, exItem.exercise_id, idx)}
-                      aria-label={`${s.completed ? 'Desmarcar' : 'Concluir'} série ${s.set_number}`}
-                      className={`flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors ${
-                        s.completed
-                          ? 'bg-emerald-400 text-black'
-                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                      }`}
-                    >
-                      <Check className="h-4 w-4 stroke-[3]" aria-hidden="true" />
-                      {s.completed ? 'Concluída' : 'Concluir'}
-                    </button>
-                  </div>
+              {sets.map((s, idx) => {
+                const badge = getSetBadge(s.type)
+                return (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-2xl border space-y-2 transition-all ${
+                      s.completed
+                        ? 'bg-emerald-950/20 border-emerald-800/40'
+                        : 'bg-zinc-900/80 border-zinc-800/60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-zinc-400">
+                          #{s.set_number}
+                        </span>
+                        <span
+                          className={`text-[9px] font-black uppercase border px-2 py-0.5 rounded-md ${badge.color}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-zinc-400">
+                        Meta: {s.target_reps} reps | RIR {s.rir ?? '0'}
+                      </span>
+                    </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <label className="min-w-0 text-[10px] font-bold uppercase text-zinc-500">
-                      Kg
-                      <input
-                        type="number"
-                        value={s.weight_kg}
-                        onChange={(e) => handleUpdateSet(exItem.id, idx, 'weight_kg', e.target.value)}
-                        placeholder="0"
-                        className="mt-1 h-12 w-full rounded-xl border border-zinc-800 bg-black px-2 text-center text-base font-extrabold text-white outline-none focus:border-emerald-400"
-                      />
-                    </label>
-                    <label className="min-w-0 text-[10px] font-bold uppercase text-zinc-500">
-                      Reps
-                      <input
-                        type="number"
-                        value={s.reps}
-                        onChange={(e) => handleUpdateSet(exItem.id, idx, 'reps', e.target.value)}
-                        placeholder={String(exItem.target_reps ?? '0')}
-                        className="mt-1 h-12 w-full rounded-xl border border-zinc-800 bg-black px-2 text-center text-base font-extrabold text-white outline-none focus:border-emerald-400"
-                      />
-                    </label>
-                    <label className="min-w-0 text-[10px] font-bold uppercase text-zinc-500">
-                      RIR
-                      <input
-                        type="number"
-                        value={s.rir}
-                        onChange={(e) => handleUpdateSet(exItem.id, idx, 'rir', e.target.value)}
-                        placeholder="0"
-                        className="mt-1 h-12 w-full rounded-xl border border-zinc-800 bg-black px-2 text-center text-base font-medium text-white outline-none focus:border-emerald-400"
-                      />
-                    </label>
+                    <div className="grid grid-cols-3 gap-2 items-center pt-1">
+                      <div>
+                        <span className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">
+                          Carga (kg)
+                        </span>
+                        <input
+                          type="number"
+                          value={s.weight_kg}
+                          onChange={(e) =>
+                            handleUpdateSet(
+                              exItem.id,
+                              idx,
+                              'weight_kg',
+                              e.target.value
+                            )
+                          }
+                          placeholder="0"
+                          className="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-center text-sm font-extrabold text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <span className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">
+                          Reps Feitas
+                        </span>
+                        <input
+                          type="number"
+                          value={s.reps}
+                          onChange={(e) =>
+                            handleUpdateSet(
+                              exItem.id,
+                              idx,
+                              'reps',
+                              e.target.value
+                            )
+                          }
+                          placeholder={s.target_reps || '0'}
+                          className="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-center text-sm font-extrabold text-white focus:outline-none"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          toggleCompleteSet(
+                            exItem.id,
+                            exItem.exercise_id,
+                            idx
+                          )
+                        }
+                        className={`w-full h-10 rounded-xl flex justify-center items-center font-bold mt-3 transition-all ${
+                          s.completed
+                            ? 'bg-emerald-500 text-black'
+                            : 'bg-zinc-800 text-zinc-500'
+                        }`}
+                      >
+                        <Check className="w-5 h-5 stroke-[3]" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )
       })}
 
-      {/* Modal Finalizar Treino (Esforço RPE) */}
+      {/* MODAL DE FINALIZAÇÃO DA SESSÃO */}
       {showFinishModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-sm space-y-6">
             <div className="text-center space-y-1">
               <h2 className="text-xl font-black uppercase">Finalizar Treino</h2>
-              <p className="text-xs text-zinc-400 font-medium">
-                Qual foi o Esforço Percebido (RPE) da sessão?
+              <p className="text-xs text-zinc-400">
+                Qual foi o Esforço (RPE) da sessão?
               </p>
             </div>
-
-            {/* Selector de RPE (1 a 10) */}
             <div className="space-y-3 text-center">
-              <span className="text-4xl font-black text-white">{sessionRpe} / 10</span>
+              <span className="text-4xl font-black text-white">
+                {sessionRpe} / 10
+              </span>
               <input
                 type="range"
                 min="1"
@@ -466,13 +372,7 @@ export default function WorkoutExecutionPage() {
                 onChange={(e) => setSessionRpe(Number(e.target.value))}
                 className="w-full accent-white"
               />
-              <div className="flex justify-between text-[10px] text-zinc-500 font-bold uppercase">
-                <span>1 - Leve</span>
-                <span>5 - Moderado</span>
-                <span>10 - Máximo</span>
-              </div>
             </div>
-
             <div className="flex gap-2">
               <button
                 onClick={() => setShowModal(false)}
@@ -483,9 +383,13 @@ export default function WorkoutExecutionPage() {
               <button
                 onClick={handleFinishWorkout}
                 disabled={finishing}
-                className="w-1/2 bg-white text-black font-extrabold p-4 rounded-xl text-xs uppercase flex items-center justify-center"
+                className="w-1/2 bg-white text-black font-extrabold p-4 rounded-xl text-xs uppercase flex justify-center items-center"
               >
-                {finishing ? <Loader2 className="animate-spin w-5 h-5" /> : 'Salvar'}
+                {finishing ? (
+                  <Loader2 className="animate-spin w-5 h-5" />
+                ) : (
+                  'Salvar'
+                )}
               </button>
             </div>
           </div>
@@ -493,4 +397,4 @@ export default function WorkoutExecutionPage() {
       )}
     </div>
   )
-}
+          }

@@ -375,59 +375,68 @@ export default function WorkoutExecutionPage() {
               </div>
             )}
 
-            {/* Tabela de Séries */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-5 gap-2 text-[10px] font-black uppercase text-zinc-500 text-center px-1">
-                <span>Série</span>
-                <span>Kg</span>
-                <span>Reps</span>
-                <span>RIR</span>
-                <span>✓</span>
-              </div>
-
+            <div className="space-y-3">
+              <h4 className="text-xs font-extrabold uppercase tracking-wide text-zinc-400">
+                Séries ({sets.length})
+              </h4>
               {sets.map((s, idx) => (
                 <div
-                  key={idx}
-                  className={`grid grid-cols-5 gap-2 items-center p-2 rounded-2xl border transition-all ${
+                  key={s.set_number}
+                  className={`space-y-3 rounded-2xl border p-3 transition-colors ${
                     s.completed
-                      ? 'bg-emerald-950/20 border-emerald-800/40'
-                      : 'bg-zinc-900/80 border-zinc-800/60'
+                      ? 'border-emerald-700/60 bg-emerald-950/20'
+                      : 'border-zinc-800 bg-zinc-900/70'
                   }`}
                 >
-                  <span className="text-xs font-black text-center text-zinc-400">#{s.set_number}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-black text-white">Série {s.set_number}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleCompleteSet(exItem.id, exItem.exercise_id, idx)}
+                      aria-label={`${s.completed ? 'Desmarcar' : 'Concluir'} série ${s.set_number}`}
+                      className={`flex min-h-10 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors ${
+                        s.completed
+                          ? 'bg-emerald-400 text-black'
+                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                      }`}
+                    >
+                      <Check className="h-4 w-4 stroke-[3]" aria-hidden="true" />
+                      {s.completed ? 'Concluída' : 'Concluir'}
+                    </button>
+                  </div>
 
-                  <input
-                    type="number"
-                    value={s.weight_kg}
-                    onChange={(e) => handleUpdateSet(exItem.id, idx, 'weight_kg', e.target.value)}
-                    placeholder="0"
-                    className="bg-black border border-zinc-800 rounded-xl p-2 text-center text-sm font-extrabold text-white focus:outline-none focus:border-white"
-                  />
-
-                  <input
-                    type="number"
-                    value={s.reps}
-                    onChange={(e) => handleUpdateSet(exItem.id, idx, 'reps', e.target.value)}
-                    placeholder={String(exItem.target_reps ?? '0')}
-                    className="bg-black border border-zinc-800 rounded-xl p-2 text-center text-sm font-extrabold text-white focus:outline-none focus:border-white"
-                  />
-
-                  <input
-                    type="number"
-                    value={s.rir}
-                    onChange={(e) => handleUpdateSet(exItem.id, idx, 'rir', e.target.value)}
-                    placeholder="RIR"
-                    className="bg-black border border-zinc-800 rounded-xl p-2 text-center text-sm font-medium text-zinc-400 focus:outline-none focus:border-white"
-                  />
-
-                  <button
-                    onClick={() => toggleCompleteSet(exItem.id, exItem.exercise_id, idx)}
-                    className={`w-full h-9 rounded-xl flex items-center justify-center transition-all ${
-                      s.completed ? 'bg-emerald-500 text-black font-bold' : 'bg-zinc-800 text-zinc-500'
-                    }`}
-                  >
-                    <Check className="w-5 h-5 stroke-[3]" />
-                  </button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="min-w-0 text-[10px] font-bold uppercase text-zinc-500">
+                      Kg
+                      <input
+                        type="number"
+                        value={s.weight_kg}
+                        onChange={(e) => handleUpdateSet(exItem.id, idx, 'weight_kg', e.target.value)}
+                        placeholder="0"
+                        className="mt-1 h-12 w-full rounded-xl border border-zinc-800 bg-black px-2 text-center text-base font-extrabold text-white outline-none focus:border-emerald-400"
+                      />
+                    </label>
+                    <label className="min-w-0 text-[10px] font-bold uppercase text-zinc-500">
+                      Reps
+                      <input
+                        type="number"
+                        value={s.reps}
+                        onChange={(e) => handleUpdateSet(exItem.id, idx, 'reps', e.target.value)}
+                        placeholder={String(exItem.target_reps ?? '0')}
+                        className="mt-1 h-12 w-full rounded-xl border border-zinc-800 bg-black px-2 text-center text-base font-extrabold text-white outline-none focus:border-emerald-400"
+                      />
+                    </label>
+                    <label className="min-w-0 text-[10px] font-bold uppercase text-zinc-500">
+                      RIR
+                      <input
+                        type="number"
+                        value={s.rir}
+                        onChange={(e) => handleUpdateSet(exItem.id, idx, 'rir', e.target.value)}
+                        placeholder="0"
+                        className="mt-1 h-12 w-full rounded-xl border border-zinc-800 bg-black px-2 text-center text-base font-medium text-white outline-none focus:border-emerald-400"
+                      />
+                    </label>
+                  </div>
                 </div>
               ))}
             </div>

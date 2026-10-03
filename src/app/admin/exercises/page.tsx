@@ -166,10 +166,7 @@ export default function AdminExercisesPage() {
               className="space-y-3 rounded-2xl border border-zinc-900 bg-zinc-950 p-4"
             >
               <ExerciseMedia
-                imageUrl={ex.image_url}
-                videoUrl={ex.video_url}
                 muscleGroup={ex.muscle_group}
-                exerciseName={ex.name}
               />
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800">

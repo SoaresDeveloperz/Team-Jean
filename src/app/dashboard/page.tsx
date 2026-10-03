@@ -247,10 +247,7 @@ export default function DashboardPage() {
                       className="overflow-hidden rounded-2xl border border-zinc-900 bg-zinc-950"
                     >
                       <ExerciseMedia
-                        imageUrl={item.exercises?.image_url}
-                        videoUrl={item.exercises?.video_url}
                         muscleGroup={item.exercises?.muscle_group ?? 'Treino'}
-                        exerciseName={item.exercises?.name ?? 'Exercício'}
                       />
                       <div className="flex items-center gap-3 p-4">
                         <span className="text-xs font-black text-zinc-600">

@@ -31,17 +31,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white relative overflow-hidden">
-      {/* Luz sutil de fundo estilo Hevy */}
-      <div className="absolute w-96 h-96 bg-zinc-900/40 rounded-full blur-3xl pointer-events-none -top-20 -left-20" />
-
-      <div className="w-full max-w-sm flex flex-col items-center z-10 space-y-8">
-        
-        {/* Monograma TJ Brilhante */}
-        <div className="flex flex-col items-center space-y-3">
-          <div className="p-4 bg-zinc-950 border border-zinc-800/80 rounded-3xl shadow-2xl">
-            <Logo className="w-20 h-20" />
-          </div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white">
+      <div className="w-full max-w-sm flex flex-col items-center space-y-8">
+        <div className="flex flex-col items-center">
+          <Logo className="w-28 h-28 mb-5" />
           <div className="text-center">
             <h1 className="text-2xl font-black tracking-widest uppercase text-white">TEAM JEAN</h1>
             <p className="text-[10px] text-zinc-500 font-extrabold tracking-widest uppercase mt-0.5">

@@ -12,7 +12,6 @@ import {
   Search,
   X,
   CheckCircle2,
-  Flame,
 } from 'lucide-react'
 
 export default function AdminWorkoutsPage() {
@@ -21,7 +20,6 @@ export default function AdminWorkoutsPage() {
   const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modais e edição
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState('')
@@ -59,7 +57,6 @@ export default function AdminWorkoutsPage() {
     setLoading(false)
   }
 
-  // ABRIR MODAL PARA EDITAR
   const handleEditWorkout = async (workout: any) => {
     setEditingId(workout.id)
     setSelectedStudent(workout.student_id)
@@ -78,7 +75,6 @@ export default function AdminWorkoutsPage() {
         muscle_group: item.exercises?.muscle_group,
         secondary_muscle: item.exercises?.secondary_muscle,
         notes: item.notes || '',
-        // Carrega as séries individuais salvas ou gera padrão
         planned_sets: item.planned_sets || [
           { type: 'warmup', reps: '15-20', rir: 4 },
           { type: 'feeder', reps: '10-12', rir: 2 },
@@ -98,7 +94,6 @@ export default function AdminWorkoutsPage() {
     setShowBuilder(true)
   }
 
-  // ADICIONAR EXERCÍCIO COM SÉRIES PADRÃO
   const handleAddExerciseToWorkout = (ex: any) => {
     setSelectedExercises([
       ...selectedExercises,
@@ -118,7 +113,6 @@ export default function AdminWorkoutsPage() {
     setShowExPicker(false)
   }
 
-  // ADICIONAR UMA NOVA SÉRIE A UM EXERCÍCIO ESPECÍFICO
   const handleAddSetToExercise = (exIdx: number) => {
     const updated = [...selectedExercises]
     const currentSets = updated[exIdx].planned_sets || []
@@ -129,7 +123,6 @@ export default function AdminWorkoutsPage() {
     setSelectedExercises(updated)
   }
 
-  // REMOVER UMA SÉRIE ESPECÍFICA DE UM EXERCÍCIO
   const handleRemoveSetFromExercise = (exIdx: number, setIdx: number) => {
     const updated = [...selectedExercises]
     updated[exIdx].planned_sets = updated[exIdx].planned_sets.filter(
@@ -138,7 +131,6 @@ export default function AdminWorkoutsPage() {
     setSelectedExercises(updated)
   }
 
-  // ATUALIZAR UMA SÉRIE INDIVIDUAL (TIPO, REPS OU RIR)
   const handleUpdateIndividualSet = (
     exIdx: number,
     setIdx: number,
@@ -154,7 +146,6 @@ export default function AdminWorkoutsPage() {
     setSelectedExercises(selectedExercises.filter((_, i) => i !== index))
   }
 
-  // SALVAR TREINO NO SUPABASE
   const handleSaveWorkout = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedStudent || !workoutName || selectedExercises.length === 0)
@@ -197,7 +188,7 @@ export default function AdminWorkoutsPage() {
         target_reps: item.planned_sets[0]?.reps || '8-12',
         target_rir: item.planned_sets[0]?.rir || 2,
         set_type: item.planned_sets[0]?.type || 'working',
-        planned_sets: item.planned_sets, // Salva o array JSONB com cada série
+        planned_sets: item.planned_sets,
         notes: item.notes || null,
       }))
 
@@ -232,7 +223,6 @@ export default function AdminWorkoutsPage() {
       ex.muscle_group.toLowerCase().includes(exSearch.toLowerCase())
   )
 
-  // Rótulos e cores dos Tipos de Série
   const getSetTypeBadge = (type: string) => {
     switch (type) {
       case 'warmup':
@@ -271,7 +261,6 @@ export default function AdminWorkoutsPage() {
         </button>
       </div>
 
-      {/* Lista de Treinos */}
       {loading ? (
         <div className="flex justify-center py-12 text-zinc-500">
           <Loader2 className="animate-spin w-8 h-8" />
@@ -320,7 +309,6 @@ export default function AdminWorkoutsPage() {
         </div>
       )}
 
-      {/* MODAL CONSTRUTOR COM SÉRIES INDIVIDUAIS */}
       {showBuilder && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-4 overflow-y-auto">
           <div className="max-w-md mx-auto w-full space-y-6 pb-20">
@@ -375,7 +363,6 @@ export default function AdminWorkoutsPage() {
                 />
               </div>
 
-              {/* LISTA DE EXERCÍCIOS */}
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-extrabold uppercase text-zinc-300">
@@ -396,7 +383,6 @@ export default function AdminWorkoutsPage() {
                       key={exIdx}
                       className="bg-zinc-950 border border-zinc-800 rounded-3xl p-4 space-y-4 shadow-xl"
                     >
-                      {/* Cabeçalho do Exercício */}
                       <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
                         <div>
                           <h4 className="font-extrabold text-base text-white">
@@ -418,7 +404,6 @@ export default function AdminWorkoutsPage() {
                         </button>
                       </div>
 
-                      {/* TABELA DE SÉRIES INDIVIDUAIS DO EXERCÍCIO */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between px-1">
                           <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
@@ -460,7 +445,6 @@ export default function AdminWorkoutsPage() {
                                 )}
                               </div>
 
-                              {/* CONFIGURAÇÃO DA SÉRIE INDIVIDUAL */}
                               <div className="grid grid-cols-3 gap-2 pt-1">
                                 <div>
                                   <label className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">
@@ -508,4 +492,127 @@ export default function AdminWorkoutsPage() {
                                       )
                                     }
                                     placeholder="Ex: 8-10"
-  
+                                    className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-center text-xs font-bold text-white focus:outline-none"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">
+                                    RIR Alvo
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={s.rir}
+                                    onChange={(e) =>
+                                      handleUpdateIndividualSet(
+                                        exIdx,
+                                        setIdx,
+                                        'rir',
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="0 (Falha)"
+                                    className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-center text-xs font-bold text-white focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddSetToExercise(exIdx)}
+                          className="w-full py-2 bg-zinc-900 border border-dashed border-zinc-800 text-zinc-400 font-bold text-[10px] uppercase rounded-xl flex items-center justify-center gap-1 hover:text-white transition-all mt-2"
+                        >
+                          <Plus className="w-3 h-3" /> Adicionar Série
+                        </button>
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          value={item.notes}
+                          onChange={(e) => {
+                            const updated = [...selectedExercises]
+                            updated[exIdx].notes = e.target.value
+                            setSelectedExercises(updated)
+                          }}
+                          placeholder="Obs do Treinador (ex: Descanso de 3min)"
+                          className="w-full bg-black/60 border border-zinc-800/80 rounded-xl p-3 text-xs text-white focus:outline-none placeholder:text-zinc-600"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={saving || selectedExercises.length === 0}
+                className="w-full bg-white text-black font-black text-sm uppercase py-4 rounded-2xl flex items-center justify-center gap-2 mt-6 active:scale-95 transition-all shadow-xl"
+              >
+                {saving ? (
+                  <Loader2 className="animate-spin w-5 h-5" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />{' '}
+                    {editingId
+                      ? 'SALVAR E ATUALIZAR TREINO'
+                      : 'ENVIAR TREINO AO ALUNO'}
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showExPicker && (
+        <div className="fixed inset-0 bg-black/95 z-50 p-4 flex flex-col justify-between">
+          <div className="max-w-md mx-auto w-full space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black uppercase text-sm">
+                Adicionar Exercício
+              </h3>
+              <button
+                onClick={() => setShowExPicker(false)}
+                className="text-zinc-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+              <input
+                type="text"
+                value={exSearch}
+                onChange={(e) => setExSearch(e.target.value)}
+                placeholder="Buscar por músculo ou exercício..."
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white"
+              />
+            </div>
+            <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
+              {filteredLibrary.map((ex) => (
+                <div
+                  key={ex.id}
+                  onClick={() => handleAddExerciseToWorkout(ex)}
+                  className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex justify-between cursor-pointer active:scale-98 transition-all"
+                >
+                  <div>
+                    <h4 className="font-bold text-xs text-white">{ex.name}</h4>
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      Alvo: {ex.muscle_group}
+                    </p>
+                  </div>
+                  <Plus className="w-4 h-4 text-zinc-400 my-auto" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+                           

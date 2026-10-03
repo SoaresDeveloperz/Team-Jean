@@ -1,0 +1,8 @@
+{
+  "buildCommand": "next build",
+  "installCommand": "npm ci",
+  "env": {
+    "NODE_VERSION": "20.11.0"
+  },
+  "framework": "nextjs"
+}

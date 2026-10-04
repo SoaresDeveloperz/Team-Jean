@@ -2,82 +2,70 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { Loader2 } from 'lucide-react'
+import { Dumbbell, Loader2, ArrowRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-export default function StudentWeekPage() {
-  const [workout, setWorkout] = useState<any>(null)
+export default function StudentRoutinePage() {
+  const [workouts, setWorkouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
-
-  const days = [
-    { name: 'Segunda-feira', short: 'SEG' },
-    { name: 'Terça-feira', short: 'TER' },
-    { name: 'Quarta-feira', short: 'QUA' },
-    { name: 'Quinta-feira', short: 'QUI' },
-    { name: 'Sexta-feira', short: 'SEX' },
-    { name: 'Sábado', short: 'SÁB' },
-    { name: 'Domingo', short: 'DOM' },
-  ]
+  const router = useRouter()
 
   useEffect(() => {
-    loadWorkout()
+    loadWorkouts()
   }, [])
 
-  const loadWorkout = async () => {
+  const loadWorkouts = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      // Busca TODOS os treinos ativos do aluno
       const { data } = await supabase
         .from('assigned_workouts')
         .select('*')
         .eq('student_id', user.id)
         .eq('is_current', true)
-        .limit(1)
-        .single()
+        .order('name', { ascending: true })
 
-      if (data) setWorkout(data)
+      if (data) setWorkouts(data)
     }
     setLoading(false)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div>
-        <h1 className="text-2xl font-black uppercase tracking-wide">Sua Semana</h1>
-        <p className="text-xs text-zinc-500 font-medium">Cronograma de treinos</p>
+        <h1 className="text-3xl font-black uppercase tracking-wide text-white">Rotina</h1>
+        <p className="text-xs text-zinc-500 font-bold tracking-widest uppercase mt-1">Seu cronograma atual</p>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12 text-zinc-500">
-          <Loader2 className="animate-spin w-8 h-8" />
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-zinc-500" /></div>
+      ) : workouts.length === 0 ? (
+        <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-4">
+          <Dumbbell className="w-10 h-10 text-zinc-700 mx-auto" />
+          <h3 className="font-black text-sm text-zinc-400 uppercase">Sem treinos ativos</h3>
         </div>
       ) : (
-        <div className="space-y-3">
-          {days.map((day, idx) => (
+        <div className="space-y-4">
+          {workouts.map((w, idx) => (
             <div
-              key={idx}
-              className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between"
+              key={w.id}
+              onClick={() => router.push(`/student/workout/${w.id}`)}
+              className="bg-zinc-950 border border-zinc-900 hover:border-zinc-700 rounded-3xl p-5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
             >
-              <div className="flex items-center gap-3">
-                <span className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center font-black text-xs text-zinc-400 border border-zinc-800">
-                  {day.short}
-                </span>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center font-black text-zinc-500 text-lg border border-zinc-800 group-hover:border-emerald-500/50 group-hover:text-emerald-400 transition-colors">
+                  {String.fromCharCode(65 + idx)} {/* Transforma 0,1,2 em A, B, C */}
+                </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">{day.name}</h3>
-                  <p className="text-xs text-zinc-500">
-                    {workout ? workout.name : 'Descanso / Livre'}
+                  <h3 className="font-black text-base text-white">{w.name}</h3>
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
+                    Toque para iniciar
                   </p>
                 </div>
               </div>
-              {workout ? (
-                <span className="text-[10px] font-bold uppercase text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2.5 py-1 rounded-lg">
-                  Prescrito
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold uppercase text-zinc-600 bg-zinc-900 px-2.5 py-1 rounded-lg">
-                  Livre
-                </span>
-              )}
+              <ArrowRight className="w-5 h-5 text-zinc-600 group-hover:text-white transition-colors" />
             </div>
           ))}
         </div>

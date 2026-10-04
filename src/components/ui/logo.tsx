@@ -1,4 +1,4 @@
-export function Logo({ className = "w-12 h-12" }: { className?: string }) {
+export function Logo({ className = "w-8 h-8" }: { className?: string }) {
   return (
     <svg 
       viewBox="0 0 400 400" 
@@ -6,7 +6,6 @@ export function Logo({ className = "w-12 h-12" }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg" 
       className={className}
     >
-      {/* Monograma TJ idêntico à foto da sua marca */}
       <path 
         d="M60 120 L340 120 L300 150 L225 150 L225 280 L200 310 L150 250 L175 220 L200 250 L200 150 L100 150 Z" 
         fill="white" 

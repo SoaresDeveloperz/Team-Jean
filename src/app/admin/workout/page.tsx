@@ -12,6 +12,7 @@ import {
   Search,
   X,
   CheckCircle2,
+  AlertCircle,
 } from 'lucide-react'
 
 export default function AdminWorkoutsPage() {
@@ -20,6 +21,7 @@ export default function AdminWorkoutsPage() {
   const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Modais e Estados de Edição
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState('')
@@ -29,6 +31,7 @@ export default function AdminWorkoutsPage() {
   const [showExPicker, setShowExPicker] = useState(false)
   const [exSearch, setExSearch] = useState('')
   const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const supabase = createClient()
 
@@ -57,36 +60,47 @@ export default function AdminWorkoutsPage() {
     setLoading(false)
   }
 
+  // ABRIR PARA EDITAR TREINO
   const handleEditWorkout = async (workout: any) => {
+    setErrorMessage('')
     setEditingId(workout.id)
     setSelectedStudent(workout.student_id)
     setWorkoutName(workout.name)
 
-    const { data: ex } = await supabase
+    const { data: ex, error } = await supabase
       .from('assigned_workout_exercises')
       .select('*, exercises(name, muscle_group, secondary_muscle)')
       .eq('assigned_workout_id', workout.id)
       .order('order', { ascending: true })
 
-    if (ex) {
+    if (error) {
+      setErrorMessage('Erro ao carregar exercícios: ' + error.message)
+    }
+
+    if (ex && ex.length > 0) {
       const mapped = ex.map((item) => ({
         exercise_id: item.exercise_id,
-        name: item.exercises?.name,
-        muscle_group: item.exercises?.muscle_group,
-        secondary_muscle: item.exercises?.secondary_muscle,
+        name: item.exercises?.name || 'Exercício',
+        muscle_group: item.exercises?.muscle_group || 'Geral',
+        secondary_muscle: item.exercises?.secondary_muscle || '',
         notes: item.notes || '',
-        planned_sets: item.planned_sets || [
-          { type: 'warmup', reps: '15-20', rir: 4 },
-          { type: 'feeder', reps: '10-12', rir: 2 },
-          { type: 'working', reps: '6-8', rir: 0 },
-        ],
+        planned_sets: item.planned_sets && item.planned_sets.length > 0
+          ? item.planned_sets
+          : [
+              { type: 'warmup', reps: '15-20', rir: 4 },
+              { type: 'feeder', reps: '10-12', rir: 2 },
+              { type: 'working', reps: '8-10', rir: 0 },
+            ],
       }))
       setSelectedExercises(mapped)
+    } else {
+      setSelectedExercises([])
     }
     setShowBuilder(true)
   }
 
   const handleCreateNew = () => {
+    setErrorMessage('')
     setEditingId(null)
     setSelectedStudent('')
     setWorkoutName('')
@@ -101,7 +115,7 @@ export default function AdminWorkoutsPage() {
         exercise_id: ex.id,
         name: ex.name,
         muscle_group: ex.muscle_group,
-        secondary_muscle: ex.secondary_muscle,
+        secondary_muscle: ex.secondary_muscle || '',
         notes: '',
         planned_sets: [
           { type: 'warmup', reps: '15-20', rir: 4 },
@@ -146,54 +160,81 @@ export default function AdminWorkoutsPage() {
     setSelectedExercises(selectedExercises.filter((_, i) => i !== index))
   }
 
+  // SALVAR COM TRATAMENTO DE ERRO COMPLETO
   const handleSaveWorkout = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedStudent || !workoutName || selectedExercises.length === 0)
+    setErrorMessage('')
+
+    if (!selectedStudent) {
+      setErrorMessage('Selecione um aluno.')
       return
-    setSaving(true)
-
-    let currentWorkoutId = editingId
-
-    if (currentWorkoutId) {
-      await supabase
-        .from('assigned_workouts')
-        .update({ name: workoutName, student_id: selectedStudent })
-        .eq('id', currentWorkoutId)
-      await supabase
-        .from('assigned_workout_exercises')
-        .delete()
-        .eq('assigned_workout_id', currentWorkoutId)
-    } else {
-      const { data: newW } = await supabase
-        .from('assigned_workouts')
-        .insert([
-          {
-            student_id: selectedStudent,
-            name: workoutName,
-            is_current: true,
-          },
-        ])
-        .select()
-        .single()
-
-      if (newW) currentWorkoutId = newW.id
+    }
+    if (!workoutName) {
+      setErrorMessage('Informe o nome do treino.')
+      return
+    }
+    if (selectedExercises.length === 0) {
+      setErrorMessage('Adicione pelo menos 1 exercício ao treino.')
+      return
     }
 
-    if (currentWorkoutId) {
+    setSaving(true)
+    let currentWorkoutId = editingId
+
+    try {
+      // 1. ATUALIZA OU CRIA O CABEÇALHO DO TREINO
+      if (currentWorkoutId) {
+        const { error: updateErr } = await supabase
+          .from('assigned_workouts')
+          .update({ name: workoutName, student_id: selectedStudent, updated_at: new Date().toISOString() })
+          .eq('id', currentWorkoutId)
+
+        if (updateErr) throw new Error('Erro ao atualizar treino: ' + updateErr.message)
+
+        // Limpa os exercícios antigos para regravar os novos
+        const { error: delErr } = await supabase
+          .from('assigned_workout_exercises')
+          .delete()
+          .eq('assigned_workout_id', currentWorkoutId)
+
+        if (delErr) throw new Error('Erro ao apagar exercícios antigos: ' + delErr.message)
+      } else {
+        const { data: newW, error: createErr } = await supabase
+          .from('assigned_workouts')
+          .insert([
+            {
+              student_id: selectedStudent,
+              name: workoutName,
+              is_current: true,
+            },
+          ])
+          .select()
+          .single()
+
+        if (createErr || !newW) throw new Error('Erro ao criar treino: ' + createErr?.message)
+        currentWorkoutId = newW.id
+      }
+
+      // 2. GRAVA OS NOVOS EXERCÍCIOS E SÉRIES INDIVIDUAIS
       const rows = selectedExercises.map((item, idx) => ({
         assigned_workout_id: currentWorkoutId,
         exercise_id: item.exercise_id,
         order: idx + 1,
         sets_count: item.planned_sets.length,
         target_reps: item.planned_sets[0]?.reps || '8-12',
-        target_rir: item.planned_sets[0]?.rir || 2,
+        target_rir: item.planned_sets[0]?.rir !== undefined ? Number(item.planned_sets[0].rir) : 2,
         set_type: item.planned_sets[0]?.type || 'working',
         planned_sets: item.planned_sets,
         notes: item.notes || null,
       }))
 
-      await supabase.from('assigned_workout_exercises').insert(rows)
+      const { error: insertExErr } = await supabase
+        .from('assigned_workout_exercises')
+        .insert(rows)
 
+      if (insertExErr) throw new Error('Erro ao gravar exercícios: ' + insertExErr.message)
+
+      // 3. NOTIFICA O ALUNO
       if (!editingId) {
         await supabase.from('notifications').insert([
           {
@@ -204,11 +245,14 @@ export default function AdminWorkoutsPage() {
           },
         ])
       }
-    }
 
-    setShowBuilder(false)
-    loadData()
-    setSaving(false)
+      setShowBuilder(false)
+      loadData()
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro desconhecido ao salvar.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDeleteWorkout = async (workoutId: string) => {
@@ -261,6 +305,7 @@ export default function AdminWorkoutsPage() {
         </button>
       </div>
 
+      {/* Lista de Treinos */}
       {loading ? (
         <div className="flex justify-center py-12 text-zinc-500">
           <Loader2 className="animate-spin w-8 h-8" />
@@ -309,6 +354,7 @@ export default function AdminWorkoutsPage() {
         </div>
       )}
 
+      {/* MODAL CONSTRUTOR DE TREINOS */}
       {showBuilder && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-4 overflow-y-auto">
           <div className="max-w-md mx-auto w-full space-y-6 pb-20">
@@ -328,6 +374,13 @@ export default function AdminWorkoutsPage() {
                 <X className="w-6 h-6" />
               </button>
             </div>
+
+            {errorMessage && (
+              <div className="p-3 bg-red-950/80 border border-red-800 rounded-2xl text-red-300 text-xs flex items-center gap-2 font-bold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSaveWorkout} className="space-y-5">
               <div>
@@ -615,4 +668,4 @@ export default function AdminWorkoutsPage() {
     </div>
   )
 }
-                           
+  

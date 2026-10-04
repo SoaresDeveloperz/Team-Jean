@@ -39,11 +39,11 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         </div>
       </header>
 
-      {/* Conteúdo da Tela */}
+      {/* Conteúdo da Tela que o aluno estiver vendo */}
       <main className="p-4 max-w-md mx-auto">{children}</main>
 
-      {/* Barra de Navegação Inferior (Fixa no rodapé) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-900 px-2 py-2 flex justify-around items-center z-50">
+      {/* BARRA DE NAVEGAÇÃO INFERIOR FIXA NO RODAPÉ */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-900 px-2 py-2.5 flex justify-around items-center z-50">
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = pathname.startsWith(item.href)
@@ -51,14 +51,14 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all ${
+              className={`flex flex-col items-center gap-1 p-1.5 rounded-2xl transition-all ${
                 isActive ? 'text-white scale-105' : 'text-zinc-600 hover:text-zinc-400'
               }`}
             >
               <div className={`p-1.5 rounded-xl ${isActive ? 'bg-zinc-900 border border-zinc-800' : ''}`}>
                 <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5] text-emerald-400' : 'stroke-2'}`} />
               </div>
-              <span className={`text-[9px] uppercase tracking-wider ${isActive ? 'font-black' : 'font-semibold'}`}>
+              <span className={`text-[9px] uppercase tracking-wider ${isActive ? 'font-black text-white' : 'font-semibold'}`}>
                 {item.label}
               </span>
             </Link>

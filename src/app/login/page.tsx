@@ -31,12 +31,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white relative overflow-hidden">
-      {/* Glow sutil de fundo */}
+      {/* Glow de fundo */}
       <div className="absolute w-96 h-96 bg-zinc-900/40 rounded-full blur-3xl pointer-events-none -top-20 -left-20" />
 
       <div className="w-full max-w-sm flex flex-col items-center z-10 space-y-8">
         
-        {/* Monograma TJ em Vetor Nativo */}
+        {/* Logo TJ Nativa */}
         <div className="flex flex-col items-center space-y-3">
           <div className="p-4 bg-zinc-950 border border-zinc-800/80 rounded-3xl shadow-2xl">
             <svg viewBox="0 0 400 400" className="w-16 h-16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -52,7 +52,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Formulario */}
+        {/* Formulário */}
         <form onSubmit={handleLogin} className="w-full bg-zinc-950 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-2xl">
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider block">E-mail</label>

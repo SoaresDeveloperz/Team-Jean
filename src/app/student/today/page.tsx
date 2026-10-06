@@ -3,17 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
-import { Play, Dumbbell, Loader2, Calendar, Flame, Activity } from 'lucide-react'
+import { Play, Dumbbell, Loader2, Calendar, Activity, Flame } from 'lucide-react'
 
 export default function StudentTodayPage() {
   const router = useRouter()
   const supabase = createClient()
 
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [workout, setWorkout] = useState<any>(null)
-  
-  // Inovação: Termômetro de Prontidão (Readiness)
   const [readiness, setReadiness] = useState(80)
 
   useEffect(() => {
@@ -23,18 +22,26 @@ export default function StudentTodayPage() {
   const loadData = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    setUserId(user.id)
 
-    const { data: p } = await supabase.from('profiles').select('full_name').eq('id', user.id).single()
-    setProfile(p)
+    const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    if (p) {
+      setProfile(p)
+      if (p.readiness_score !== undefined && p.readiness_score !== null) {
+        setReadiness(p.readiness_score)
+      }
+    }
 
-    // Pega o primeiro treino da lista
     const { data: w } = await supabase
       .from('assigned_workouts')
       .select('*')
       .eq('student_id', user.id)
       .eq('is_current', true)
-      .order('name', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
@@ -42,86 +49,98 @@ export default function StudentTodayPage() {
     setLoading(false)
   }
 
-  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
-
-  const getReadinessColor = () => {
-    if (readiness >= 80) return 'text-emerald-400 bg-emerald-400'
-    if (readiness >= 50) return 'text-amber-400 bg-amber-400'
-    return 'text-rose-500 bg-rose-500'
+  // ATUALIZA A RECUPERAÇÃO NO SUPABASE EM TEMPO REAL
+  const handleReadinessChange = async (value: number) => {
+    setReadiness(value)
+    if (userId) {
+      await supabase
+        .from('profiles')
+        .update({
+          readiness_score: value,
+          readiness_updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+    }
   }
 
-  const getReadinessText = () => {
-    if (readiness >= 80) return 'Pronto para destruir!'
-    if (readiness >= 50) return 'Levemente fadigado.'
-    return 'Recuperação necessária.'
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  const getReadinessBadge = () => {
+    if (readiness >= 80) return { text: 'Pronto pra moer! 🔥', color: 'text-emerald-400 bg-emerald-950/60 border-emerald-800/50' }
+    if (readiness >= 50) return { text: 'Fadiga Moderada ⚠️', color: 'text-amber-400 bg-amber-950/60 border-amber-800/50' }
+    return { text: 'Cansaço Elevado 🪫', color: 'text-rose-400 bg-rose-950/60 border-rose-800/50' }
   }
 
   if (loading) return <div className="flex justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-zinc-500" /></div>
 
+  const badge = getReadinessBadge()
+
   return (
-    <div className="space-y-8 pb-24">
-      {/* Cabeçalho Imersivo */}
+    <div className="space-y-6 pb-24">
+      {/* Saudação */}
       <div className="space-y-1">
         <h1 className="text-3xl font-black text-white leading-tight">
-          Fala, <br/><span className="text-emerald-400">{profile?.full_name?.split(' ')[0] || 'Atleta'}</span>!
+          Fala, <span className="text-emerald-400">{profile?.full_name?.split(' ')[0] || 'Atleta'}</span>! 💪
         </h1>
-        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] flex items-center gap-2 mt-2">
-          <Calendar className="w-3.5 h-3.5" />
-          {today}
+        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] flex items-center gap-2 mt-1">
+          <Calendar className="w-3.5 h-3.5" /> {today}
         </p>
       </div>
 
-      {/* Widget Interativo de Prontidão (Inovação) */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-            <Activity className="w-4 h-4" /> Nível de Recuperação
-          </h3>
-          <span className={`text-xl font-black ${getReadinessColor().split(' ')[0]}`}>{readiness}%</span>
+      {/* Widget de Recuperação (Salva pro Treinador ver) */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-300">
+              Nível de Recuperação
+            </span>
+          </div>
+          <span className="text-lg font-black text-white">{readiness}%</span>
         </div>
-        
-        <input 
-          type="range" 
-          min="10" 
-          max="100" 
+
+        <input
+          type="range"
+          min="10"
+          max="100"
           step="10"
-          value={readiness} 
-          onChange={(e) => setReadiness(Number(e.target.value))}
+          value={readiness}
+          onChange={(e) => handleReadinessChange(Number(e.target.value))}
           className="w-full h-2 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-white"
         />
-        
-        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-4 text-center">
-          Status: <span className="text-white">{getReadinessText()}</span>
-        </p>
+
+        <div className="text-center pt-1">
+          <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${badge.color}`}>
+            {badge.text}
+          </span>
+        </div>
       </div>
 
+      {/* Card do Treino Prescrito */}
       {!workout ? (
-        <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-4">
+        <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-3">
           <Dumbbell className="w-10 h-10 text-zinc-700 mx-auto" />
-          <h2 className="text-lg font-black uppercase text-zinc-400">Descanso</h2>
+          <h2 className="text-lg font-black uppercase text-zinc-400">Dia de Descanso</h2>
         </div>
       ) : (
-        /* Card Cinematográfico do Treino */
-        <div className="relative rounded-[2rem] p-1 overflow-hidden group cursor-pointer" onClick={() => router.push(`/student/workout/${workout.id}`)}>
-          {/* Borda Animada */}
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 via-emerald-500/20 to-zinc-900 opacity-50" />
+        <div className="bg-gradient-to-br from-zinc-900 via-zinc-950 to-black border border-zinc-800 rounded-3xl p-6 shadow-2xl space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl" />
           
-          <div className="relative bg-black rounded-[1.8rem] p-6 h-full flex flex-col justify-between border border-zinc-800/50 z-10 space-y-8">
+          <div className="relative z-10 space-y-5">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.2em]">Treino Sugerido</span>
-                <span className="flex items-center gap-1 text-[9px] font-black text-amber-400 bg-amber-400/10 px-2 py-1 rounded-md uppercase">
-                  <Flame className="w-3 h-3" /> Foco Total
-                </span>
-              </div>
-              <h2 className="text-3xl font-black uppercase text-white leading-none tracking-tight">
+              <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest block mb-1">
+                SEU TREINO DE HOJE
+              </span>
+              <h2 className="text-2xl font-black uppercase text-white leading-tight">
                 {workout.name}
               </h2>
             </div>
 
-            <button className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 active:scale-95 transition-all">
-              <Play className="w-5 h-5 fill-black" />
-              INICIAR TREINO
+            <button
+              onClick={() => router.push(`/student/workout/${workout.id}`)}
+              className="w-full h-14 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl hover:bg-zinc-200"
+            >
+              <Play className="w-5 h-5 fill-black" /> INICIAR TREINO
             </button>
           </div>
         </div>

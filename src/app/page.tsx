@@ -14,12 +14,10 @@ export default function RootPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        // Se não tá logado, manda DIRETO pro Login
         router.replace('/login')
         return
       }
 
-      // Se tá logado, checa se é admin ou aluno
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')

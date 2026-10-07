@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { Plus, User, Loader2, Pencil, X, CheckCircle2 } from 'lucide-react'
+import { Plus, User, Loader2, Pencil, X, CheckCircle2, Zap } from 'lucide-react'
 
 export default function AdminStudentsPage() {
   const [students, setStudents] = useState<any[]>([])
@@ -39,7 +39,6 @@ export default function AdminStudentsPage() {
     setLoading(false)
   }
 
-  // CADASTRAR NOVO ALUNO
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -69,14 +68,12 @@ export default function AdminStudentsPage() {
     setSaving(false)
   }
 
-  // ABRIR MODAL DE EDITAR NOME DO ALUNO
   const handleOpenEditModal = (student: any) => {
     setEditingStudentId(student.id)
     setEditFullName(student.full_name || '')
     setShowEditModal(true)
   }
 
-  // SALVAR NOME EDITADO DO ALUNO
   const handleSaveStudentName = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingStudentId) return
@@ -96,16 +93,23 @@ export default function AdminStudentsPage() {
     setSaving(false)
   }
 
+  // Cor da badge de recuperação pro Treinador
+  const getReadinessBadge = (score: number = 100) => {
+    if (score >= 80) return { label: `${score}% - Pronto`, color: 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40' }
+    if (score >= 50) return { label: `${score}% - Moderado`, color: 'text-amber-400 bg-amber-950/60 border-amber-800/40' }
+    return { label: `${score}% - Fadigado`, color: 'text-rose-400 bg-rose-950/60 border-rose-800/40' }
+  }
+
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black uppercase tracking-wide">Meus Alunos</h1>
-          <p className="text-xs text-zinc-500 font-medium">Gerencie sua consultoria</p>
+          <p className="text-xs text-zinc-500 font-medium">Acompanhe seus atletas</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all shadow-lg"
+          className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg active:scale-95"
         >
           <Plus className="w-4 h-4" /> Cadastrar
         </button>
@@ -122,41 +126,48 @@ export default function AdminStudentsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {students.map((student) => (
-            <div
-              key={student.id}
-              className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center font-black text-white text-sm border border-zinc-800">
-                  {student.full_name ? student.full_name.substring(0, 2).toUpperCase() : 'AL'}
+          {students.map((student) => {
+            const readinessBadge = getReadinessBadge(student.readiness_score)
+
+            return (
+              <div
+                key={student.id}
+                className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-zinc-900 rounded-full flex items-center justify-center font-black text-white text-sm border border-zinc-800 shrink-0">
+                    {student.full_name ? student.full_name.substring(0, 2).toUpperCase() : 'AL'}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-white">{student.full_name || 'Aluno Sem Nome'}</h3>
+                    <p className="text-[11px] text-zinc-500">{student.email}</p>
+                    
+                    {/* INDICADOR DE RECUPERAÇÃO DO ALUNO (Sua ideia!) */}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <Zap className="w-3 h-3 text-amber-400" />
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md border ${readinessBadge.color}`}>
+                        Recuperação: {readinessBadge.label}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm text-white">{student.full_name || 'Aluno Sem Nome'}</h3>
-                  <p className="text-xs text-zinc-500">{student.email}</p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenEditModal(student)}
+                    className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all"
+                    title="Editar Nome"
+                  >
+                    <Pencil className="w-4 h-4 text-emerald-400" />
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase text-emerald-400 bg-emerald-950/50 border border-emerald-800/40 px-2 py-1 rounded-lg">
-                  Ativo
-                </span>
-
-                {/* BOTÃO LÁPIS PARA EDITAR NOME DO ALUNO */}
-                <button
-                  onClick={() => handleOpenEditModal(student)}
-                  className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all"
-                  title="Editar Nome"
-                >
-                  <Pencil className="w-4 h-4 text-emerald-400" />
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {/* MODAL CADASTRAR NOVO ALUNO */}
+      {/* MODAL CADASTRAR ALUNO */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-sm space-y-4">
@@ -170,7 +181,7 @@ export default function AdminStudentsPage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Ex: João Silva"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white"
                 />
               </div>
 
@@ -182,7 +193,7 @@ export default function AdminStudentsPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="joao@email.com"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white"
                 />
               </div>
 
@@ -194,7 +205,7 @@ export default function AdminStudentsPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white focus:outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white"
                 />
               </div>
 
@@ -242,7 +253,7 @@ export default function AdminStudentsPage() {
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white focus:outline-none focus:border-white font-bold"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white font-bold"
                 />
               </div>
 

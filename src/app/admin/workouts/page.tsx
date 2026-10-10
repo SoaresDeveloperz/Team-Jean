@@ -13,6 +13,9 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  ChevronUp,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react'
 
 export default function AdminWorkoutsPage() {
@@ -21,6 +24,7 @@ export default function AdminWorkoutsPage() {
   const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Modais e Edição
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState('')
@@ -33,6 +37,9 @@ export default function AdminWorkoutsPage() {
   const [errorMessage, setErrorMessage] = useState('')
 
   const supabase = createClient()
+
+  // Atalhos de Faixas de Repetições Predefinidas
+  const REP_PRESETS = ['6-8', '8-10', '8-12', '10-12', '12-15', '15-20', 'Até a Falha']
 
   useEffect(() => {
     loadData()
@@ -59,6 +66,23 @@ export default function AdminWorkoutsPage() {
     setLoading(false)
   }
 
+  // REORDENAR EXERCÍCIO (PARA CIMA OU PARA BAIXO)
+  const handleMoveExercise = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === selectedExercises.length - 1)
+    ) {
+      return
+    }
+    const updated = [...selectedExercises]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setSelectedExercises(updated)
+  }
+
+  // ABRIR PARA EDITAR TREINO
   const handleEditWorkout = async (workout: any) => {
     setErrorMessage('')
     setEditingId(workout.id)
@@ -151,6 +175,16 @@ export default function AdminWorkoutsPage() {
   ) => {
     const updated = [...selectedExercises]
     updated[exIdx].planned_sets[setIdx][field] = value
+    setSelectedExercises(updated)
+  }
+
+  // APLICAR PREDEFINIÇÃO DE REPS EM TODAS AS SÉRIES DO EXERCÍCIO
+  const handleApplyPresetToAllSets = (exIdx: number, presetReps: string) => {
+    const updated = [...selectedExercises]
+    updated[exIdx].planned_sets = updated[exIdx].planned_sets.map((s: any) => ({
+      ...s,
+      reps: presetReps,
+    }))
     setSelectedExercises(updated)
   }
 
@@ -351,6 +385,7 @@ export default function AdminWorkoutsPage() {
         </div>
       )}
 
+      {/* MODAL CONSTRUTOR DE TREINOS */}
       {showBuilder && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-4 overflow-y-auto">
           <div className="max-w-md mx-auto w-full space-y-6 pb-20">
@@ -360,7 +395,7 @@ export default function AdminWorkoutsPage() {
                   {editingId ? '✏️ Editar Prescrição' : '⚡ Prescrever Treino'}
                 </h2>
                 <p className="text-xs text-zinc-500">
-                  Configure cada série individualmente
+                  Configure séries e ordene os exercícios
                 </p>
               </div>
               <button
@@ -432,18 +467,44 @@ export default function AdminWorkoutsPage() {
                       key={exIdx}
                       className="bg-zinc-950 border border-zinc-800 rounded-3xl p-4 space-y-4 shadow-xl"
                     >
+                      {/* Cabeçalho do Exercício com Botões de Reordenar ⬆️ ⬇️ */}
                       <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
-                        <div>
-                          <h4 className="font-extrabold text-base text-white">
-                            #{exIdx + 1} {item.name}
-                          </h4>
-                          <p className="text-[10px] text-zinc-400 font-medium mt-0.5">
-                            <span className="text-emerald-400 font-bold">
-                              Alvo:
-                            </span>{' '}
-                            {item.muscle_group}
-                          </p>
+                        <div className="flex items-center gap-3">
+                          {/* BOTÕES PARA REORDENAR EXERCÍCIO */}
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              disabled={exIdx === 0}
+                              onClick={() => handleMoveExercise(exIdx, 'up')}
+                              className="p-1 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-300 disabled:opacity-30 hover:bg-zinc-800"
+                              title="Mover para cima"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={exIdx === selectedExercises.length - 1}
+                              onClick={() => handleMoveExercise(exIdx, 'down')}
+                              className="p-1 bg-zinc-900 border border-zinc-800 rounded-md text-zinc-300 disabled:opacity-30 hover:bg-zinc-800"
+                              title="Mover para baixo"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div>
+                            <h4 className="font-extrabold text-base text-white">
+                              #{exIdx + 1} {item.name}
+                            </h4>
+                            <p className="text-[10px] text-zinc-400 font-medium mt-0.5">
+                              <span className="text-emerald-400 font-bold">
+                                Alvo:
+                              </span>{' '}
+                              {item.muscle_group}
+                            </p>
+                          </div>
                         </div>
+
                         <button
                           type="button"
                           onClick={() => handleRemoveExercise(exIdx)}
@@ -451,6 +512,26 @@ export default function AdminWorkoutsPage() {
                         >
                           <X className="w-5 h-5" />
                         </button>
+                      </div>
+
+                      {/* CHIPS DE PREDEFINIÇÃO RÁPIDA DE REPETIÇÕES */}
+                      <div className="space-y-1.5 bg-zinc-900/50 p-2.5 rounded-2xl border border-zinc-800/80">
+                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-zinc-400">
+                          <Sparkles className="w-3 h-3 text-emerald-400" />
+                          <span>Predefinição Rápida de Reps (Aplicar em todas)</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {REP_PRESETS.map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => handleApplyPresetToAllSets(exIdx, preset)}
+                              className="text-[9px] font-bold uppercase bg-black hover:bg-white hover:text-black text-zinc-300 border border-zinc-800 px-2 py-1 rounded-lg transition-all"
+                                                        >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div className="space-y-2">
@@ -519,7 +600,7 @@ export default function AdminWorkoutsPage() {
                                     <option value="top">Top Set</option>
                                     <option value="backoff">
                                       Back-off Set
-                  </option>
+                                    </option>
                                     <option value="cluster">Cluster Set</option>
                                     <option value="myo_reps">Myo Reps</option>
                                   </select>
@@ -664,3 +745,5 @@ export default function AdminWorkoutsPage() {
     </div>
   )
 }
+                          
+            

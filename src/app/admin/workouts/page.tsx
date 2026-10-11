@@ -13,8 +13,9 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
+  User,
   Sparkles,
 } from 'lucide-react'
 
@@ -24,7 +25,10 @@ export default function AdminWorkoutsPage() {
   const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modais e Edição
+  // Controle de sanfona (quais alunos estão expandidos)
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({})
+
+  // Modais e Estados de Edição
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState('')
@@ -38,7 +42,7 @@ export default function AdminWorkoutsPage() {
 
   const supabase = createClient()
 
-  // Atalhos de Faixas de Repetições Predefinidas
+  // Atalhos de Faixas de Repetições
   const REP_PRESETS = ['6-8', '8-10', '8-12', '10-12', '12-15', '15-20', 'Até a Falha']
 
   useEffect(() => {
@@ -66,20 +70,12 @@ export default function AdminWorkoutsPage() {
     setLoading(false)
   }
 
-  // REORDENAR EXERCÍCIO (PARA CIMA OU PARA BAIXO)
-  const handleMoveExercise = (index: number, direction: 'up' | 'down') => {
-    if (
-      (direction === 'up' && index === 0) ||
-      (direction === 'down' && index === selectedExercises.length - 1)
-    ) {
-      return
-    }
-    const updated = [...selectedExercises]
-    const targetIndex = direction === 'up' ? index - 1 : index + 1
-    const temp = updated[index]
-    updated[index] = updated[targetIndex]
-    updated[targetIndex] = temp
-    setSelectedExercises(updated)
+  // Alternar expandir/recolher card do aluno
+  const toggleStudentAccordion = (studentId: string) => {
+    setExpandedStudents((prev) => ({
+      ...prev,
+      [studentId]: !prev[studentId],
+    }))
   }
 
   // ABRIR PARA EDITAR TREINO
@@ -121,10 +117,10 @@ export default function AdminWorkoutsPage() {
     setShowBuilder(true)
   }
 
-  const handleCreateNew = () => {
+  const handleCreateNew = (studentId?: string) => {
     setErrorMessage('')
     setEditingId(null)
-    setSelectedStudent('')
+    setSelectedStudent(studentId || '')
     setWorkoutName('')
     setSelectedExercises([])
     setShowBuilder(true)
@@ -147,6 +143,21 @@ export default function AdminWorkoutsPage() {
       },
     ])
     setShowExPicker(false)
+  }
+
+  const handleMoveExercise = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === selectedExercises.length - 1)
+    ) {
+      return
+    }
+    const updated = [...selectedExercises]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setSelectedExercises(updated)
   }
 
   const handleAddSetToExercise = (exIdx: number) => {
@@ -178,7 +189,6 @@ export default function AdminWorkoutsPage() {
     setSelectedExercises(updated)
   }
 
-  // APLICAR PREDEFINIÇÃO DE REPS EM TODAS AS SÉRIES DO EXERCÍCIO
   const handleApplyPresetToAllSets = (exIdx: number, presetReps: string) => {
     const updated = [...selectedExercises]
     updated[exIdx].planned_sets = updated[exIdx].planned_sets.map((s: any) => ({
@@ -278,6 +288,8 @@ export default function AdminWorkoutsPage() {
         ])
       }
 
+      // Expande o card desse aluno automaticamente
+      setExpandedStudents((prev) => ({ ...prev, [selectedStudent]: true }))
       setShowBuilder(false)
       loadData()
     } catch (err: any) {
@@ -318,6 +330,15 @@ export default function AdminWorkoutsPage() {
     }
   }
 
+  // AGRUPAMENTO DOS TREINOS POR ALUNO
+  const studentGroups = students.map((student) => {
+    const studentWorkouts = workouts.filter((w) => w.student_id === student.id)
+    return {
+      student,
+      workouts: studentWorkouts,
+    }
+  })
+
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
@@ -326,11 +347,11 @@ export default function AdminWorkoutsPage() {
             Treinos dos Alunos
           </h1>
           <p className="text-xs text-zinc-500 font-medium">
-            Monte e prescreva séries individuais
+            Organizados por atleta
           </p>
         </div>
         <button
-          onClick={handleCreateNew}
+          onClick={() => handleCreateNew()}
           className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
         >
           <Plus className="w-4 h-4" /> Montar Treino
@@ -341,47 +362,117 @@ export default function AdminWorkoutsPage() {
         <div className="flex justify-center py-12 text-zinc-500">
           <Loader2 className="animate-spin w-8 h-8" />
         </div>
-      ) : workouts.length === 0 ? (
+      ) : studentGroups.length === 0 ? (
         <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-2">
           <ClipboardList className="w-10 h-10 text-zinc-700 mx-auto" />
           <p className="text-sm font-semibold text-zinc-400">
-            Nenhum treino montado ainda.
+            Nenhum aluno cadastrado.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {workouts.map((w) => (
-            <div
-              key={w.id}
-              className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between"
-            >
-              <div className="space-y-1">
-                <span className="text-[9px] font-black uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-md">
-                  Aluno: {w.profiles?.full_name || w.profiles?.email}
-                </span>
-                <h3 className="font-extrabold text-base text-white">
-                  {w.name}
-                </h3>
-              </div>
+        /* ESTRUTURA EM SANFORNA / ACCORDION AGRUPADA POR ALUNO */
+        <div className="space-y-4">
+          {studentGroups.map(({ student, workouts: sWorkouts }) => {
+            const isExpanded = !!expandedStudents[student.id]
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleEditWorkout(w)}
-                  className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white hover:bg-zinc-800 transition-all"
-                  title="Editar Treino"
+            return (
+              <div
+                key={student.id}
+                className="bg-zinc-950 border border-zinc-900 rounded-3xl overflow-hidden transition-all shadow-xl"
+              >
+                {/* CABEÇALHO DO CARD DO ALUNO (Tocar para expandir) */}
+                <div
+                  onClick={() => toggleStudentAccordion(student.id)}
+                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-zinc-900/50 transition-colors select-none"
                 >
-                  <Pencil className="w-4 h-4 text-emerald-400" />
-                </button>
-                <button
-                  onClick={() => handleDeleteWorkout(w.id)}
-                  className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 hover:text-red-400 transition-all"
-                  title="Excluir Treino"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 bg-zinc-900 rounded-2xl flex items-center justify-center font-black text-white text-sm border border-zinc-800 shrink-0">
+                      {student.full_name ? student.full_name.substring(0, 2).toUpperCase() : 'AL'}
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-white">
+                        {student.full_name || 'Aluno sem nome'}
+                      </h3>
+                      <p className="text-[11px] text-zinc-500 font-medium">
+                        {sWorkouts.length} {sWorkouts.length === 1 ? 'Treino Prescrito' : 'Treinos Prescritos'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-1 rounded-lg">
+                      {sWorkouts.length}
+                    </span>
+                    <div className="p-1 text-zinc-500">
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-white" /> : <ChevronDown className="w-5 h-5" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* CONTEÚDO EXPANDÍVEL COM OS TREINOS DO ALUNO (Animação Fluida) */}
+                {isExpanded && (
+                  <div className="border-t border-zinc-900 bg-black/60 p-4 space-y-3 animate-fadeIn">
+                    {sWorkouts.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-zinc-600 font-medium space-y-2">
+                        <p>Nenhum treino prescrito para este aluno ainda.</p>
+                        <button
+                          onClick={() => handleCreateNew(student.id)}
+                          className="text-emerald-400 font-bold hover:underline"
+                        >
+                          + Criar Primeiro Treino
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          {sWorkouts.map((w) => (
+                            <div
+                              key={w.id}
+                              className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between hover:border-zinc-700 transition-all"
+                            >
+                              <div className="space-y-0.5">
+                                <h4 className="font-extrabold text-sm text-white">
+                                  {w.name}
+                                </h4>
+                                <span className="text-[9px] font-bold text-zinc-500 block">
+                                  Criado em {new Date(w.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditWorkout(w)}
+                                  className="p-2 bg-zinc-950 border border-zinc-800 rounded-xl text-emerald-400 hover:text-white transition-all"
+                                  title="Editar Treino"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteWorkout(w.id)}
+                                  className="p-2 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-500 hover:text-red-400 transition-all"
+                                  title="Excluir Treino"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Botão Atalho para Montar Mais um Treino para Esse Aluno */}
+                        <button
+                          onClick={() => handleCreateNew(student.id)}
+                          className="w-full py-3 bg-zinc-900 border border-dashed border-zinc-800 rounded-2xl text-xs font-bold text-zinc-400 hover:text-white uppercase flex items-center justify-center gap-1.5 transition-all mt-2"
+                        >
+                          <Plus className="w-4 h-4" /> Adicionar Treino para {student.full_name?.split(' ')[0]}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -395,7 +486,7 @@ export default function AdminWorkoutsPage() {
                   {editingId ? '✏️ Editar Prescrição' : '⚡ Prescrever Treino'}
                 </h2>
                 <p className="text-xs text-zinc-500">
-                  Configure séries e ordene os exercícios
+                  Configure cada série individualmente
                 </p>
               </div>
               <button
@@ -433,7 +524,8 @@ export default function AdminWorkoutsPage() {
                 </select>
               </div>
 
-              <div>
+  
+                                  <div>
                 <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">
                   Nome do Treino
                 </label>
@@ -470,7 +562,6 @@ export default function AdminWorkoutsPage() {
                       {/* Cabeçalho do Exercício com Botões de Reordenar ⬆️ ⬇️ */}
                       <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
                         <div className="flex items-center gap-3">
-                          {/* BOTÕES PARA REORDENAR EXERCÍCIO */}
                           <div className="flex flex-col gap-1">
                             <button
                               type="button"
@@ -518,7 +609,7 @@ export default function AdminWorkoutsPage() {
                       <div className="space-y-1.5 bg-zinc-900/50 p-2.5 rounded-2xl border border-zinc-800/80">
                         <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-zinc-400">
                           <Sparkles className="w-3 h-3 text-emerald-400" />
-                          <span>Predefinição Rápida de Reps (Aplicar em todas)</span>
+                          <span>Predefinição Rápida de Reps</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {REP_PRESETS.map((preset) => (
@@ -527,7 +618,7 @@ export default function AdminWorkoutsPage() {
                               type="button"
                               onClick={() => handleApplyPresetToAllSets(exIdx, preset)}
                               className="text-[9px] font-bold uppercase bg-black hover:bg-white hover:text-black text-zinc-300 border border-zinc-800 px-2 py-1 rounded-lg transition-all"
-                                                        >
+                            >
                               {preset}
                             </button>
                           ))}
@@ -745,5 +836,3 @@ export default function AdminWorkoutsPage() {
     </div>
   )
 }
-                          
-            

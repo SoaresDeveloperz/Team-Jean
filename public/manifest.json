@@ -1,17 +1,27 @@
 {
   "name": "Team Jean Consultoria",
   "short_name": "Team Jean",
-  "description": "App de Treino Profissional Team Jean",
+  "description": "App Oficial de Treino da Consultoria Team Jean",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "orientation": "portrait",
+  "lang": "pt-BR",
+  "categories": ["fitness", "lifestyle"],
   "icons": [
     {
       "src": "https://iqoiyqjndyvcputmllwq.supabase.co/storage/v1/object/public/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://iqoiyqjndyvcputmllwq.supabase.co/storage/v1/object/public/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

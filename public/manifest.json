@@ -1,0 +1,17 @@
+{
+  "name": "Team Jean Consultoria",
+  "short_name": "Team Jean",
+  "description": "App de Treino Profissional Team Jean",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "https://iqoiyqjndyvcputmllwq.supabase.co/storage/v1/object/public/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

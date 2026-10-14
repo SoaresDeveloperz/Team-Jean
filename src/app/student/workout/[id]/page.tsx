@@ -37,7 +37,6 @@ export default function WorkoutExecutionPage() {
     return () => clearInterval(timerRef.current)
   }, [])
 
-  // Cronômetro
   useEffect(() => {
     if (isTimerRunning && restSeconds > 0) {
       timerRef.current = setInterval(() => {
@@ -190,6 +189,7 @@ export default function WorkoutExecutionPage() {
 
   return (
     <div className="space-y-6 pb-28">
+      {/* Topo do Treino */}
       <div className="flex items-center justify-between border-b border-zinc-900 pb-4 sticky top-0 bg-black/90 backdrop-blur-md z-30 pt-2">
         <button onClick={() => router.back()} className="p-2 text-zinc-400 hover:text-white"><ArrowLeft className="w-6 h-6" /></button>
         <div>
@@ -199,6 +199,7 @@ export default function WorkoutExecutionPage() {
         <button onClick={() => setShowModal(true)} className="bg-white text-black font-extrabold px-3.5 py-2 rounded-xl text-xs uppercase shadow-lg">Concluir</button>
       </div>
 
+      {/* Lista de Exercícios */}
       {assignedExercises.map((exItem) => {
         const last = lastRecords[exItem.id]
         const sets = setsData[exItem.id] || []
@@ -334,7 +335,7 @@ export default function WorkoutExecutionPage() {
               </div>
 
               <div className="space-y-3 pt-2">
-                <button onClick={() => alert('Print tirado! Compartilhe no Instagram e marque @teamjean')} className="w-full bg-white text-black font-black p-4 rounded-2xl text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
+                <button onClick={() => alert('Tire um print da tela e poste no Instagram marcando @teamjean !')} className="w-full bg-white text-black font-black p-4 rounded-2xl text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
                   <Share2 className="w-4 h-4" /> COMPARTILHAR NOS STORIES
                 </button>
                 <button onClick={() => router.push('/student/today')} className="w-full bg-zinc-900 text-zinc-400 font-bold p-3 rounded-2xl text-xs uppercase">
@@ -347,4 +348,4 @@ export default function WorkoutExecutionPage() {
       )}
     </div>
   )
-}
+                  }

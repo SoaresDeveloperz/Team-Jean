@@ -30,7 +30,6 @@ export default function StudentTodayPage() {
     }
     setUserId(user.id)
 
-    // Pega o perfil do Aluno
     const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (p) {
       setProfile(p)
@@ -39,7 +38,6 @@ export default function StudentTodayPage() {
       }
     }
 
-    // Contagem de Treinos Concluídos no Mês (Streak Nike)
     const startOfMonth = new Date()
     startOfMonth.setDate(1)
     startOfMonth.setHours(0, 0, 0, 0)
@@ -53,7 +51,6 @@ export default function StudentTodayPage() {
 
     setCompletedCount(count || 0)
 
-    // Treino Ativo Prescrito
     const { data: w } = await supabase
       .from('assigned_workouts')
       .select('*')
@@ -76,155 +73,175 @@ export default function StudentTodayPage() {
     setLoading(false)
   }
 
-  // Atualiza no banco o nível de recuperação (para o Treinador Jean ver)
   const handleReadinessChange = async (value: number) => {
     setReadiness(value)
     if (userId) {
-      await supabase
-        .from('profiles')
-        .update({
-          readiness_score: value,
-          readiness_updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId)
+      await supabase.from('profiles').update({
+        readiness_score: value,
+        readiness_updated_at: new Date().toISOString(),
+      }).eq('id', userId)
     }
   }
 
-  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' })
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Loader2 className="w-8 h-8 animate-spin text-zinc-500" />
-      </div>
-    )
+  // Cores dinâmicas para o termômetro de recuperação
+  const getReadinessColor = () => {
+    if (readiness >= 80) return 'text-emerald-400'
+    if (readiness >= 50) return 'text-amber-400'
+    return 'text-rose-400'
   }
 
+  if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-zinc-600" /></div>
+
   return (
-    <div className="space-y-6 pb-28">
-      {/* Topo NIKE STYLE: Nome + Sequência Streak */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest block">
+    <div className="space-y-7 pb-28">
+      {/* HEADER DA PÁGINA */}
+      <div className="flex items-end justify-between px-1">
+        <div className="space-y-0.5">
+          <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-[0.15em]">
             {today}
-          </span>
-          <h1 className="text-3xl font-black text-white leading-none uppercase">
+          </p>
+          <h1 className="text-3xl font-black text-white tracking-tight">
             Fala, {profile?.full_name?.split(' ')[0] || 'Atleta'}!
           </h1>
         </div>
 
-        {/* STREAK COUNTER NIKE */}
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl px-3.5 py-2 flex items-center gap-2 shadow-xl">
-          <Flame className="w-5 h-5 text-amber-500 animate-pulse fill-amber-500" />
-          <div className="text-right">
-            <span className="text-xs font-black text-white block leading-none">{completedCount}</span>
-            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider">No Mês</span>
+        {/* STREAK BADGE */}
+        <div className="bg-zinc-900/80 border border-zinc-800/80 backdrop-blur-md rounded-2xl px-3 py-1.5 flex items-center gap-2">
+          <Flame className="w-5 h-5 text-amber-500 fill-amber-500/20" />
+          <div className="flex flex-col items-end leading-none">
+            <span className="text-sm font-black text-white">{completedCount}</span>
+            <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest mt-0.5">No Mês</span>
           </div>
         </div>
       </div>
 
-      {/* Termômetro de Prontidão (Whoop/NTC) */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 space-y-3">
+      {/* WIDGET DE RECUPERAÇÃO (READINESS) */}
+      <div className="bg-[#0c0c0c] border border-zinc-900 rounded-3xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-black uppercase tracking-wider text-zinc-300">
-              Prontidão de Treino
+            <div className={`p-1.5 rounded-lg bg-zinc-900/50 ${getReadinessColor()}`}>
+              <Activity className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-extrabold uppercase tracking-widest text-zinc-400">
+              PRONTIDÃO
             </span>
           </div>
-          <span className="text-base font-black text-white">{readiness}%</span>
+          <span className={`text-xl font-black ${getReadinessColor()}`}>{readiness}%</span>
         </div>
 
-        <input
-          type="range"
-          min="10"
-          max="100"
-          step="10"
-          value={readiness}
-          onChange={(e) => handleReadinessChange(Number(e.target.value))}
-          className="w-full h-2 bg-zinc-900 rounded-lg appearance-none cursor-pointer accent-white"
-        />
+        <div className="relative pt-2">
+          <input
+            type="range"
+            min="10"
+            max="100"
+            step="10"
+            value={readiness}
+            onChange={(e) => handleReadinessChange(Number(e.target.value))}
+            className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-white"
+          />
+          <div className="flex justify-between mt-2 px-1">
+            <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">Fadigado</span>
+            <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">Recuperado</span>
+          </div>
+        </div>
       </div>
 
-      {/* HERO CARD DE TREINO (Nike / Adidas Style) */}
       {!workout ? (
-        <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-3">
-          <Dumbbell className="w-10 h-10 text-zinc-700 mx-auto" />
-          <h2 className="text-lg font-black uppercase text-zinc-400">Dia de Descanso</h2>
-          <p className="text-xs text-zinc-600">Nenhum treino ativo agendado. Descanse a musculatura!</p>
+        <div className="bg-[#0c0c0c] border border-zinc-900 rounded-3xl p-10 text-center space-y-3">
+          <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-2">
+            <Dumbbell className="w-5 h-5 text-zinc-500" />
+          </div>
+          <h2 className="text-sm font-black uppercase text-zinc-400 tracking-widest">Dia de Descanso</h2>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+          {/* HERO CARD CINEMATOGRÁFICO DO TREINO */}
+          <div className="relative bg-zinc-950 rounded-[2rem] p-6 overflow-hidden shadow-2xl border border-zinc-800/60">
+            {/* Background Texture/Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/80 via-black to-black z-0" />
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] z-0" />
+            <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-[60px] z-0" />
 
-            <div className="space-y-3 relative z-10">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-1 rounded-lg">
-                  PRESCRITO PELO TREINADOR
-                </span>
-                <span className="text-xs font-bold text-zinc-400 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> ~50 min
-                </span>
+            <div className="relative z-10 flex flex-col h-full justify-between space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400 bg-emerald-950/30 px-2.5 py-1 rounded-full border border-emerald-900/50">
+                    SESSÃO ATIVA
+                  </span>
+                  <span className="text-[10px] font-bold text-zinc-400 flex items-center gap-1 bg-zinc-900/50 px-2 py-1 rounded-full backdrop-blur-sm">
+                    <Clock className="w-3 h-3" /> ~50 min
+                  </span>
+                </div>
+
+                <div className="pt-2">
+                  <h2 className="text-3xl font-black uppercase tracking-tight text-white leading-none">
+                    {workout.name}
+                  </h2>
+                  
+                  {/* Chips de Músculos Compactos */}
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {Array.from(new Set(exercises.map(ex => ex.exercises?.muscle_group))).slice(0, 3).map((muscle, idx) => (
+                      <span key={idx} className="text-[9px] font-bold uppercase tracking-wider text-zinc-300 bg-zinc-800/80 px-2.5 py-1 rounded-md">
+                        {muscle as string}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              <h2 className="text-3xl font-black uppercase tracking-tight text-white leading-none pt-1">
-                {workout.name}
-              </h2>
+              {/* Botão de Iniciar Premium */}
+              <button
+                onClick={() => router.push(`/student/workout/${workout.id}`)}
+                className="w-full bg-white hover:bg-zinc-200 text-black font-black text-sm uppercase tracking-[0.2em] py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)]"
+              >
+                <Play className="w-5 h-5 fill-black" /> COMEÇAR
+              </button>
             </div>
-
-            {/* Músculos do Treino */}
-            <div className="flex flex-wrap gap-2 pt-1 border-t border-zinc-900">
-              {exercises.slice(0, 3).map((ex, idx) => (
-                <span key={idx} className="text-[9px] font-bold uppercase text-zinc-400 bg-zinc-900 px-2.5 py-1 rounded-md border border-zinc-800">
-                  {ex.exercises?.muscle_group}
-                </span>
-              ))}
-              {exercises.length > 3 && (
-                <span className="text-[9px] font-bold uppercase text-zinc-500 bg-zinc-900 px-2 py-1 rounded-md">
-                  +{exercises.length - 3} mais
-                </span>
-              )}
-            </div>
-
-            {/* Botão Gigante Nike Play */}
-            <button
-              onClick={() => router.push(`/student/workout/${workout.id}`)}
-              className="w-full bg-white text-black font-black text-sm uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl hover:bg-zinc-200"
-            >
-              <Play className="w-5 h-5 fill-black" /> INICIAR SESSÃO
-            </button>
           </div>
 
-          {/* VISÃO GERAL DOS EXERCÍCIOS */}
-          <div className="space-y-2 pt-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 pl-1 block">
-              Lista de Exercícios ({exercises.length})
-            </span>
+          {/* LISTA DE EXERCÍCIOS ULTRA CLEAN */}
+          <div className="pt-2">
+            <div className="flex items-center justify-between px-2 mb-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                Resumo da Sessão
+              </span>
+              <span className="text-[10px] font-bold text-zinc-600">{exercises.length} exercícios</span>
+            </div>
 
-            {exercises.map((item, idx) => {
-              const setsCount = item.planned_sets ? item.planned_sets.length : item.sets_count
-              return (
-                <div key={item.id} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-black text-zinc-600 w-4 text-center">{idx + 1}</span>
-                    <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800">
-                      <Dumbbell className="w-5 h-5 text-zinc-400" />
+            <div className="space-y-1.5">
+              {exercises.map((item, idx) => {
+                const setsCount = item.planned_sets ? item.planned_sets.length : item.sets_count
+                return (
+                  <div 
+                    key={item.id} 
+                    className="bg-[#0c0c0c] border border-zinc-900/80 rounded-2xl p-3.5 flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <span className="text-[10px] font-black text-zinc-600 w-3 text-right">
+                        {idx + 1}
+                      </span>
+                      <div className="w-9 h-9 bg-zinc-900/80 rounded-xl flex items-center justify-center border border-zinc-800/50">
+                        <Dumbbell className="w-4 h-4 text-zinc-400" />
+                      </div>
+                      <div className="flex flex-col justify-center">
+                        <h3 className="font-extrabold text-xs text-zinc-200 leading-tight">
+                          {item.exercises?.name}
+                        </h3>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500 mt-1">
+                          {setsCount} {setsCount === 1 ? 'Série' : 'Séries'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-sm text-white">{item.exercises?.name}</h3>
-                      <p className="text-[10px] font-bold uppercase text-zinc-500 mt-0.5">
-                        {setsCount} Séries Prescritas
-                      </p>
-                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-700" />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-zinc-600" />
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         </div>
       )}
     </div>
   )
-          }
+}

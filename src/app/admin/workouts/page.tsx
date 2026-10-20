@@ -37,8 +37,8 @@ import { Alert, FeedbackAlert, type Feedback } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
 import { PageLoader } from '@/components/ui/page-loader'
 
-type WorkoutWithMeta = AssignedWorkout & { assigned_workout_exercises?: { count: number }[] }
-type TemplateWithMeta = { id: string; name: string; workout_template_exercises?: { count: number }[] }
+type WorkoutWithMeta = AssignedWorkout
+type TemplateWithMeta = { id: string; name: string }
 
 type BuilderExercise = {
   key: string
@@ -66,10 +66,6 @@ type BuilderMode = { kind: 'workout' | 'template'; editingId: string | null }
 
 const inputClassName =
   'w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white placeholder:text-zinc-600 focus:border-white focus:outline-none'
-
-function countOf(meta: { count: number }[] | undefined) {
-  return meta?.[0]?.count ?? 0
-}
 
 export default function AdminWorkoutsPage() {
   const [supabase] = useState(() => createClient())
@@ -117,9 +113,9 @@ export default function AdminWorkoutsPage() {
       const [workoutsResult, templatesResult, studentsResult, exercisesResult] = await Promise.all([
         supabase
           .from('assigned_workouts')
-          .select('*, profiles(full_name, email), assigned_workout_exercises(count)')
+          .select('*, profiles(full_name, email)')
           .order('created_at', { ascending: false }),
-        supabase.from('workout_templates').select('id, name, workout_template_exercises(count)').order('name'),
+        supabase.from('workout_templates').select('id, name').order('name'),
         supabase.from('profiles').select('id, role, full_name, email').eq('role', 'student').order('full_name'),
         supabase.from('exercises').select('*').order('name'),
       ])
@@ -655,8 +651,7 @@ export default function AdminWorkoutsPage() {
                                   )}
                                 </div>
                                 <span className="mt-0.5 block text-[10px] font-bold text-zinc-500">
-                                  {countOf(workout.assigned_workout_exercises)} exercícios · criado em{' '}
-                                  {new Date(workout.created_at).toLocaleDateString('pt-BR')}
+                                  Criado em {new Date(workout.created_at).toLocaleDateString('pt-BR')}
                                 </span>
                               </div>
 
@@ -756,7 +751,7 @@ export default function AdminWorkoutsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span className="rounded-md border border-amber-800/40 bg-amber-950/60 px-2 py-0.5 text-[9px] font-black uppercase text-amber-400">
-                        Modelo · {countOf(template.workout_template_exercises)} exercícios
+                        Modelo pré-definido
                       </span>
                       <h3 className="mt-1 truncate text-base font-extrabold text-white">{template.name}</h3>
                     </div>

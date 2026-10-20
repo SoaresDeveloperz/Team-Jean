@@ -18,8 +18,7 @@ type StudentProfile = {
 type WorkoutSessionRow = {
   id: string
   student_id: string
-  created_at: string
-  completed_at: string | null
+  completed_at: string
   status: string
   session_rpe: number | null
   assigned_workouts: { name: string | null } | null
@@ -30,7 +29,6 @@ type CompletedSet = {
   exercise_id: string
   weight_kg: number | null
   reps: number | null
-  created_at: string | null
 }
 
 type ExerciseMuscles = {
@@ -138,12 +136,13 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         const weekEnd = new Date(weekStart)
         weekEnd.setDate(weekEnd.getDate() + 7)
 
+        // Só treinos concluídos contam: a data de referência é a conclusão.
         let sessionsQuery = supabase
           .from('workout_sessions')
-          .select('id, student_id, created_at, completed_at, status, session_rpe, assigned_workouts(name)')
-          .gte('created_at', weekStart.toISOString())
-          .lt('created_at', weekEnd.toISOString())
-          .in('status', ['in_progress', 'completed'])
+          .select('id, student_id, completed_at, status, session_rpe, assigned_workouts(name)')
+          .eq('status', 'completed')
+          .gte('completed_at', weekStart.toISOString())
+          .lt('completed_at', weekEnd.toISOString())
         if (studentId) sessionsQuery = sessionsQuery.eq('student_id', studentId)
 
         const { data: sessionRows, error: sessionsError } = await sessionsQuery
@@ -155,7 +154,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         if (sessionIds.length > 0) {
           const { data, error } = await supabase
             .from('session_sets')
-            .select('session_id, exercise_id, weight_kg, reps, created_at')
+            .select('session_id, exercise_id, weight_kg, reps')
             .in('session_id', sessionIds)
             .eq('completed', true)
           if (error) throw error
@@ -165,10 +164,8 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         const exerciseIds = [...new Set(sets.map((set) => set.exercise_id))]
         let exerciseRows: ExerciseMuscles[] = []
         if (exerciseIds.length > 0) {
-          const { data, error } = await supabase
-            .from('exercises')
-            .select('id, name, muscle_group, secondary_muscle')
-            .in('id', exerciseIds)
+          // select('*'): secondary_muscle pode não existir na tabela.
+          const { data, error } = await supabase.from('exercises').select('*').in('id', exerciseIds)
           if (error) throw error
           exerciseRows = (data ?? []) as ExerciseMuscles[]
         }
@@ -181,9 +178,8 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           return { day: weekday.day, shortName: weekday.shortName, date, sets: 0, volume: 0, sessions: [] }
         })
 
-        const completedSessions = sessions.filter((session) => session.status === 'completed')
-        for (const session of completedSessions) {
-          const weekday = getWeekday(new Date(session.completed_at ?? session.created_at))
+        for (const session of sessions) {
+          const weekday = getWeekday(new Date(session.completed_at))
           daily[weekday - 1].sessions.push({
             id: session.id,
             workoutName: session.assigned_workouts?.name || 'Treino',
@@ -204,7 +200,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         let totalVolume = 0
         for (const set of sets) {
           const session = sessionById.get(set.session_id)
-          const dayData = daily[getWeekday(new Date(set.created_at ?? session?.created_at ?? weekStart)) - 1]
+          const dayData = daily[getWeekday(new Date(session?.completed_at ?? weekStart)) - 1]
           const volume = Math.max(0, Number(set.weight_kg) || 0) * Math.max(0, Number(set.reps) || 0)
           totalVolume += volume
           dayData.sets += 1
@@ -234,10 +230,10 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           }))
           .sort((first, second) => second.effectiveSets - first.effectiveSets)
 
-        const rpeValues = completedSessions
+        const rpeValues = sessions
           .filter((session) => session.session_rpe != null)
           .map((session) => Number(session.session_rpe))
-        const trainedStudentIds = new Set(completedSessions.map((session) => session.student_id))
+        const trainedStudentIds = new Set(sessions.map((session) => session.student_id))
 
         if (!active) return
         setStudents(studentRows)
@@ -245,7 +241,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           daily,
           totalSets: sets.length,
           totalVolume,
-          completedSessions: completedSessions.length,
+          completedSessions: sessions.length,
           averageRpe: rpeValues.length > 0 ? rpeValues.reduce((total, value) => total + value, 0) / rpeValues.length : null,
           muscles,
           studentsWithoutTraining:

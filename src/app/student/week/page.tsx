@@ -5,14 +5,15 @@ import Link from 'next/link'
 import { ArrowRight, Dumbbell } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
-import { RESUME_WINDOW_MS, pickNextWorkout } from '@/lib/workouts'
+import { pickNextWorkout } from '@/lib/workouts'
+import { readActiveSession } from '@/lib/active-session'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { PageLoader } from '@/components/ui/page-loader'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 
 type RoutineWorkout = AssignedWorkout & {
-  assigned_workout_exercises?: { count: number }[]
+  exerciseCount: number
   lastDoneAt: string | null
   inProgress: boolean
 }
@@ -33,15 +34,16 @@ export default function StudentWeekPage() {
       const [workoutsResult, sessionsResult] = await Promise.all([
         supabase
           .from('assigned_workouts')
-          .select('*, assigned_workout_exercises(count)')
+          .select('*')
           .eq('student_id', user.id)
           .eq('is_current', true)
           .order('name', { ascending: true }),
         supabase
           .from('workout_sessions')
-          .select('assigned_workout_id, status, created_at, completed_at')
+          .select('assigned_workout_id, completed_at')
           .eq('student_id', user.id)
-          .order('created_at', { ascending: false })
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
           .limit(60),
       ])
       if (!active) return
@@ -53,25 +55,33 @@ export default function StudentWeekPage() {
         return
       }
 
-      const sessions = (sessionsResult.data ?? []) as {
-        assigned_workout_id: string
-        status: string
-        created_at: string
-        completed_at: string | null
-      }[]
+      const workoutRows = (workoutsResult.data ?? []) as AssignedWorkout[]
+      const exerciseCounts = new Map<string, number>()
+      if (workoutRows.length > 0) {
+        const { data: exerciseRows } = await supabase
+          .from('assigned_workout_exercises')
+          .select('assigned_workout_id')
+          .in(
+            'assigned_workout_id',
+            workoutRows.map((workout) => workout.id),
+          )
+        if (!active) return
+        for (const row of (exerciseRows ?? []) as { assigned_workout_id: string }[]) {
+          exerciseCounts.set(row.assigned_workout_id, (exerciseCounts.get(row.assigned_workout_id) ?? 0) + 1)
+        }
+      }
+
       const lastDone = new Map<string, string>()
-      for (const session of sessions) {
-        if (session.status === 'completed' && session.completed_at && !lastDone.has(session.assigned_workout_id)) {
+      for (const session of (sessionsResult.data ?? []) as { assigned_workout_id: string; completed_at: string | null }[]) {
+        if (session.completed_at && !lastDone.has(session.assigned_workout_id)) {
           lastDone.set(session.assigned_workout_id, session.completed_at)
         }
       }
-      const inProgressId =
-        sessions.find(
-          (session) => session.status === 'in_progress' && Date.now() - new Date(session.created_at).getTime() < RESUME_WINDOW_MS,
-        )?.assigned_workout_id ?? null
+      const inProgressId = readActiveSession(user.id)?.workoutId ?? null
 
-      const rows = ((workoutsResult.data ?? []) as RoutineWorkout[]).map((workout) => ({
+      const rows = workoutRows.map((workout) => ({
         ...workout,
+        exerciseCount: exerciseCounts.get(workout.id) ?? 0,
         lastDoneAt: lastDone.get(workout.id) ?? null,
         inProgress: workout.id === inProgressId,
       }))
@@ -106,7 +116,6 @@ export default function StudentWeekPage() {
           <ul className="space-y-3">
             {workouts.map((workout, index) => {
               const isNext = workout.id === nextWorkoutId
-              const exerciseCount = workout.assigned_workout_exercises?.[0]?.count ?? 0
               return (
                 <li key={workout.id}>
                   <Link
@@ -138,7 +147,7 @@ export default function StudentWeekPage() {
                           )}
                         </div>
                         <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                          {exerciseCount} exercícios ·{' '}
+                          {workout.exerciseCount} exercícios ·{' '}
                           {workout.lastDoneAt
                             ? `feito em ${new Date(workout.lastDoneAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
                             : 'ainda não feito'}

@@ -12,8 +12,9 @@ type SetRow = {
   session_id: string
   weight_kg: number | null
   reps: number | null
-  created_at: string | null
 }
+
+type CompletedSession = { id: string; completed_at: string | null }
 
 type SessionBest = {
   sessionId: string
@@ -34,7 +35,8 @@ function formatKg(value: number) {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value)
 }
 
-function groupBestSetPerSession(rows: SetRow[]) {
+// Melhor série (maior carga; empate, mais reps) de cada treino, em ordem de data.
+function groupBestSetPerSession(rows: SetRow[], dateBySession: Map<string, string>) {
   const bySession = new Map<string, SessionBest>()
 
   for (const row of rows) {
@@ -43,7 +45,7 @@ function groupBestSetPerSession(rows: SetRow[]) {
     const current = bySession.get(row.session_id)
 
     if (!current) {
-      bySession.set(row.session_id, { sessionId: row.session_id, date: row.created_at ?? '', weight, reps })
+      bySession.set(row.session_id, { sessionId: row.session_id, date: dateBySession.get(row.session_id) ?? '', weight, reps })
     } else if (weight > current.weight || (weight === current.weight && reps > current.reps)) {
       current.weight = weight
       current.reps = reps
@@ -55,7 +57,7 @@ function groupBestSetPerSession(rows: SetRow[]) {
 
 export default function StudentProgressPage() {
   const [supabase] = useState(() => createClient())
-  const [userId, setUserId] = useState<string | null>(null)
+  const [completedSessions, setCompletedSessions] = useState<CompletedSession[] | null>(null)
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
   const [sessions, setSessions] = useState<SessionBest[]>([])
@@ -71,38 +73,63 @@ export default function StudentProgressPage() {
     const loadExercises = async () => {
       const user = await getCurrentUser(supabase)
       if (!active || !user) return
-      setUserId(user.id)
 
-      const [{ data, error }, { data: lastSet }] = await Promise.all([
+      const [workoutsResult, sessionsResult] = await Promise.all([
+        supabase.from('assigned_workouts').select('id').eq('student_id', user.id),
         supabase
-          .from('assigned_workout_exercises')
-          .select('exercise_id, exercises(id, name, muscle_group), assigned_workouts!inner(student_id)')
-          .eq('assigned_workouts.student_id', user.id),
-        // Abre a tela no último exercício treinado.
-        supabase
-          .from('session_sets')
-          .select('exercise_id, workout_sessions!inner(student_id)')
-          .eq('workout_sessions.student_id', user.id)
-          .eq('completed', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .from('workout_sessions')
+          .select('id, completed_at')
+          .eq('student_id', user.id)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(60),
       ])
-
       if (!active) return
-      if (error) {
-        setErrorMessage(`Não foi possível carregar seus exercícios: ${error.message}`)
+
+      const firstError = workoutsResult.error ?? sessionsResult.error
+      if (firstError) {
+        setErrorMessage(`Não foi possível carregar seus exercícios: ${firstError.message}`)
+        setLoading(false)
+        return
+      }
+
+      const workoutIds = ((workoutsResult.data ?? []) as { id: string }[]).map((workout) => workout.id)
+      const sessions = (sessionsResult.data ?? []) as CompletedSession[]
+
+      const [exercisesResult, lastSetResult] = await Promise.all([
+        workoutIds.length > 0
+          ? supabase
+              .from('assigned_workout_exercises')
+              .select('exercise_id, exercises(id, name, muscle_group)')
+              .in('assigned_workout_id', workoutIds)
+          : Promise.resolve({ data: [], error: null }),
+        // Abre a tela num exercício do último treino concluído.
+        sessions.length > 0
+          ? supabase
+              .from('session_sets')
+              .select('exercise_id')
+              .eq('session_id', sessions[0].id)
+              .eq('completed', true)
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ])
+      if (!active) return
+
+      if (exercisesResult.error) {
+        setErrorMessage(`Não foi possível carregar seus exercícios: ${exercisesResult.error.message}`)
         setLoading(false)
         return
       }
 
       const unique = new Map<string, ExerciseOption>()
-      for (const row of (data ?? []) as unknown as { exercises: ExerciseOption | null }[]) {
+      for (const row of (exercisesResult.data ?? []) as unknown as { exercises: ExerciseOption | null }[]) {
         if (row.exercises) unique.set(row.exercises.id, row.exercises)
       }
       const options = [...unique.values()].sort((first, second) => first.name.localeCompare(second.name, 'pt-BR'))
 
-      const lastExerciseId = (lastSet as { exercise_id: string } | null)?.exercise_id
+      const lastExerciseId = (lastSetResult.data as { exercise_id: string } | null)?.exercise_id
+      setCompletedSessions(sessions)
       setExercises(options)
       setSelectedExerciseId(options.find((option) => option.id === lastExerciseId)?.id ?? options[0]?.id ?? '')
       setLoading(false)
@@ -115,19 +142,20 @@ export default function StudentProgressPage() {
   }, [supabase])
 
   useEffect(() => {
-    if (!userId || !selectedExerciseId) return
+    if (!completedSessions || completedSessions.length === 0 || !selectedExerciseId) return
     const currentRequest = ++requestId.current
 
     const loadProgress = async () => {
       setLoadingChart(true)
       const { data, error } = await supabase
         .from('session_sets')
-        .select('session_id, weight_kg, reps, created_at, workout_sessions!inner(student_id)')
-        .eq('workout_sessions.student_id', userId)
+        .select('session_id, weight_kg, reps')
+        .in(
+          'session_id',
+          completedSessions.map((session) => session.id),
+        )
         .eq('exercise_id', selectedExerciseId)
         .eq('completed', true)
-        .order('created_at', { ascending: false })
-        .limit(200)
 
       // Ignora respostas de um exercício que já não está selecionado.
       if (currentRequest !== requestId.current) return
@@ -136,14 +164,15 @@ export default function StudentProgressPage() {
         setErrorMessage(`Não foi possível carregar sua evolução: ${error.message}`)
         setSessions([])
       } else {
+        const dateBySession = new Map(completedSessions.map((session) => [session.id, session.completed_at ?? '']))
         setErrorMessage('')
-        setSessions(groupBestSetPerSession((data ?? []) as SetRow[]).slice(-MAX_SESSIONS))
+        setSessions(groupBestSetPerSession((data ?? []) as SetRow[], dateBySession).slice(-MAX_SESSIONS))
       }
       setLoadingChart(false)
     }
 
     void loadProgress()
-  }, [supabase, userId, selectedExerciseId])
+  }, [supabase, completedSessions, selectedExerciseId])
 
   const stats = useMemo(() => {
     if (sessions.length === 0) return null

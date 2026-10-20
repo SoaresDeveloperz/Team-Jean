@@ -1,5 +1,6 @@
 // Formato das linhas que o app lê do Supabase. Campos opcionais são colunas
-// que podem não existir em todas as versões do banco.
+// que podem não existir no banco: o app só filtra/ordena pelas obrigatórias e
+// lê as opcionais via select('*'), tolerando a ausência.
 
 export type Profile = {
   id: string
@@ -58,9 +59,11 @@ export type WorkoutSession = {
   assigned_workout_id: string
   student_id: string
   status: string
-  created_at: string
   completed_at: string | null
   session_rpe: number | null
+  // Não existe na tabela atual; lidos só se um dia forem adicionados.
+  created_at?: string | null
+  started_at?: string | null
 }
 
 export type SessionSet = {
@@ -74,7 +77,7 @@ export type SessionSet = {
   rir: number | null
   set_type: string | null
   completed: boolean
-  created_at: string | null
+  created_at?: string | null
 }
 
 export type AppNotification = {
@@ -83,5 +86,5 @@ export type AppNotification = {
   type: string
   title: string
   message: string
-  created_at: string
+  created_at?: string | null
 }

@@ -24,7 +24,7 @@ export function BottomNav({ items, label }: { items: NavItem[]; label: string })
       aria-label={label}
       className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl backdrop-saturate-150"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-5">
+      <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((item) => {
           const Icon = item.icon
           const active = item.exact
@@ -38,7 +38,7 @@ export function BottomNav({ items, label }: { items: NavItem[]; label: string })
                 aria-current={active ? 'page' : undefined}
                 className="group flex min-h-[52px] w-full flex-col items-center justify-center gap-1 rounded-2xl"
               >
-                <span className="relative grid h-8 w-14 place-items-center">
+                <span className="relative grid h-8 w-full max-w-14 place-items-center">
                   {active && (
                     <m.span
                       layoutId={pillId}
@@ -56,7 +56,7 @@ export function BottomNav({ items, label }: { items: NavItem[]; label: string })
                 </span>
                 <span
                   className={cn(
-                    'text-[10px] font-semibold tracking-wide transition-colors',
+                    'max-w-full truncate px-0.5 text-[10px] font-semibold tracking-wide transition-colors',
                     active ? 'text-white' : 'text-zinc-500',
                   )}
                 >

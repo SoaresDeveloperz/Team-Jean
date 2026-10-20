@@ -30,6 +30,19 @@ O `.env.local` não deve ser commitado.
 Todo o controle de acesso aos dados depende do RLS do Supabase. Revise e rode
 [`supabase/policies.sql`](supabase/policies.sql) no SQL Editor do projeto.
 
+## Comunidade
+
+A aba **Equipe** (feed com fotos, fogo, comentários e ranking da semana) usa
+tabelas e um bucket próprios. Depois do `policies.sql`, rode
+[`supabase/community.sql`](supabase/community.sql) no SQL Editor. Ele pode ser
+rodado mais de uma vez. Enquanto não for rodado, o app mostra como ativar.
+
+- Fotos ficam no bucket privado `community` (até 4 por post, reduzidas no
+  celular para no máximo 1600 px) e aparecem por links temporários.
+- O treinador fixa e apaga qualquer post ou comentário; cada aluno apaga só o
+  que é dele.
+- O ranking mostra apenas nome e quantidade de treinos da semana.
+
 ## Scripts
 
 - `pnpm dev`: servidor de desenvolvimento

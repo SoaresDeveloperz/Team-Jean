@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { m } from 'framer-motion'
-import { Clock, Download, Gauge, Layers, LoaderCircle, Share2, Trophy, Weight } from 'lucide-react'
+import { Check, Clock, Download, Gauge, Layers, LoaderCircle, MessageCircleHeart, Share2, Trophy, Weight } from 'lucide-react'
+import type { PostDraft } from '@/lib/community'
 import type { MuscleRegion } from '@/lib/muscles'
 import { formatKg } from '@/lib/workouts'
 import { renderShareImage, serializeSvg } from '@/lib/share-image'
@@ -11,6 +13,7 @@ import { Modal } from '@/components/ui/modal'
 import { useToast } from '@/components/ui/toast'
 import { Logo } from '@/components/ui/logo'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
+import { Composer } from '@/components/community/Composer'
 
 export type WorkoutSummaryData = {
   workoutName: string
@@ -20,6 +23,8 @@ export type WorkoutSummaryData = {
   rpe: number
   prs: { name: string; weight: number; reps: number }[]
   fills: Partial<Record<MuscleRegion, string>>
+  // Intensidade 0..1 por região (para o post da comunidade redesenhar o mapa).
+  regions: Partial<Record<MuscleRegion, number>>
 }
 
 // Partículas que "explodem" do troféu na entrada.
@@ -33,6 +38,8 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
   const mapRef = useRef<SVGSVGElement>(null)
   const [generating, setGenerating] = useState(false)
   const [image, setImage] = useState<{ blob: Blob; url: string } | null>(null)
+  const [composerOpen, setComposerOpen] = useState(false)
+  const [posted, setPosted] = useState(false)
 
   useEffect(() => {
     haptic([40, 60, 120])
@@ -43,6 +50,25 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
   }, [image])
 
   const closePreview = useCallback(() => setImage(null), [])
+  const closeComposer = useCallback(() => setComposerOpen(false), [])
+  const handlePosted = useCallback(() => {
+    setPosted(true)
+    haptic([10, 30, 10])
+    toast({ tone: 'success', title: 'Publicado na comunidade 🔥', description: 'A equipe já pode dar fogo no seu treino.' })
+  }, [toast])
+
+  const workoutDraft: PostDraft = {
+    kind: 'workout',
+    meta: {
+      name: data.workoutName,
+      volume: data.volume,
+      sets: data.sets,
+      minutes: data.minutes,
+      rpe: data.rpe,
+      prs: data.prs,
+      regions: data.regions,
+    },
+  }
 
   const generate = async () => {
     setGenerating(true)
@@ -191,6 +217,23 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
       </m.section>
 
       <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.05 }} className="space-y-2.5 pt-1">
+        {posted ? (
+          <Link
+            href="/student/community"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-brand/40 bg-brand-soft text-sm font-black uppercase tracking-[0.16em] text-brand"
+          >
+            <Check className="h-4 w-4" aria-hidden="true" /> Ver na comunidade
+          </Link>
+        ) : (
+          <m.button
+            type="button"
+            onClick={() => setComposerOpen(true)}
+            whileTap={{ scale: 0.97 }}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand text-sm font-black uppercase tracking-[0.16em] text-black"
+          >
+            <MessageCircleHeart className="h-4 w-4" aria-hidden="true" /> Postar na comunidade
+          </m.button>
+        )}
         <m.button
           type="button"
           onClick={generate}
@@ -214,6 +257,8 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           Voltar para o app
         </button>
       </m.div>
+
+      <Composer open={composerOpen} onClose={closeComposer} onPosted={handlePosted} draft={workoutDraft} />
 
       <Modal open={image !== null} onClose={closePreview} title="Seu card" description="Pronto para os stories">
         {image && (

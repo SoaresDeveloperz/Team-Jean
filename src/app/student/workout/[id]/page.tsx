@@ -513,8 +513,9 @@ export default function WorkoutExecutionPage() {
         }
       }
     }
+    const regions = muscleLoad(work)
     const fills: Partial<Record<MuscleRegion, string>> = {}
-    for (const [region, intensity] of Object.entries(muscleLoad(work)) as [MuscleRegion, number][]) {
+    for (const [region, intensity] of Object.entries(regions) as [MuscleRegion, number][]) {
       fills[region] = loadFill(intensity)
     }
 
@@ -526,6 +527,7 @@ export default function WorkoutExecutionPage() {
       rpe,
       prs: [...prs.values()],
       fills,
+      regions,
     })
     window.scrollTo({ top: 0 })
   }

@@ -3,30 +3,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { m } from 'framer-motion'
 import {
-  Award,
   Bell,
-  CalendarCheck,
   ChevronRight,
-  Crown,
   Download,
-  Flame,
-  Footprints,
-  Medal,
+  MessageCircleHeart,
   Minus,
   Plus,
   Share,
   Smartphone,
-  Star,
-  Sunrise,
   Target,
   Timer,
   Trophy,
   Vibrate,
-  type LucideIcon,
 } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
-import { bestWeekStreak, weekStreak } from '@/lib/stats'
+import { weekStreak } from '@/lib/stats'
+import { buildAchievements, type Achievement } from '@/lib/achievements'
+import { levelFor } from '@/lib/levels'
+import type { PostDraft } from '@/lib/community'
 import { plural } from '@/lib/text'
 import { setPreferences, usePreferences } from '@/lib/preferences'
 import { promptInstall, useInstallState } from '@/lib/install-prompt'
@@ -40,8 +35,12 @@ import { PageSkeleton } from '@/components/ui/skeleton'
 import { ProgressRing } from '@/components/ui/progress-ring'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { LogoutButton } from '@/components/layout/LogoutButton'
+import { AchievementIcon } from '@/components/fitness/AchievementIcon'
+import { Composer } from '@/components/community/Composer'
+import { LevelBadge } from '@/components/community/LevelBadge'
 import { ChangePasswordTile } from '@/components/account/ChangePasswordTile'
 
 type ProfileData = {
@@ -51,14 +50,6 @@ type ProfileData = {
   dates: Date[]
 }
 
-type Achievement = {
-  title: string
-  description: string
-  icon: LucideIcon
-  value: number
-  goal: number
-}
-
 const REST_OPTIONS = [
   { value: 60, label: '1:00' },
   { value: 90, label: '1:30' },
@@ -66,33 +57,13 @@ const REST_OPTIONS = [
   { value: 180, label: '3:00' },
 ]
 
-function buildAchievements(total: number, dates: Date[]): Achievement[] {
-  const early = dates.filter((date) => date.getHours() < 8).length
-  const weekend = dates.filter((date) => date.getDay() === 0 || date.getDay() === 6).length
-  return [
-    { title: 'Primeiro passo', description: 'Concluir o primeiro treino no app.', icon: Footprints, value: total, goal: 1 },
-    { title: 'Ritmo forte', description: 'Concluir 5 treinos.', icon: Flame, value: total, goal: 5 },
-    { title: 'Elite', description: 'Concluir 10 treinos.', icon: Medal, value: total, goal: 10 },
-    { title: 'Lenda do foco', description: 'Concluir 25 treinos.', icon: Award, value: total, goal: 25 },
-    { title: 'Meio século', description: 'Concluir 50 treinos.', icon: Crown, value: total, goal: 50 },
-    { title: 'Centurião', description: 'Concluir 100 treinos.', icon: Trophy, value: total, goal: 100 },
-    {
-      title: 'Constância',
-      description: 'Treinar 4 semanas seguidas, sem pular nenhuma.',
-      icon: CalendarCheck,
-      value: bestWeekStreak(dates),
-      goal: 4,
-    },
-    { title: 'Madrugador', description: 'Concluir um treino antes das 8h.', icon: Sunrise, value: early, goal: 1 },
-    { title: 'Fim de semana', description: 'Concluir 4 treinos em sábados ou domingos.', icon: Star, value: weekend, goal: 4 },
-  ]
-}
-
 export default function StudentProfilePage() {
   const [supabase] = useState(() => createClient())
+  const toast = useToast()
   const [data, setData] = useState<ProfileData | null>(null)
   const [loadError, setLoadError] = useState('')
   const [selectedBadge, setSelectedBadge] = useState<Achievement | null>(null)
+  const [shareDraft, setShareDraft] = useState<PostDraft | null>(null)
   const preferences = usePreferences()
   const installState = useInstallState()
   const { items: notices, unseen } = useNotifications()
@@ -142,6 +113,7 @@ export default function StudentProfilePage() {
 
   const achievements = useMemo(() => (data ? buildAchievements(data.completedCount, data.dates) : []), [data])
   const closeBadge = useCallback(() => setSelectedBadge(null), [])
+  const closeShare = useCallback(() => setShareDraft(null), [])
 
   if (!data) return <PageSkeleton label="Carregando perfil" />
 
@@ -155,6 +127,7 @@ export default function StudentProfilePage() {
     .toUpperCase()
   const unlockedCount = achievements.filter((item) => item.value >= item.goal).length
   const streak = weekStreak(data.dates)
+  const level = levelFor(data.completedCount)
 
   return (
     <Stagger className="space-y-4">
@@ -169,9 +142,7 @@ export default function StudentProfilePage() {
         </div>
         <h1 className="mt-4 font-display text-4xl font-bold uppercase leading-none">{name}</h1>
         <p className="mt-1.5 truncate text-xs text-zinc-500">{data.profile?.email || data.email}</p>
-        <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-300">
-          Atleta Team Jean
-        </span>
+        <LevelBadge workouts={data.completedCount} className="mt-3 px-3 py-1 text-[10px] tracking-[0.16em]" />
 
         <dl className="mt-5 grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-black/30">
           {[
@@ -188,6 +159,35 @@ export default function StudentProfilePage() {
             </div>
           ))}
         </dl>
+
+        <div className="mt-4 rounded-2xl border border-line bg-black/30 p-3.5 text-left">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Nível {level.level}</span>
+            <span className="text-[11px] font-bold text-zinc-300">
+              {level.next ? `Próximo: ${level.next.name}` : 'Nível máximo'}
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={level.next ? `Progresso até o nível ${level.next.name}` : 'Nível máximo alcançado'}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(level.progress * 100)}
+            className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"
+          >
+            <m.div
+              className="h-full rounded-full bg-gradient-to-r from-brand-deep via-brand to-gold"
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.max(4, level.progress * 100)}%` }}
+              transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.3 }}
+            />
+          </div>
+          <p className="mt-2 text-[11px] text-zinc-400">
+            {level.next
+              ? `Faltam ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} para virar ${level.next.name}.`
+              : 'Você é lenda do Team Jean. 👑'}
+          </p>
+        </div>
       </Tile>
 
       {/* Conquistas */}
@@ -205,7 +205,6 @@ export default function StudentProfilePage() {
         <ul className="grid grid-cols-3 gap-2.5">
           {achievements.map((badge, index) => {
             const unlocked = badge.value >= badge.goal
-            const Icon = badge.icon
             return (
               <m.li
                 key={badge.title}
@@ -233,7 +232,7 @@ export default function StudentProfilePage() {
                         unlocked ? 'bg-gold text-black' : 'bg-white/[0.05] text-zinc-600',
                       )}
                     >
-                      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                      <AchievementIcon icon={badge.icon} className="h-[18px] w-[18px]" />
                     </span>
                   </ProgressRing>
                   <span className={cn('mt-2 text-[11px] font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
@@ -388,7 +387,6 @@ export default function StudentProfilePage() {
           <div className="flex flex-col items-center pb-2 text-center">
             {(() => {
               const unlocked = selectedBadge.value >= selectedBadge.goal
-              const Icon = selectedBadge.icon
               return (
                 <>
                   <ProgressRing
@@ -403,7 +401,7 @@ export default function StudentProfilePage() {
                         unlocked ? 'bg-gold text-black' : 'bg-white/[0.05] text-zinc-500',
                       )}
                     >
-                      <Icon className="h-9 w-9" aria-hidden="true" />
+                      <AchievementIcon icon={selectedBadge.icon} className="h-9 w-9" />
                     </span>
                   </ProgressRing>
                   <p className="mt-4 text-sm text-zinc-300">{selectedBadge.description}</p>
@@ -412,12 +410,39 @@ export default function StudentProfilePage() {
                       ? 'Conquistada!'
                       : `${Math.min(selectedBadge.value, selectedBadge.goal)} de ${selectedBadge.goal}`}
                   </p>
+                  {unlocked && (
+                    <m.button
+                      type="button"
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        setShareDraft({
+                          kind: 'achievement',
+                          meta: {
+                            title: selectedBadge.title,
+                            description: selectedBadge.description,
+                            icon: selectedBadge.icon,
+                            goal: selectedBadge.goal,
+                          },
+                        })
+                        setSelectedBadge(null)
+                      }}
+                      className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gold text-xs font-black uppercase tracking-wider text-black"
+                    >
+                      <MessageCircleHeart className="h-4 w-4" aria-hidden="true" /> Compartilhar na comunidade
+                    </m.button>
+                  )}
                 </>
               )
             })()}
           </div>
         )}
       </Modal>
+      <Composer
+        open={shareDraft !== null}
+        onClose={closeShare}
+        onPosted={() => toast({ tone: 'success', title: 'Conquista publicada 🏆', description: 'A equipe já pode dar fogo.' })}
+        draft={shareDraft ?? undefined}
+      />
     </Stagger>
   )
 }

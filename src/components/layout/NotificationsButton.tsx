@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { AnimatePresence, m } from 'framer-motion'
-import { Bell, BellOff, Dumbbell, Megaphone } from 'lucide-react'
+import { Bell, BellOff, ChevronRight, Dumbbell, Megaphone, MessageCircle } from 'lucide-react'
 import { markNotificationsSeen, onOpenNotifications, useNotifications } from '@/lib/notifications'
 import { plural } from '@/lib/text'
 import { Modal } from '@/components/ui/modal'
@@ -58,7 +59,7 @@ export function NotificationsButton() {
           <ul className="space-y-2.5">
             {items.map((item, index) => {
               const isNew = !seen.has(item.id)
-              const Icon = item.type === 'workout_updated' ? Dumbbell : Megaphone
+              const Icon = item.type === 'workout_updated' ? Dumbbell : item.type === 'community' ? MessageCircle : Megaphone
               return (
                 <m.li
                   key={item.id}
@@ -92,6 +93,15 @@ export function NotificationsButton() {
                       <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                         {new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                       </p>
+                    )}
+                    {item.type === 'community' && (
+                      <Link
+                        href="/student/community"
+                        onClick={close}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-brand"
+                      >
+                        Ver na comunidade <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Link>
                     )}
                   </div>
                 </m.li>

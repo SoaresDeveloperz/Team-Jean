@@ -1,133 +1,183 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '../../../lib/supabase/client'
-import { Bell, LogOut, Loader2, Trophy, Flame, Dumbbell, Award } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { Award, Bell, Dumbbell, Flame, Trophy } from 'lucide-react'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
+import type { AppNotification, Profile } from '@/lib/types'
+import { cn } from '@/lib/cn'
+import { Alert } from '@/components/ui/alert'
+import { PageLoader } from '@/components/ui/page-loader'
+import { LogoutButton } from '@/components/layout/LogoutButton'
+
+type ProfileData = {
+  profile: Pick<Profile, 'full_name' | 'email'> | null
+  email: string | null
+  notifications: AppNotification[]
+  completedCount: number
+}
+
+const BADGES = [
+  { title: 'Primeiro passo', desc: 'Concluiu o 1º treino', icon: Dumbbell, goal: 1 },
+  { title: 'Ritmo forte', desc: '5 treinos concluídos', icon: Flame, goal: 5 },
+  { title: 'Membro de elite', desc: '10 treinos no app', icon: Trophy, goal: 10 },
+  { title: 'Lenda do foco', desc: '25 treinos concluídos', icon: Award, goal: 25 },
+]
 
 export default function StudentProfilePage() {
-  const [profile, setProfile] = useState<any>(null)
-  const [notifications, setNotifications] = useState<any[]>([])
-  const [completedWorkoutsCount, setCompletedCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
+  const [data, setData] = useState<ProfileData | null>(null)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    loadData()
-  }, [])
+    let active = true
 
-  const loadData = async () => {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const load = async () => {
+      const user = await getCurrentUser(supabase)
+      if (!active || !user) return
 
-    if (user) {
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      const { data: n } = await supabase.from('notifications').select('*').eq('recipient_id', user.id).order('created_at', { ascending: false })
-      
-      const { count } = await supabase.from('workout_sessions').select('*', { count: 'exact', head: true }).eq('student_id', user.id).eq('status', 'completed')
+      const [profileResult, notificationsResult, countResult] = await Promise.all([
+        supabase.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('recipient_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(30),
+        supabase
+          .from('workout_sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('student_id', user.id)
+          .eq('status', 'completed'),
+      ])
+      if (!active) return
 
-      if (p) setProfile(p)
-      if (n) setNotifications(n)
-      setCompletedCount(count || 0)
+      const error = profileResult.error ?? notificationsResult.error ?? countResult.error
+      if (error) setLoadError(`Algumas informações não carregaram: ${error.message}`)
+
+      setData({
+        profile: profileResult.data as ProfileData['profile'],
+        email: user.email ?? null,
+        notifications: (notificationsResult.data ?? []) as AppNotification[],
+        completedCount: countResult.count ?? 0,
+      })
     }
-    setLoading(false)
-  }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
+    void load()
+    return () => {
+      active = false
+    }
+  }, [supabase])
 
-  // BADGES ESTILO ADIDAS ATHLETE
-  const badges = [
-    { title: 'Primeiro Passo', desc: 'Concluiu o 1º treino', icon: Dumbbell, unlocked: completedWorkoutsCount >= 1 },
-    { title: 'Ritmo Forte', desc: '5 treinos concluídos', icon: Flame, unlocked: completedWorkoutsCount >= 5 },
-    { title: 'Membro de Elite', desc: '10 treinos no app', icon: Trophy, unlocked: completedWorkoutsCount >= 10 },
-    { title: 'Lenda do Foco', desc: '25 treinos concluídos', icon: Award, unlocked: completedWorkoutsCount >= 25 },
-  ]
+  if (!data) return <PageLoader label="Carregando perfil" />
+
+  const name = data.profile?.full_name || 'Atleta'
+  const nextBadge = BADGES.find((badge) => data.completedCount < badge.goal)
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black uppercase tracking-wide text-white">Meu Perfil</h1>
-        <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mt-1">Sua evolução e marcas</p>
+        <h1 className="text-2xl font-black uppercase tracking-wide text-white">Meu perfil</h1>
+        <p className="mt-1 text-xs font-bold uppercase tracking-widest text-zinc-500">Sua evolução e marcas</p>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-zinc-500" /></div>
-      ) : (
-        <div className="space-y-6">
-          {/* Card Atleta */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 flex items-center justify-between shadow-2xl">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center font-black text-lg">
-                {profile?.full_name ? profile.full_name.substring(0, 2).toUpperCase() : 'TJ'}
-              </div>
-              <div>
-                <h3 className="font-black text-base text-white">{profile?.full_name || 'Atleta'}</h3>
-                <p className="text-xs text-zinc-500">{profile?.email}</p>
-              </div>
-            </div>
-            <button onClick={handleLogout} className="p-3 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-400 hover:text-white">
-              <LogOut className="w-5 h-5" />
-            </button>
+      {loadError && <Alert variant="error">{loadError}</Alert>}
+
+      <div className="flex items-center justify-between gap-3 rounded-3xl border border-zinc-900 bg-zinc-950 p-5 shadow-2xl">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-lg font-black text-black">
+            {name.substring(0, 2).toUpperCase()}
           </div>
-
-          {/* MURAL DE CONQUISTAS ADIDAS STYLE */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-black uppercase text-zinc-400 tracking-widest flex items-center gap-2 pl-1">
-              <Trophy className="w-4 h-4 text-amber-400" /> Suas Conquistas
-            </h3>
-
-            <div className="grid grid-cols-2 gap-3">
-              {badges.map((b, idx) => {
-                const Icon = b.icon
-                return (
-                  <div key={idx} className={`p-4 rounded-2xl border space-y-2 transition-all ${b.unlocked ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-950/40 border-zinc-900/60 opacity-40'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${b.unlocked ? 'bg-amber-400/10 text-amber-400 border border-amber-400/30' : 'bg-zinc-900 text-zinc-600'}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span className="text-[9px] font-black uppercase text-zinc-500">
-                        {b.unlocked ? '✓ Desbloqueada' : 'Bloqueada'}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-xs text-white">{b.title}</h4>
-                      <p className="text-[9px] text-zinc-500 font-medium">{b.desc}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* MURAL DE AVISOS */}
-          <div className="space-y-3 pt-2">
-            <h3 className="text-xs font-black uppercase text-zinc-400 tracking-widest flex items-center gap-2 pl-1">
-              <Bell className="w-4 h-4 text-emerald-400" /> Mural de Avisos
-            </h3>
-
-            {notifications.length === 0 ? (
-              <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-6 text-center text-xs text-zinc-600 font-medium">
-                Nenhum aviso recebido ainda.
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <div key={n.id} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-4 space-y-1">
-                  <span className="text-[9px] font-black uppercase text-emerald-500">
-                    {new Date(n.created_at).toLocaleDateString('pt-BR')}
-                  </span>
-                  <h4 className="font-bold text-sm text-white">{n.title}</h4>
-                  <p className="text-xs text-zinc-400">{n.message}</p>
-                </div>
-              ))
-            )}
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-black text-white">{name}</h2>
+            <p className="truncate text-xs text-zinc-500">{data.profile?.email || data.email}</p>
+            <p className="mt-1 text-[10px] font-bold uppercase text-emerald-400">
+              {data.completedCount} {data.completedCount === 1 ? 'treino concluído' : 'treinos concluídos'}
+            </p>
           </div>
         </div>
-      )}
+        <LogoutButton showLabel className="shrink-0 rounded-2xl border border-zinc-800 bg-zinc-900 px-3 py-3" />
+      </div>
+
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 pl-1 text-xs font-black uppercase tracking-widest text-zinc-400">
+          <Trophy className="h-4 w-4 text-amber-400" aria-hidden="true" /> Suas conquistas
+        </h2>
+
+        {nextBadge && (
+          <div className="rounded-2xl border border-zinc-900 bg-zinc-950 p-4">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase text-zinc-400">
+              <span>Próxima: {nextBadge.title}</span>
+              <span>
+                {data.completedCount}/{nextBadge.goal}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full rounded-full bg-amber-400"
+                style={{ width: `${Math.min(100, (data.completedCount / nextBadge.goal) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <ul className="grid grid-cols-2 gap-3">
+          {BADGES.map((badge) => {
+            const Icon = badge.icon
+            const unlocked = data.completedCount >= badge.goal
+            return (
+              <li
+                key={badge.title}
+                className={cn(
+                  'space-y-2 rounded-2xl border p-4 transition-all',
+                  unlocked ? 'border-zinc-800 bg-zinc-950' : 'border-zinc-900/60 bg-zinc-950/40 opacity-40',
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div
+                    className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-xl',
+                      unlocked ? 'border border-amber-400/30 bg-amber-400/10 text-amber-400' : 'bg-zinc-900 text-zinc-600',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase text-zinc-500">
+                    {unlocked ? '✓ Desbloqueada' : 'Bloqueada'}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xs font-extrabold text-white">{badge.title}</h3>
+                  <p className="text-[9px] font-medium text-zinc-500">{badge.desc}</p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <section className="space-y-3 pt-2">
+        <h2 className="flex items-center gap-2 pl-1 text-xs font-black uppercase tracking-widest text-zinc-400">
+          <Bell className="h-4 w-4 text-emerald-400" aria-hidden="true" /> Mural de avisos
+        </h2>
+
+        {data.notifications.length === 0 ? (
+          <div className="rounded-2xl border border-zinc-900 bg-zinc-950 p-6 text-center text-xs font-medium text-zinc-600">
+            Nenhum aviso recebido ainda.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {data.notifications.map((notification) => (
+              <li key={notification.id} className="space-y-1 rounded-2xl border border-zinc-900 bg-zinc-950 p-4">
+                <span className="text-[9px] font-black uppercase text-emerald-500">
+                  {new Date(notification.created_at).toLocaleDateString('pt-BR')}
+                </span>
+                <h3 className="text-sm font-bold text-white">{notification.title}</h3>
+                <p className="whitespace-pre-line text-xs text-zinc-400">{notification.message}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }

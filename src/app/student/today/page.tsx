@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Activity, CalendarDays, ChevronRight, Clock, Dumbbell, Flame, Play, RotateCcw } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, PrescribedExercise } from '@/lib/types'
-import { getSetsCount } from '@/lib/workouts'
+import { RESUME_WINDOW_MS, getSetsCount, pickNextWorkout } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { PageLoader } from '@/components/ui/page-loader'
@@ -32,24 +32,6 @@ function getReadinessColor(value: number) {
   return 'text-rose-400'
 }
 
-// Escolhe o próximo treino da rotação: um em andamento; senão, o que nunca foi
-// feito (em ordem de nome: A, B, C...); senão, o feito há mais tempo.
-function pickNextWorkout(
-  workouts: AssignedWorkout[],
-  lastDoneByWorkout: Map<string, string>,
-  inProgressWorkoutId: string | null,
-) {
-  const inProgress = workouts.find((workout) => workout.id === inProgressWorkoutId)
-  if (inProgress) return inProgress
-
-  return [...workouts].sort((first, second) => {
-    const firstDone = lastDoneByWorkout.get(first.id) ?? ''
-    const secondDone = lastDoneByWorkout.get(second.id) ?? ''
-    if (firstDone !== secondDone) return firstDone.localeCompare(secondDone)
-    return first.name.localeCompare(second.name, 'pt-BR', { numeric: true })
-  })[0]
-}
-
 export default function StudentTodayPage() {
   const [supabase] = useState(() => createClient())
   const [data, setData] = useState<TodayData | null>(null)
@@ -64,9 +46,7 @@ export default function StudentTodayPage() {
     let active = true
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getCurrentUser(supabase)
       if (!active || !user) return
       setUserId(user.id)
 
@@ -117,7 +97,7 @@ export default function StudentTodayPage() {
           lastDoneByWorkout.set(session.assigned_workout_id, session.completed_at)
         }
       }
-      const resumeLimit = Date.now() - 12 * 3_600_000
+      const resumeLimit = Date.now() - RESUME_WINDOW_MS
       const inProgressWorkoutId =
         sessions.find((session) => session.status === 'in_progress' && new Date(session.created_at).getTime() > resumeLimit)
           ?.assigned_workout_id ?? null

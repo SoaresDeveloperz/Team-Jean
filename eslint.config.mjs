@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Sobras do template de monorepo do Replit: não fazem parte do app Next.
+    "artifacts/**",
+    "lib/**",
+    "scripts/**",
+    "attached_assets/**",
   ]),
 ]);
 

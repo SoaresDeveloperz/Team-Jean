@@ -1,15 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import {
-  Activity,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Dumbbell,
-} from 'lucide-react'
-import { createClient } from '../../lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { Activity, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Dumbbell } from 'lucide-react'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
+import { cn } from '@/lib/cn'
 
 type WeeklyTrainingInsightsProps = {
   mode: 'student' | 'admin'
@@ -21,19 +15,14 @@ type StudentProfile = {
   email: string | null
 }
 
-type ScheduledWorkout = {
-  id: string
-  name: string
-  student_id: string
-  day_of_week: number | null
-}
-
-type WorkoutSession = {
+type WorkoutSessionRow = {
   id: string
   student_id: string
   created_at: string
+  completed_at: string | null
   status: string
   session_rpe: number | null
+  assigned_workouts: { name: string | null } | null
 }
 
 type CompletedSet = {
@@ -41,7 +30,6 @@ type CompletedSet = {
   exercise_id: string
   weight_kg: number | null
   reps: number | null
-  completed: boolean
   created_at: string | null
 }
 
@@ -59,23 +47,25 @@ type MusclePriority = {
   exercises: { name: string; sets: number }[]
 }
 
+type DaySession = { id: string; workoutName: string; studentId: string }
+
 type DailyVolume = {
   day: number
   shortName: string
   date: Date
   sets: number
   volume: number
-  sessions: number
+  sessions: DaySession[]
 }
 
 type InsightsData = {
-  workouts: ScheduledWorkout[]
   daily: DailyVolume[]
   totalSets: number
   totalVolume: number
   completedSessions: number
   averageRpe: number | null
   muscles: MusclePriority[]
+  studentsWithoutTraining: StudentProfile[]
 }
 
 const WEEKDAYS = [
@@ -95,8 +85,8 @@ function getWeekStart(offset: number) {
   return start
 }
 
-function getCurrentWeekday() {
-  const day = new Date().getDay()
+function getWeekday(date: Date) {
+  const day = date.getDay()
   return day === 0 ? 7 : day
 }
 
@@ -117,217 +107,196 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState('all')
   const [weekOffset, setWeekOffset] = useState(0)
-  const [selectedDay, setSelectedDay] = useState(getCurrentWeekday)
+  const [selectedDay, setSelectedDay] = useState(() => getWeekday(new Date()))
   const [chartMode, setChartMode] = useState<'sets' | 'load'>('sets')
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null)
   const [insights, setInsights] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
 
-  const loadInsights = useCallback(async () => {
-    setLoading(true)
-    setErrorMessage('')
+  useEffect(() => {
+    let active = true
 
-    try {
-      const { data: authData, error: authError } = await supabase.auth.getUser()
-      if (authError) throw authError
-      if (!authData.user) throw new Error('Faça login para ver o resumo semanal.')
+    const load = async () => {
+      try {
+        const user = await getCurrentUser(supabase)
+        if (!user) throw new Error('Faça login para ver o resumo semanal.')
 
-      let studentRows: StudentProfile[] = []
-      if (mode === 'admin') {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, email')
-          .eq('role', 'student')
-          .order('full_name')
-        if (error) throw error
-        studentRows = (data ?? []) as StudentProfile[]
-        setStudents(studentRows)
-      }
-
-      const studentId = mode === 'student'
-        ? authData.user.id
-        : selectedStudentId === 'all'
-          ? null
-          : selectedStudentId
-
-      const weekStart = getWeekStart(weekOffset)
-      const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekEnd.getDate() + 7)
-
-      let workoutsQuery = supabase
-        .from('assigned_workouts')
-        .select('id, name, student_id, day_of_week')
-        .eq('is_current', true)
-      if (studentId) workoutsQuery = workoutsQuery.eq('student_id', studentId)
-
-      const { data: workoutRows, error: workoutsError } = await workoutsQuery
-      if (workoutsError) throw workoutsError
-
-      let sessionsQuery = supabase
-        .from('workout_sessions')
-        .select('id, student_id, created_at, status, session_rpe')
-        .gte('created_at', weekStart.toISOString())
-        .lt('created_at', weekEnd.toISOString())
-        .in('status', ['in_progress', 'completed'])
-      if (studentId) sessionsQuery = sessionsQuery.eq('student_id', studentId)
-
-      const { data: sessionRows, error: sessionsError } = await sessionsQuery
-      if (sessionsError) throw sessionsError
-      const sessions = (sessionRows ?? []) as WorkoutSession[]
-      const sessionIds = sessions.map((session) => session.id)
-
-      let sets: CompletedSet[] = []
-      if (sessionIds.length > 0) {
-        const { data, error } = await supabase
-          .from('session_sets')
-          .select('session_id, exercise_id, weight_kg, reps, completed, created_at')
-          .in('session_id', sessionIds)
-          .eq('completed', true)
-        if (error) throw error
-        sets = (data ?? []) as CompletedSet[]
-      }
-
-      const exerciseIds = [...new Set(sets.map((set) => set.exercise_id))]
-      let exerciseRows: ExerciseMuscles[] = []
-      if (exerciseIds.length > 0) {
-        const fullExerciseQuery = await supabase
-          .from('exercises')
-          .select('id, name, muscle_group, secondary_muscle')
-          .in('id', exerciseIds)
-
-        if (fullExerciseQuery.error) {
-          const basicExerciseQuery = await supabase
-            .from('exercises')
-            .select('id, name, muscle_group')
-            .in('id', exerciseIds)
-          if (basicExerciseQuery.error) throw basicExerciseQuery.error
-          exerciseRows = (basicExerciseQuery.data ?? []) as ExerciseMuscles[]
-        } else {
-          exerciseRows = (fullExerciseQuery.data ?? []) as ExerciseMuscles[]
+        let studentRows: StudentProfile[] = []
+        if (mode === 'admin') {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('role', 'student')
+            .order('full_name')
+          if (error) throw error
+          studentRows = (data ?? []) as StudentProfile[]
         }
-      }
 
-      const exerciseById = new Map(exerciseRows.map((exercise) => [exercise.id, exercise]))
-      const sessionById = new Map(sessions.map((session) => [session.id, session]))
-      const daily = WEEKDAYS.map((weekday, index) => {
-        const date = new Date(weekStart)
-        date.setDate(date.getDate() + index)
-        return { day: weekday.day, shortName: weekday.shortName, date, sets: 0, volume: 0, sessions: 0 }
-      })
+        const studentId = mode === 'student' ? user.id : selectedStudentId === 'all' ? null : selectedStudentId
+        const weekStart = getWeekStart(weekOffset)
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekEnd.getDate() + 7)
 
-      for (const session of sessions) {
-        if (session.status !== 'completed') continue
-        const date = new Date(session.created_at)
-        const weekday = date.getDay() === 0 ? 7 : date.getDay()
-        const dayData = daily.find((item) => item.day === weekday)
-        if (dayData) dayData.sessions += 1
-      }
+        let sessionsQuery = supabase
+          .from('workout_sessions')
+          .select('id, student_id, created_at, completed_at, status, session_rpe, assigned_workouts(name)')
+          .gte('created_at', weekStart.toISOString())
+          .lt('created_at', weekEnd.toISOString())
+          .in('status', ['in_progress', 'completed'])
+        if (studentId) sessionsQuery = sessionsQuery.eq('student_id', studentId)
 
-      const muscleTotals = new Map<string, { effectiveSets: number; exercises: Map<string, number> }>()
-      const addMuscleWork = (muscle: string | null | undefined, count: number, exerciseName: string) => {
-        const name = muscle?.trim()
-        if (!name) return
-        const current = muscleTotals.get(name) ?? { effectiveSets: 0, exercises: new Map<string, number>() }
-        current.effectiveSets += count
-        current.exercises.set(exerciseName, (current.exercises.get(exerciseName) ?? 0) + count)
-        muscleTotals.set(name, current)
-      }
+        const { data: sessionRows, error: sessionsError } = await sessionsQuery
+        if (sessionsError) throw sessionsError
+        const sessions = (sessionRows ?? []) as unknown as WorkoutSessionRow[]
+        const sessionIds = sessions.map((session) => session.id)
 
-      let totalVolume = 0
-      for (const set of sets) {
-        const session = sessionById.get(set.session_id)
-        const setDate = new Date(set.created_at ?? session?.created_at ?? weekStart)
-        const weekday = setDate.getDay() === 0 ? 7 : setDate.getDay()
-        const dayData = daily.find((item) => item.day === weekday)
-        const weight = Math.max(0, Number(set.weight_kg) || 0)
-        const reps = Math.max(0, Number(set.reps) || 0)
-        const volume = weight * reps
-        totalVolume += volume
-        if (dayData) {
+        let sets: CompletedSet[] = []
+        if (sessionIds.length > 0) {
+          const { data, error } = await supabase
+            .from('session_sets')
+            .select('session_id, exercise_id, weight_kg, reps, created_at')
+            .in('session_id', sessionIds)
+            .eq('completed', true)
+          if (error) throw error
+          sets = (data ?? []) as CompletedSet[]
+        }
+
+        const exerciseIds = [...new Set(sets.map((set) => set.exercise_id))]
+        let exerciseRows: ExerciseMuscles[] = []
+        if (exerciseIds.length > 0) {
+          const { data, error } = await supabase
+            .from('exercises')
+            .select('id, name, muscle_group, secondary_muscle')
+            .in('id', exerciseIds)
+          if (error) throw error
+          exerciseRows = (data ?? []) as ExerciseMuscles[]
+        }
+
+        const exerciseById = new Map(exerciseRows.map((exercise) => [exercise.id, exercise]))
+        const sessionById = new Map(sessions.map((session) => [session.id, session]))
+        const daily: DailyVolume[] = WEEKDAYS.map((weekday, index) => {
+          const date = new Date(weekStart)
+          date.setDate(date.getDate() + index)
+          return { day: weekday.day, shortName: weekday.shortName, date, sets: 0, volume: 0, sessions: [] }
+        })
+
+        const completedSessions = sessions.filter((session) => session.status === 'completed')
+        for (const session of completedSessions) {
+          const weekday = getWeekday(new Date(session.completed_at ?? session.created_at))
+          daily[weekday - 1].sessions.push({
+            id: session.id,
+            workoutName: session.assigned_workouts?.name || 'Treino',
+            studentId: session.student_id,
+          })
+        }
+
+        const muscleTotals = new Map<string, { effectiveSets: number; exercises: Map<string, number> }>()
+        const addMuscleWork = (muscle: string | null | undefined, count: number, exerciseName: string) => {
+          const name = muscle?.trim()
+          if (!name) return
+          const current = muscleTotals.get(name) ?? { effectiveSets: 0, exercises: new Map<string, number>() }
+          current.effectiveSets += count
+          current.exercises.set(exerciseName, (current.exercises.get(exerciseName) ?? 0) + count)
+          muscleTotals.set(name, current)
+        }
+
+        let totalVolume = 0
+        for (const set of sets) {
+          const session = sessionById.get(set.session_id)
+          const dayData = daily[getWeekday(new Date(set.created_at ?? session?.created_at ?? weekStart)) - 1]
+          const volume = Math.max(0, Number(set.weight_kg) || 0) * Math.max(0, Number(set.reps) || 0)
+          totalVolume += volume
           dayData.sets += 1
           dayData.volume += volume
+
+          const exercise = exerciseById.get(set.exercise_id)
+          if (exercise) {
+            addMuscleWork(exercise.muscle_group, 1, exercise.name)
+            const secondaryMuscles =
+              exercise.secondary_muscle
+                ?.split(/[,;/]/)
+                .map((muscle) => muscle.trim())
+                .filter((muscle) => muscle && muscle !== exercise.muscle_group) ?? []
+            for (const muscle of secondaryMuscles) addMuscleWork(muscle, 0.5, exercise.name)
+          }
         }
 
-        const exercise = exerciseById.get(set.exercise_id)
-        if (exercise) {
-          addMuscleWork(exercise.muscle_group, 1, exercise.name)
-          const secondaryMuscles = exercise.secondary_muscle
-            ?.split(/[,;/]/)
-            .map((muscle) => muscle.trim())
-            .filter((muscle) => muscle && muscle !== exercise.muscle_group) ?? []
-          for (const muscle of secondaryMuscles) addMuscleWork(muscle, 0.5, exercise.name)
-        }
+        const effectiveSetTotal = [...muscleTotals.values()].reduce((total, muscle) => total + muscle.effectiveSets, 0)
+        const muscles = [...muscleTotals.entries()]
+          .map(([name, muscle]) => ({
+            name,
+            effectiveSets: muscle.effectiveSets,
+            percentage: effectiveSetTotal > 0 ? Math.round((muscle.effectiveSets / effectiveSetTotal) * 100) : 0,
+            exercises: [...muscle.exercises.entries()]
+              .map(([exerciseName, exerciseSets]) => ({ name: exerciseName, sets: exerciseSets }))
+              .sort((first, second) => second.sets - first.sets),
+          }))
+          .sort((first, second) => second.effectiveSets - first.effectiveSets)
+
+        const rpeValues = completedSessions
+          .filter((session) => session.session_rpe != null)
+          .map((session) => Number(session.session_rpe))
+        const trainedStudentIds = new Set(completedSessions.map((session) => session.student_id))
+
+        if (!active) return
+        setStudents(studentRows)
+        setInsights({
+          daily,
+          totalSets: sets.length,
+          totalVolume,
+          completedSessions: completedSessions.length,
+          averageRpe: rpeValues.length > 0 ? rpeValues.reduce((total, value) => total + value, 0) / rpeValues.length : null,
+          muscles,
+          studentsWithoutTraining:
+            mode === 'admin' && !studentId ? studentRows.filter((student) => !trainedStudentIds.has(student.id)) : [],
+        })
+        setErrorMessage('')
+      } catch (error) {
+        if (!active) return
+        setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar o resumo semanal.')
+        setInsights(null)
+      } finally {
+        if (active) setLoading(false)
       }
+    }
 
-      const effectiveSetTotal = [...muscleTotals.values()]
-        .reduce((total, muscle) => total + muscle.effectiveSets, 0)
-      const muscles = [...muscleTotals.entries()]
-        .map(([name, muscle]) => ({
-          name,
-          effectiveSets: muscle.effectiveSets,
-          percentage: effectiveSetTotal > 0
-            ? Math.round((muscle.effectiveSets / effectiveSetTotal) * 100)
-            : 0,
-          exercises: [...muscle.exercises.entries()]
-            .map(([exerciseName, exerciseSets]) => ({ name: exerciseName, sets: exerciseSets }))
-            .sort((first, second) => second.sets - first.sets),
-        }))
-        .sort((first, second) => second.effectiveSets - first.effectiveSets)
-
-      const rpeValues = sessions
-        .filter((session) => session.status === 'completed' && session.session_rpe != null)
-        .map((session) => Number(session.session_rpe))
-      const averageRpe = rpeValues.length > 0
-        ? rpeValues.reduce((total, value) => total + value, 0) / rpeValues.length
-        : null
-
-      setInsights({
-        workouts: (workoutRows ?? []) as ScheduledWorkout[],
-        daily,
-        totalSets: sets.length,
-        totalVolume,
-        completedSessions: sessions.filter((session) => session.status === 'completed').length,
-        averageRpe,
-        muscles,
-      })
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar o resumo semanal.')
-      setInsights(null)
-    } finally {
-      setLoading(false)
+    void load()
+    return () => {
+      active = false
     }
   }, [mode, selectedStudentId, supabase, weekOffset])
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadInsights()
-    }, 0)
-    return () => window.clearTimeout(timer)
-  }, [loadInsights])
+  const changeWeek = (offset: number) => {
+    setLoading(true)
+    setWeekOffset(Math.min(0, offset))
+  }
+
+  const changeStudent = (studentId: string) => {
+    setLoading(true)
+    setSelectedStudentId(studentId)
+  }
 
   const weekStart = getWeekStart(weekOffset)
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekEnd.getDate() + 6)
   const studentById = new Map(students.map((student) => [student.id, student]))
-  const selectedDayData = insights?.daily.find((day) => day.day === selectedDay)
-  const selectedDayWorkouts = insights?.workouts.filter((workout) => workout.day_of_week === selectedDay) ?? []
+  const selectedDayData = insights?.daily[selectedDay - 1]
   const selectedMuscleData = insights?.muscles.find((muscle) => muscle.name === selectedMuscle)
-  const chartMaximum = Math.max(
-    1,
-    ...(insights?.daily.map((day) => chartMode === 'sets' ? day.sets : day.volume) ?? [0]),
-  )
+  const chartMaximum = Math.max(1, ...(insights?.daily.map((day) => (chartMode === 'sets' ? day.sets : day.volume)) ?? [0]))
   const topMuscle = insights?.muscles[0]
 
   return (
-    <section className="space-y-5 border-y border-zinc-900 py-5 text-white" aria-labelledby="weekly-training-title">
+    <section className="space-y-5 text-white" aria-labelledby="weekly-training-title">
       <header className="flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
             <Activity className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
             {mode === 'admin' ? 'Painel do treinador' : 'Painel do atleta'}
           </p>
-          <h2 id="weekly-training-title" className="mt-1 text-lg font-black">Semana de treino</h2>
+          <h2 id="weekly-training-title" className="mt-1 text-lg font-black">
+            Semana de treino
+          </h2>
           <p className="mt-1 text-xs text-zinc-500">
             {formatDate(weekStart)} – {formatDate(weekEnd)}
           </p>
@@ -336,7 +305,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           <button
             type="button"
             aria-label="Semana anterior"
-            onClick={() => setWeekOffset((offset) => offset - 1)}
+            onClick={() => changeWeek(weekOffset - 1)}
             className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -344,7 +313,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           {weekOffset !== 0 && (
             <button
               type="button"
-              onClick={() => setWeekOffset(0)}
+              onClick={() => changeWeek(0)}
               className="rounded-lg px-2 py-1 text-[10px] font-bold text-emerald-300 hover:bg-zinc-900"
             >
               Esta semana
@@ -354,7 +323,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             type="button"
             aria-label="Próxima semana"
             disabled={weekOffset >= 0}
-            onClick={() => setWeekOffset((offset) => Math.min(0, offset + 1))}
+            onClick={() => changeWeek(weekOffset + 1)}
             className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -367,7 +336,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           Atleta
           <select
             value={selectedStudentId}
-            onChange={(event) => setSelectedStudentId(event.target.value)}
+            onChange={(event) => changeStudent(event.target.value)}
             className="mt-1.5 h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-sm font-medium normal-case text-white outline-none focus:border-emerald-400"
           >
             <option value="all">Todos os atletas</option>
@@ -381,7 +350,9 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
       )}
 
       {loading ? (
-        <div className="py-8 text-center text-xs text-zinc-500">Carregando semana...</div>
+        <div className="py-8 text-center text-xs text-zinc-500" role="status">
+          Carregando semana...
+        </div>
       ) : errorMessage ? (
         <p role="alert" className="rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-xs text-red-300">
           {errorMessage}
@@ -395,7 +366,9 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             </div>
             <div className="py-3 pl-3 sm:px-3">
               <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
-              <p className="mt-1 text-xl font-black">{formatLoad(insights.totalVolume)} <span className="text-xs font-semibold text-zinc-500">kg</span></p>
+              <p className="mt-1 text-xl font-black">
+                {formatLoad(insights.totalVolume)} <span className="text-xs font-semibold text-zinc-500">kg</span>
+              </p>
             </div>
             <div className="py-3 pr-3 sm:px-3">
               <p className="text-[10px] font-bold uppercase text-zinc-500">Treinos</p>
@@ -403,30 +376,52 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             </div>
             <div className="py-3 pl-3 sm:pl-3">
               <p className="text-[10px] font-bold uppercase text-zinc-500">RPE médio</p>
-              <p className="mt-1 text-xl font-black">{insights.averageRpe?.toFixed(1).replace('.', ',') ?? '—'}<span className="text-xs font-semibold text-zinc-500">/10</span></p>
+              <p className="mt-1 text-xl font-black">
+                {insights.averageRpe?.toFixed(1).replace('.', ',') ?? '—'}
+                <span className="text-xs font-semibold text-zinc-500">/10</span>
+              </p>
             </div>
           </div>
+
+          {insights.studentsWithoutTraining.length > 0 && weekOffset === 0 && (
+            <div className="rounded-xl border border-amber-900/50 bg-amber-950/20 p-3">
+              <p className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-400">
+                <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                Sem treino concluído nesta semana ({insights.studentsWithoutTraining.length})
+              </p>
+              <p className="mt-1.5 text-xs text-zinc-300">
+                {insights.studentsWithoutTraining
+                  .slice(0, 8)
+                  .map((student) => student.full_name || student.email || 'Atleta')
+                  .join(', ')}
+                {insights.studentsWithoutTraining.length > 8 && '…'}
+              </p>
+            </div>
+          )}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-extrabold">Volume diário</h3>
               <div className="flex rounded-lg border border-zinc-800 bg-zinc-950 p-0.5" role="group" aria-label="Métrica do gráfico semanal">
-                <button
-                  type="button"
-                  aria-pressed={chartMode === 'sets'}
-                  onClick={() => setChartMode('sets')}
-                  className={`rounded-md px-2 py-1.5 text-[10px] font-bold transition ${chartMode === 'sets' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}
-                >
-                  Séries
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={chartMode === 'load'}
-                  onClick={() => setChartMode('load')}
-                  className={`rounded-md px-2 py-1.5 text-[10px] font-bold transition ${chartMode === 'load' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}
-                >
-                  Kg × reps
-                </button>
+                {(
+                  [
+                    { id: 'sets', label: 'Séries' },
+                    { id: 'load', label: 'Kg × reps' },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={chartMode === option.id}
+                    onClick={() => setChartMode(option.id)}
+                    className={cn(
+                      'rounded-md px-2 py-1.5 text-[10px] font-bold transition',
+                      chartMode === option.id ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="grid grid-cols-7 gap-1.5">
@@ -447,11 +442,13 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                     </span>
                     <span className="flex h-20 w-full items-end rounded-md bg-zinc-900/70 p-1">
                       <span
-                        className={`w-full rounded-sm transition-all ${selectedDay === day.day ? 'bg-emerald-400' : 'bg-sky-500'}`}
+                        className={cn('w-full rounded-sm transition-all', selectedDay === day.day ? 'bg-emerald-400' : 'bg-sky-500')}
                         style={{ height: `${height}%` }}
                       />
                     </span>
-                    <span className={`text-[9px] font-bold ${selectedDay === day.day ? 'text-emerald-300' : 'text-zinc-500'}`}>
+                    <span
+                      className={cn('text-[9px] font-bold', selectedDay === day.day ? 'text-emerald-300' : 'text-zinc-500')}
+                    >
                       {day.shortName}
                     </span>
                   </button>
@@ -461,12 +458,43 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           </div>
 
           <div className="space-y-3 border-t border-zinc-900 pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-extrabold">Mapa de foco muscular</h3>
-                <p className="mt-0.5 text-[10px] text-zinc-500">Toque em um músculo para explorar o estímulo</p>
-              </div>
-              <Activity className="h-4 w-4 text-sky-400" aria-hidden="true" />
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+              <h3 className="text-sm font-extrabold">
+                {WEEKDAYS[selectedDay - 1].fullName} · {formatDate(selectedDayData?.date ?? weekStart)}
+              </h3>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              {selectedDayData?.sets ?? 0} séries concluídas · {formatLoad(selectedDayData?.volume ?? 0)} kg
+            </p>
+            {selectedDayData && selectedDayData.sessions.length > 0 ? (
+              <ul className="divide-y divide-zinc-900">
+                {selectedDayData.sessions.map((session) => {
+                  const student = studentById.get(session.studentId)
+                  return (
+                    <li key={session.id} className="flex items-center justify-between gap-3 py-2.5">
+                      <span className="truncate text-sm font-semibold text-white">{session.workoutName}</span>
+                      {mode === 'admin' && (
+                        <span className="shrink-0 text-[10px] text-zinc-500">
+                          {student?.full_name || student?.email || 'Atleta'}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="flex items-center gap-2 rounded-xl bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
+                <Dumbbell className="h-4 w-4" aria-hidden="true" />
+                Nenhum treino concluído neste dia
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-3 border-t border-zinc-900 pt-4">
+            <div>
+              <h3 className="text-sm font-extrabold">Mapa de foco muscular</h3>
+              <p className="mt-0.5 text-[10px] text-zinc-500">Toque em um músculo para ver os exercícios</p>
             </div>
 
             {insights.muscles.length > 0 ? (
@@ -476,8 +504,11 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                     key={muscle.name}
                     type="button"
                     aria-pressed={selectedMuscle === muscle.name}
-                    onClick={() => setSelectedMuscle((current) => current === muscle.name ? null : muscle.name)}
-                    className={`w-full rounded-lg px-2 py-2 text-left transition ${selectedMuscle === muscle.name ? 'bg-zinc-900' : 'hover:bg-zinc-900/60'}`}
+                    onClick={() => setSelectedMuscle((current) => (current === muscle.name ? null : muscle.name))}
+                    className={cn(
+                      'w-full rounded-lg px-2 py-2 text-left transition',
+                      selectedMuscle === muscle.name ? 'bg-zinc-900' : 'hover:bg-zinc-900/60',
+                    )}
                   >
                     <span className="flex items-center justify-between gap-3 text-xs">
                       <span className="min-w-0 truncate font-semibold text-zinc-200">{muscle.name}</span>
@@ -503,7 +534,9 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             {selectedMuscleData && (
               <div className="rounded-xl border-l-2 border-sky-400 bg-zinc-950 px-3 py-2.5">
                 <p className="text-[10px] font-bold uppercase text-sky-300">Foco selecionado</p>
-                <p className="mt-1 text-sm font-black">{selectedMuscleData.name} · {selectedMuscleData.percentage}%</p>
+                <p className="mt-1 text-sm font-black">
+                  {selectedMuscleData.name} · {selectedMuscleData.percentage}%
+                </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {selectedMuscleData.exercises.slice(0, 4).map((exercise) => (
                     <span key={exercise.name} className="rounded-md bg-zinc-900 px-2 py-1 text-[10px] text-zinc-400">
@@ -516,66 +549,11 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             <p className="text-[9px] text-zinc-600">Série principal = 1; músculo secundário = 0,5 série efetiva.</p>
           </div>
 
-          <div className="space-y-3 border-t border-zinc-900 pt-4">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-emerald-400" aria-hidden="true" />
-              <h3 className="text-sm font-extrabold">Agenda semanal</h3>
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {insights.daily.map((day) => {
-                const scheduledCount = insights.workouts.filter((workout) => workout.day_of_week === day.day).length
-                return (
-                  <button
-                    key={day.day}
-                    type="button"
-                    aria-pressed={selectedDay === day.day}
-                    onClick={() => setSelectedDay(day.day)}
-                    className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 transition ${selectedDay === day.day ? 'border-emerald-500/60 bg-emerald-950/30 text-emerald-200' : 'border-zinc-800 bg-zinc-950 text-zinc-500 hover:bg-zinc-900'}`}
-                  >
-                    <span className="text-[9px] font-bold uppercase">{day.shortName}</span>
-                    <span className="text-xs font-black">{scheduledCount || '—'}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex items-center justify-between gap-3 text-[10px] text-zinc-500">
-              <span>{WEEKDAYS[selectedDay - 1].fullName} · {formatDate(selectedDayData?.date ?? weekStart)}</span>
-              <span>{selectedDayData?.sets ?? 0} séries concluídas</span>
-            </div>
-            {selectedDayWorkouts.length > 0 ? (
-              <div className="divide-y divide-zinc-900">
-                {selectedDayWorkouts.map((workout) => {
-                  const student = studentById.get(workout.student_id)
-                  return mode === 'student' ? (
-                    <Link
-                      key={workout.id}
-                      href={`/student/workout/${workout.id}`}
-                      className="flex items-center justify-between gap-3 py-2.5 text-sm font-semibold text-white transition hover:text-emerald-300"
-                    >
-                      <span>{workout.name}</span>
-                      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    </Link>
-                  ) : (
-                    <div key={workout.id} className="flex items-center justify-between gap-3 py-2.5">
-                      <span className="truncate text-sm font-semibold text-white">{workout.name}</span>
-                      <span className="shrink-0 text-[10px] text-zinc-500">
-                        {student?.full_name || student?.email || 'Atleta'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="flex items-center gap-2 rounded-xl bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
-                <Dumbbell className="h-4 w-4" aria-hidden="true" />
-                Dia livre · sem treino alocado
-              </p>
-            )}
-          </div>
-
           {topMuscle && insights.totalSets > 0 && (
             <p className="text-[10px] text-zinc-500">
-              Seu maior foco nesta semana é <span className="font-bold text-emerald-300">{topMuscle.name}</span>, com {topMuscle.percentage}% das séries efetivas.
+              {mode === 'admin' ? 'O maior foco' : 'Seu maior foco'} nesta semana é{' '}
+              <span className="font-bold text-emerald-300">{topMuscle.name}</span>, com {topMuscle.percentage}% das séries
+              efetivas.
             </p>
           )}
         </>

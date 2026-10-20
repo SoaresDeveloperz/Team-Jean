@@ -61,3 +61,28 @@ export function formatSeconds(totalSeconds: number) {
 export function formatKg(value: number) {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value)
 }
+
+type RotationWorkout = { id: string; name: string }
+
+// Próximo treino da rotação: o que está em andamento; senão, o que nunca foi
+// feito (em ordem de nome: A, B, C...); senão, o feito há mais tempo.
+export function pickNextWorkout<T extends RotationWorkout>(
+  workouts: T[],
+  lastDoneByWorkout: Map<string, string>,
+  inProgressWorkoutId: string | null = null,
+): T | null {
+  const inProgress = workouts.find((workout) => workout.id === inProgressWorkoutId)
+  if (inProgress) return inProgress
+
+  return (
+    [...workouts].sort((first, second) => {
+      const firstDone = lastDoneByWorkout.get(first.id) ?? ''
+      const secondDone = lastDoneByWorkout.get(second.id) ?? ''
+      if (firstDone !== secondDone) return firstDone.localeCompare(secondDone)
+      return first.name.localeCompare(second.name, 'pt-BR', { numeric: true })
+    })[0] ?? null
+  )
+}
+
+// Uma sessão "em andamento" mais nova que isso pode ser retomada.
+export const RESUME_WINDOW_MS = 12 * 3_600_000

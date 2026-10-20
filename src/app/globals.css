@@ -4,6 +4,8 @@
 :root {
   --background: #000000;
   --foreground: #ffffff;
+  /* Controles nativos (select, scrollbars, date pickers) no tema escuro. */
+  color-scheme: dark;
 }
 
 * {
@@ -29,6 +31,10 @@ button:active {
 
 input, select, textarea {
   font-size: 16px !important; /* Impede zoom automático do iOS ao focar input */
+  /* O body desativa a seleção de texto; nos campos ela precisa funcionar
+     (no Safari do iOS, herdar user-select: none pode impedir a digitação). */
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Remover barra de rolagem mantendo funcionalidade */

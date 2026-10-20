@@ -18,9 +18,9 @@ import {
   Trophy,
   X,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
-import { formatKg, formatSeconds, getPlannedSets, getSetTypeInfo, normalizeRir } from '@/lib/workouts'
+import { RESUME_WINDOW_MS, formatKg, formatSeconds, getPlannedSets, getSetTypeInfo, normalizeRir } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
@@ -51,8 +51,6 @@ type LoadState = { status: 'loading' } | { status: 'ready' } | { status: 'not-fo
 type Summary = { volume: number; sets: number; prs: number; minutes: number | null }
 
 const DEFAULT_REST_SECONDS = 90
-// Uma sessão "em andamento" mais nova que isso é retomada ao reabrir o treino.
-const RESUME_WINDOW_HOURS = 12
 
 function parseNumber(value: string) {
   const number = Number(value.replace(',', '.'))
@@ -99,9 +97,7 @@ export default function WorkoutExecutionPage() {
     let active = true
 
     const load = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getCurrentUser(supabase)
       if (!active) return
       if (!user) {
         router.replace('/login')
@@ -122,7 +118,7 @@ export default function WorkoutExecutionPage() {
           .eq('assigned_workout_id', workoutId)
           .eq('student_id', user.id)
           .eq('status', 'in_progress')
-          .gte('created_at', new Date(Date.now() - RESUME_WINDOW_HOURS * 3_600_000).toISOString())
+          .gte('created_at', new Date(Date.now() - RESUME_WINDOW_MS).toISOString())
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),

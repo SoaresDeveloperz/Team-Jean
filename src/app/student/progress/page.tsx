@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dumbbell, TrendingUp, Trophy } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import { Alert } from '@/components/ui/alert'
 import { PageLoader } from '@/components/ui/page-loader'
 
@@ -69,16 +69,25 @@ export default function StudentProgressPage() {
     let active = true
 
     const loadExercises = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const user = await getCurrentUser(supabase)
       if (!active || !user) return
       setUserId(user.id)
 
-      const { data, error } = await supabase
-        .from('assigned_workout_exercises')
-        .select('exercise_id, exercises(id, name, muscle_group), assigned_workouts!inner(student_id)')
-        .eq('assigned_workouts.student_id', user.id)
+      const [{ data, error }, { data: lastSet }] = await Promise.all([
+        supabase
+          .from('assigned_workout_exercises')
+          .select('exercise_id, exercises(id, name, muscle_group), assigned_workouts!inner(student_id)')
+          .eq('assigned_workouts.student_id', user.id),
+        // Abre a tela no último exercício treinado.
+        supabase
+          .from('session_sets')
+          .select('exercise_id, workout_sessions!inner(student_id)')
+          .eq('workout_sessions.student_id', user.id)
+          .eq('completed', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
 
       if (!active) return
       if (error) {
@@ -93,8 +102,9 @@ export default function StudentProgressPage() {
       }
       const options = [...unique.values()].sort((first, second) => first.name.localeCompare(second.name, 'pt-BR'))
 
+      const lastExerciseId = (lastSet as { exercise_id: string } | null)?.exercise_id
       setExercises(options)
-      setSelectedExerciseId(options[0]?.id ?? '')
+      setSelectedExerciseId(options.find((option) => option.id === lastExerciseId)?.id ?? options[0]?.id ?? '')
       setLoading(false)
     }
 

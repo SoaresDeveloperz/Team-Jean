@@ -2,103 +2,135 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Lock, Mail } from 'lucide-react'
-import { createClient } from '../../lib/supabase/client'
+import { Eye, EyeOff, LoaderCircle, Lock, Mail } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { Logo } from '@/components/ui/logo'
+import { Alert } from '@/components/ui/alert'
+
+const inputClassName =
+  'w-full rounded-2xl border border-zinc-800 bg-zinc-900 py-3.5 pl-11 pr-4 text-sm font-medium text-white transition-all placeholder:text-zinc-600 focus:border-white focus:outline-none'
+
+function translateLoginError(message: string) {
+  const text = message.toLowerCase()
+  if (text.includes('invalid login credentials')) return 'E-mail ou senha incorretos.'
+  if (text.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.'
+  if (text.includes('fetch') || text.includes('network')) return 'Sem conexão. Verifique sua internet.'
+  return 'Não foi possível entrar. Tente novamente.'
+}
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError('E-mail ou senha incorretos.')
-      setLoading(false)
-    } else {
-      router.push('/')
+    try {
+      const { error: signInError } = await createClient().auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+      if (signInError) {
+        setError(translateLoginError(signInError.message))
+        setLoading(false)
+        return
+      }
+      // A página inicial decide o destino (painel do treinador ou do aluno).
+      router.replace('/')
       router.refresh()
+    } catch {
+      setError('Sem conexão. Verifique sua internet.')
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white relative overflow-hidden">
-      <div className="absolute w-96 h-96 bg-zinc-900/40 rounded-full blur-3xl pointer-events-none -top-20 -left-20" />
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black p-6 text-white">
+      <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-zinc-900/40 blur-3xl" aria-hidden="true" />
 
-      <div className="w-full max-w-sm flex flex-col items-center z-10 space-y-8">
+      <main className="z-10 flex w-full max-w-sm flex-col items-center space-y-8">
         <div className="flex flex-col items-center space-y-3">
-          <div className="p-4 bg-zinc-950 border border-zinc-800/80 rounded-3xl shadow-2xl">
-            <svg viewBox="0 0 400 400" className="w-16 h-16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M60 120 L340 120 L300 150 L225 150 L225 280 L200 310 L150 250 L175 220 L200 250 L200 150 L100 150 Z" fill="white" />
-              <path d="M245 170 L290 170 L290 280 L200 350 L160 300 L180 275 L200 295 L265 245 L265 170 Z" fill="white" />
-            </svg>
+          <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950 p-4 shadow-2xl">
+            <Logo className="h-16 w-16" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-black tracking-widest uppercase text-white">TEAM JEAN</h1>
-            <p className="text-[10px] text-zinc-500 font-extrabold tracking-widest uppercase mt-0.5">
-              CONSULTORIA ESPORTIVA
-            </p>
+            <h1 className="text-2xl font-black uppercase tracking-widest text-white">Team Jean</h1>
+            <p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-widest text-zinc-500">Consultoria esportiva</p>
           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="w-full bg-zinc-950 border border-zinc-900 rounded-3xl p-6 space-y-4 shadow-2xl">
+        <form
+          onSubmit={handleLogin}
+          className="w-full space-y-4 rounded-3xl border border-zinc-900 bg-zinc-950 p-6 shadow-2xl"
+        >
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider block">E-mail</label>
+            <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-zinc-400">
+              E-mail
+            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-zinc-500 absolute left-4 top-4" />
+              <Mail className="absolute left-4 top-4 h-4 w-4 text-zinc-500" aria-hidden="true" />
               <input
+                id="email"
                 type="email"
                 required
+                autoComplete="email"
+                inputMode="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
                 placeholder="seu@email.com"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-white transition-all placeholder:text-zinc-600 font-medium"
+                className={inputClassName}
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider block">Senha</label>
+            <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-wider text-zinc-400">
+              Senha
+            </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-zinc-500 absolute left-4 top-4" />
+              <Lock className="absolute left-4 top-4 h-4 w-4 text-zinc-500" aria-hidden="true" />
               <input
-                type="password"
+                id="password"
+                type={showPassword ? 'text' : 'password'}
                 required
+                autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-white transition-all placeholder:text-zinc-600 font-medium"
+                className={`${inputClassName} pr-12`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
+                className="absolute right-2 top-1.5 rounded-xl p-2.5 text-zinc-500 hover:text-white"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+              </button>
             </div>
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-950/40 border border-red-800/40 rounded-xl text-red-400 text-xs text-center font-bold">
-              {error}
-            </div>
-          )}
+          {error && <Alert variant="error">{error}</Alert>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-white text-black font-black text-xs uppercase tracking-widest rounded-2xl py-4 mt-2 hover:bg-zinc-200 active:scale-95 transition-all flex items-center justify-center h-14 shadow-xl"
+            className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-white py-4 text-xs font-black uppercase tracking-widest text-black shadow-xl transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-70"
           >
-            {loading ? <Loader2 className="animate-spin w-5 h-5" /> : 'ENTRAR NO APP'}
+            {loading ? <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Entrando" /> : 'Entrar no app'}
           </button>
         </form>
 
-        <p className="text-[10px] text-zinc-600 font-extrabold uppercase tracking-widest text-center">
+        <p className="text-center text-[10px] font-extrabold uppercase tracking-widest text-zinc-600">
           Acesso exclusivo para alunos cadastrados
         </p>
-      </div>
+      </main>
     </div>
   )
 }

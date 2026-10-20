@@ -6,6 +6,7 @@ import { AnimatePresence, m } from 'framer-motion'
 import { Copy, LoaderCircle, Megaphone, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
+import { avatarUrlOf } from '@/lib/profile'
 import { relativeDay } from '@/lib/stats'
 import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
@@ -90,12 +91,12 @@ function groupAnnouncements(rows: NotificationRow[]): SentGroup[] {
   return groups
 }
 
-function AvatarStack({ people }: { people: { id: string; name: string | null }[] }) {
+function AvatarStack({ people }: { people: { id: string; name: string | null; avatar: string | null }[] }) {
   const shown = people.slice(0, 4)
   return (
     <span aria-hidden="true" className="flex shrink-0 -space-x-1.5">
       {shown.map((person) => (
-        <Avatar key={person.id} name={person.name} seed={person.id} size="xs" className="ring-2 ring-surface" />
+        <Avatar key={person.id} name={person.name} seed={person.id} src={person.avatar} size="xs" className="ring-2 ring-surface" />
       ))}
       {people.length > shown.length && (
         <span className="grid h-6 min-w-6 place-items-center rounded-lg bg-surface-3 px-1 text-[9px] font-bold text-zinc-300 ring-2 ring-surface">
@@ -137,7 +138,8 @@ export default function AdminAnnouncementsPage() {
     const load = async () => {
       const studentsQuery = supabase
         .from('profiles')
-        .select('id, role, full_name, email')
+        // select('*'): a foto (avatar_path) só existe depois do profile.sql.
+        .select('*')
         .eq('role', 'student')
         .order('full_name')
       // created_at pode não existir em notifications: só ordena por ela se a
@@ -275,7 +277,13 @@ export default function AdminAnnouncementsPage() {
                 exit={{ opacity: 0, height: 0 }}
                 className="flex items-center gap-2 overflow-hidden text-[11px] text-zinc-400"
               >
-                <AvatarStack people={recipients.map((student) => ({ id: student.id, name: student.full_name ?? student.email }))} />
+                <AvatarStack
+                  people={recipients.map((student) => ({
+                    id: student.id,
+                    name: student.full_name ?? student.email,
+                    avatar: avatarUrlOf(student),
+                  }))}
+                />
                 {recipients.length > 1 ? `${plural(recipients.length, 'aluno vai', 'alunos vão')} receber` : 'Aviso individual'}
               </m.p>
             )}
@@ -459,6 +467,7 @@ export default function AdminAnnouncementsPage() {
                       people={group.recipients.map((id) => ({
                         id,
                         name: studentById.get(id)?.full_name ?? studentById.get(id)?.email ?? null,
+                        avatar: avatarUrlOf(studentById.get(id)),
                       }))}
                     />
                     <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-400">{recipientLabel(group)}</span>

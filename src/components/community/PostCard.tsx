@@ -23,6 +23,8 @@ type PostCardProps = {
   post: FeedPost
   // Treinos concluídos do autor (nível); null quando o ranking não carregou.
   authorWorkouts: number | null
+  // Fotos de perfil por usuário (do ranking).
+  avatarUrls: ReadonlyMap<string, string | null>
   viewerId: string
   viewerIsAdmin: boolean
   onToggleLike: (post: FeedPost) => void
@@ -65,6 +67,7 @@ function Sparks() {
 export const PostCard = memo(function PostCard({
   post,
   authorWorkouts,
+  avatarUrls,
   viewerId,
   viewerIsAdmin,
   onToggleLike,
@@ -123,7 +126,7 @@ export const PostCard = memo(function PostCard({
       )}
 
       <header className="flex items-center gap-3 p-4 pb-3">
-        <Avatar name={author} seed={post.author_id} size="md" />
+        <Avatar name={author} seed={post.author_id} src={avatarUrls.get(post.author_id)} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
             <h3 id={headingId} className="truncate text-sm font-bold text-white">
@@ -238,7 +241,7 @@ export const PostCard = memo(function PostCard({
                       exit={{ opacity: 0, height: 0 }}
                       className="flex items-start gap-2.5"
                     >
-                      <Avatar name={name} seed={item.author_id} size="xs" className="mt-1" />
+                      <Avatar name={name} seed={item.author_id} src={avatarUrls.get(item.author_id)} size="xs" className="mt-1" />
                       <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-white/[0.05] px-3 py-2">
                         <p className="flex min-w-0 items-center gap-1.5 text-xs">
                           <span className="truncate font-bold text-white">{name}</span>

@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react'
 import { m } from 'framer-motion'
+import { plural } from '@/lib/text'
 
 export type ChartPoint = { key: string; label: string; value: number }
 
@@ -9,6 +10,8 @@ type LineChartProps = {
   points: ChartPoint[]
   format: (value: number) => string
   title: string
+  // O que cada ponto representa, para o leitor de tela.
+  noun?: [singular: string, plural: string]
 }
 
 const WIDTH = 320
@@ -33,7 +36,7 @@ function smoothPath(coords: [number, number][]) {
   return d
 }
 
-export function LineChart({ points, format, title }: LineChartProps) {
+export function LineChart({ points, format, title, noun = ['treino', 'treinos'] }: LineChartProps) {
   const gradientId = useId()
   const [selected, setSelected] = useState<number | null>(null)
   const activeIndex = selected !== null && selected < points.length ? selected : points.length - 1
@@ -67,7 +70,7 @@ export function LineChart({ points, format, title }: LineChartProps) {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="h-auto w-full overflow-visible"
         role="img"
-        aria-label={`${title}: de ${format(points[0].value)} a ${format(points[points.length - 1].value)} em ${points.length} treinos`}
+        aria-label={`${title}: de ${format(points[0].value)} a ${format(points[points.length - 1].value)} em ${plural(points.length, ...noun)}`}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

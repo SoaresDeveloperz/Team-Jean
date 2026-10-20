@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, m } from 'framer-motion'
 import {
+  AtSign,
   Check,
   ChevronRight,
   ClipboardList,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignedWorkout, Profile } from '@/lib/types'
+import { avatarUrlOf, goalInfo } from '@/lib/profile'
 import { relativeDay, relativeDayPhrase, startOfWeek } from '@/lib/stats'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
@@ -27,6 +29,7 @@ import { Modal } from '@/components/ui/modal'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Stagger, tileVariants } from '@/components/ui/tile'
+import { MeasurementsCard } from '@/components/profile/MeasurementsCard'
 import { createStudent } from './actions'
 
 type SessionRow = {
@@ -181,6 +184,7 @@ export default function AdminStudentsPage() {
 
   const detail = students?.find((student) => student.id === detailId) ?? null
   const detailStats = detail ? statsOf(detail.id) : null
+  const detailGoal = goalInfo(detail?.goal)
   const detailWorkouts = detail ? workouts.filter((workout) => workout.student_id === detail.id) : []
 
   const closeCreate = useCallback(() => setShowCreateModal(false), [])
@@ -340,7 +344,7 @@ export default function AdminStudentsPage() {
                   onClick={() => setDetailId(student.id)}
                   className="flex w-full items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
                 >
-                  <Avatar name={student.full_name ?? student.email} seed={student.id} size="md" />
+                  <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-white">{student.full_name || 'Aluno sem nome'}</span>
                     <span className="block truncate text-[11px] text-zinc-500">{student.email}</span>
@@ -375,7 +379,7 @@ export default function AdminStudentsPage() {
         {detail && detailStats && (
           <div className="space-y-5">
             <div className="flex items-center gap-4">
-              <Avatar name={detail.full_name ?? detail.email} seed={detail.id} size="xl" />
+              <Avatar name={detail.full_name ?? detail.email} seed={detail.id} src={avatarUrlOf(detail)} size="xl" />
               <dl className="grid flex-1 grid-cols-3 gap-2 text-center">
                 {[
                   { label: 'Treinos', value: String(detailStats.total), hint: `${WINDOW_DAYS} dias` },
@@ -390,6 +394,31 @@ export default function AdminStudentsPage() {
                 ))}
               </dl>
             </div>
+
+            {(detailGoal || detail.bio || detail.instagram) && (
+              <div className="rounded-2xl border border-line bg-black/20 p-3.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {detailGoal && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-200">
+                      <span aria-hidden="true">{detailGoal.emoji}</span> Objetivo: {detailGoal.label}
+                    </span>
+                  )}
+                  {detail.instagram && (
+                    <a
+                      href={`https://instagram.com/${encodeURIComponent(detail.instagram)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold text-brand hover:underline"
+                    >
+                      <AtSign className="h-3.5 w-3.5" aria-hidden="true" />
+                      {detail.instagram}
+                      <span className="sr-only"> no Instagram (abre em nova aba)</span>
+                    </a>
+                  )}
+                </div>
+                {detail.bio && <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{detail.bio}</p>}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <Link
@@ -458,6 +487,8 @@ export default function AdminStudentsPage() {
                 </ul>
               )}
             </section>
+
+            <MeasurementsCard key={detail.id} userId={detail.id} goal={detail.goal} studentName={detail.full_name || detail.email} bare />
 
             <AnimatePresence initial={false} mode="wait">
               {editingName === null ? (

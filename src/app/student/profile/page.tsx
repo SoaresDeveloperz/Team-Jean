@@ -18,9 +18,9 @@ import {
 } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
+import { updateProfileDetails, type ProfileDetails, type ProfileImageKind } from '@/lib/profile'
 import { weekStreak } from '@/lib/stats'
 import { buildAchievements, type Achievement } from '@/lib/achievements'
-import { levelFor } from '@/lib/levels'
 import type { PostDraft } from '@/lib/community'
 import { plural } from '@/lib/text'
 import { setPreferences, usePreferences } from '@/lib/preferences'
@@ -29,7 +29,6 @@ import { openNotifications, useNotifications } from '@/lib/notifications'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
-import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Modal } from '@/components/ui/modal'
 import { PageSkeleton } from '@/components/ui/skeleton'
 import { ProgressRing } from '@/components/ui/progress-ring'
@@ -40,11 +39,17 @@ import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { LogoutButton } from '@/components/layout/LogoutButton'
 import { AchievementIcon } from '@/components/fitness/AchievementIcon'
 import { Composer } from '@/components/community/Composer'
-import { LevelBadge } from '@/components/community/LevelBadge'
 import { ChangePasswordTile } from '@/components/account/ChangePasswordTile'
+import { AthleteCard } from '@/components/profile/AthleteCard'
+import { EditProfileSheet } from '@/components/profile/EditProfileSheet'
+import { LevelTrail } from '@/components/profile/LevelTrail'
+import { MeasurementsCard } from '@/components/profile/MeasurementsCard'
+import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
 
 type ProfileData = {
-  profile: Pick<Profile, 'full_name' | 'email'> | null
+  userId: string
+  // select('*'): as colunas do profile.sql vêm quando existirem.
+  profile: Profile
   email: string | null
   completedCount: number
   dates: Date[]
@@ -64,6 +69,13 @@ export default function StudentProfilePage() {
   const [loadError, setLoadError] = useState('')
   const [selectedBadge, setSelectedBadge] = useState<Achievement | null>(null)
   const [shareDraft, setShareDraft] = useState<PostDraft | null>(null)
+  // O tipo fica guardado depois de fechar (a folha não muda durante a saída).
+  const [photoKind, setPhotoKind] = useState<ProfileImageKind>('avatar')
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+  const [uploading, setUploading] = useState<ProfileImageKind | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editKey, setEditKey] = useState(0)
+  const [levelsOpen, setLevelsOpen] = useState(false)
   const preferences = usePreferences()
   const installState = useInstallState()
   const { items: notices, unseen } = useNotifications()
@@ -76,7 +88,7 @@ export default function StudentProfilePage() {
       if (!active || !user) return
 
       const [profileResult, countResult, datesResult] = await Promise.all([
-        supabase.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         supabase
           .from('workout_sessions')
           .select('id', { count: 'exact', head: true })
@@ -96,7 +108,8 @@ export default function StudentProfilePage() {
       if (error) setLoadError(`Algumas informações não carregaram: ${error.message}`)
 
       setData({
-        profile: profileResult.data as ProfileData['profile'],
+        userId: user.id,
+        profile: { id: user.id, full_name: null, email: null, role: null, ...(profileResult.data as Partial<Profile> | null) },
         email: user.email ?? null,
         completedCount: countResult.count ?? 0,
         dates: ((datesResult.data ?? []) as { completed_at: string | null }[])
@@ -114,81 +127,54 @@ export default function StudentProfilePage() {
   const achievements = useMemo(() => (data ? buildAchievements(data.completedCount, data.dates) : []), [data])
   const closeBadge = useCallback(() => setSelectedBadge(null), [])
   const closeShare = useCallback(() => setShareDraft(null), [])
+  const closePhotoMenu = useCallback(() => setPhotoMenuOpen(false), [])
+  const closeEdit = useCallback(() => setEditOpen(false), [])
+  const closeLevels = useCallback(() => setLevelsOpen(false), [])
+
+  const patchProfile = (patch: Partial<ProfileDetails>) =>
+    setData((current) => (current ? { ...current, profile: { ...current.profile, ...patch } } : current))
+
+  const openPhotoMenu = (kind: ProfileImageKind) => {
+    setPhotoKind(kind)
+    setPhotoMenuOpen(true)
+  }
+
+  const handleImageChange = (kind: ProfileImageKind, path: string | null) =>
+    patchProfile(kind === 'avatar' ? { avatar_path: path } : { cover_path: path })
+
+  const saveDetails = async (patch: Partial<ProfileDetails>) => {
+    if (!data) return
+    await updateProfileDetails(supabase, data.userId, patch)
+    patchProfile(patch)
+    setEditOpen(false)
+    toast({ tone: 'success', title: 'Perfil atualizado' })
+  }
 
   if (!data) return <PageSkeleton label="Carregando perfil" />
 
-  const name = data.profile?.full_name || 'Atleta'
-  const initials = name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
   const unlockedCount = achievements.filter((item) => item.value >= item.goal).length
   const streak = weekStreak(data.dates)
-  const level = levelFor(data.completedCount)
 
   return (
     <Stagger className="space-y-4">
       {loadError && <Alert variant="error">{loadError}</Alert>}
 
       {/* Cartão do atleta */}
-      <Tile className="glow-brand rounded-[2rem] p-6 text-center">
-        <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-[conic-gradient(from_200deg,#34d399,#059669,#fbbf24,#34d399)] p-[3px]">
-          <span className="grid h-full w-full place-items-center rounded-full bg-black font-display text-4xl font-bold">
-            {initials || 'TJ'}
-          </span>
-        </div>
-        <h1 className="mt-4 font-display text-4xl font-bold uppercase leading-none">{name}</h1>
-        <p className="mt-1.5 truncate text-xs text-zinc-500">{data.profile?.email || data.email}</p>
-        <LevelBadge workouts={data.completedCount} className="mt-3 px-3 py-1 text-[10px] tracking-[0.16em]" />
+      <AthleteCard
+        profile={data.profile}
+        email={data.email}
+        stats={{ workouts: data.completedCount, streak, unlocked: unlockedCount, achievements: achievements.length }}
+        uploading={uploading}
+        onEditImage={openPhotoMenu}
+        onEditProfile={() => {
+          setEditKey((key) => key + 1)
+          setEditOpen(true)
+        }}
+        onOpenLevels={() => setLevelsOpen(true)}
+      />
 
-        <dl className="mt-5 grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-black/30">
-          {[
-            { label: 'Treinos', value: data.completedCount },
-            { label: 'Sequência', value: streak, suffix: 'sem' },
-            { label: 'Conquistas', value: unlockedCount, suffix: `/${achievements.length}` },
-          ].map((stat) => (
-            <div key={stat.label} className="px-2 py-3">
-              <dd className="font-display text-3xl font-bold leading-none">
-                <AnimatedNumber value={stat.value} />
-                {stat.suffix && <span className="text-sm text-zinc-500">{stat.suffix}</span>}
-              </dd>
-              <dt className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">{stat.label}</dt>
-            </div>
-          ))}
-        </dl>
-
-        <div className="mt-4 rounded-2xl border border-line bg-black/30 p-3.5 text-left">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Nível {level.level}</span>
-            <span className="text-[11px] font-bold text-zinc-300">
-              {level.next ? `Próximo: ${level.next.name}` : 'Nível máximo'}
-            </span>
-          </div>
-          <div
-            role="progressbar"
-            aria-label={level.next ? `Progresso até o nível ${level.next.name}` : 'Nível máximo alcançado'}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(level.progress * 100)}
-            className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"
-          >
-            <m.div
-              className="h-full rounded-full bg-gradient-to-r from-brand-deep via-brand to-gold"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.max(4, level.progress * 100)}%` }}
-              transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.3 }}
-            />
-          </div>
-          <p className="mt-2 text-[11px] text-zinc-400">
-            {level.next
-              ? `Faltam ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} para virar ${level.next.name}.`
-              : 'Você é lenda do Team Jean. 👑'}
-          </p>
-        </div>
-      </Tile>
+      {/* Medidas e fotos de evolução */}
+      <MeasurementsCard userId={data.userId} goal={data.profile.goal} />
 
       {/* Conquistas */}
       <m.section variants={tileVariants} aria-labelledby="achievements-title">
@@ -437,6 +423,18 @@ export default function StudentProfilePage() {
           </div>
         )}
       </Modal>
+      <ProfileImageEditor
+        userId={data.userId}
+        kind={photoKind}
+        open={photoMenuOpen}
+        currentPath={photoKind === 'cover' ? data.profile.cover_path : data.profile.avatar_path}
+        onClose={closePhotoMenu}
+        onChange={handleImageChange}
+        onUploadingChange={setUploading}
+      />
+      <EditProfileSheet key={editKey} open={editOpen} profile={data.profile} onClose={closeEdit} onSave={saveDetails} />
+      <LevelTrail open={levelsOpen} workouts={data.completedCount} onClose={closeLevels} />
+
       <Composer
         open={shareDraft !== null}
         onClose={closeShare}

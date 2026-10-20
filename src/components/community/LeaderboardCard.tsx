@@ -3,6 +3,7 @@
 import { m } from 'framer-motion'
 import { Crown, Trophy } from 'lucide-react'
 import { isAdminRole, type CommunityMember } from '@/lib/community'
+import { avatarUrlOf } from '@/lib/profile'
 import { startOfWeek } from '@/lib/stats'
 import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
@@ -111,6 +112,7 @@ export function LeaderboardCard({
                 <Avatar
                   name={member.full_name}
                   seed={member.id}
+                  src={avatarUrlOf(member)}
                   size={slot.place === 1 ? 'lg' : 'md'}
                   className={cn('ring-2 ring-offset-2 ring-offset-surface', slot.ring)}
                 />

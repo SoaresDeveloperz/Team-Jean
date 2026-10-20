@@ -2,18 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Dumbbell } from 'lucide-react'
+import { m } from 'framer-motion'
+import { ArrowUpRight, Dumbbell } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
 import { pickNextWorkout } from '@/lib/workouts'
 import { readActiveSession } from '@/lib/active-session'
+import { relativeDay } from '@/lib/stats'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
-import { PageLoader } from '@/components/ui/page-loader'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Eyebrow, Stagger, tileVariants } from '@/components/ui/tile'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 
 type RoutineWorkout = AssignedWorkout & {
   exerciseCount: number
+  muscles: string[]
   lastDoneAt: string | null
   inProgress: boolean
 }
@@ -56,18 +60,24 @@ export default function StudentWeekPage() {
       }
 
       const workoutRows = (workoutsResult.data ?? []) as AssignedWorkout[]
-      const exerciseCounts = new Map<string, number>()
+      const exercisesByWorkout = new Map<string, { count: number; muscles: Set<string> }>()
       if (workoutRows.length > 0) {
         const { data: exerciseRows } = await supabase
           .from('assigned_workout_exercises')
-          .select('assigned_workout_id')
+          .select('assigned_workout_id, exercises(muscle_group)')
           .in(
             'assigned_workout_id',
             workoutRows.map((workout) => workout.id),
           )
         if (!active) return
-        for (const row of (exerciseRows ?? []) as { assigned_workout_id: string }[]) {
-          exerciseCounts.set(row.assigned_workout_id, (exerciseCounts.get(row.assigned_workout_id) ?? 0) + 1)
+        for (const row of (exerciseRows ?? []) as unknown as {
+          assigned_workout_id: string
+          exercises: { muscle_group: string | null } | null
+        }[]) {
+          const entry = exercisesByWorkout.get(row.assigned_workout_id) ?? { count: 0, muscles: new Set<string>() }
+          entry.count += 1
+          if (row.exercises?.muscle_group) entry.muscles.add(row.exercises.muscle_group)
+          exercisesByWorkout.set(row.assigned_workout_id, entry)
         }
       }
 
@@ -81,7 +91,8 @@ export default function StudentWeekPage() {
 
       const rows = workoutRows.map((workout) => ({
         ...workout,
-        exerciseCount: exerciseCounts.get(workout.id) ?? 0,
+        exerciseCount: exercisesByWorkout.get(workout.id)?.count ?? 0,
+        muscles: [...(exercisesByWorkout.get(workout.id)?.muscles ?? [])],
         lastDoneAt: lastDone.get(workout.id) ?? null,
         inProgress: workout.id === inProgressId,
       }))
@@ -97,75 +108,88 @@ export default function StudentWeekPage() {
 
   return (
     <div className="space-y-8">
-      <section className="space-y-4">
-        <div>
-          <h1 className="text-3xl font-black uppercase tracking-wide text-white">Rotina</h1>
-          <p className="mt-1 text-xs font-bold uppercase tracking-widest text-zinc-500">Seus treinos ativos</p>
+      <section className="space-y-4" aria-labelledby="routine-title">
+        <div className="px-1">
+          <Eyebrow>Rotina ativa</Eyebrow>
+          <h1 id="routine-title" className="mt-1 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">
+            Seus treinos
+          </h1>
+          <p className="mt-2 text-sm text-zinc-400">Siga a ordem: o próximo da rotina fica em destaque.</p>
         </div>
 
         {loadError && <Alert variant="error">{loadError}</Alert>}
 
         {workouts === null ? (
-          <PageLoader label="Carregando rotina" />
+          <div className="space-y-3" role="status" aria-label="Carregando rotina">
+            <Skeleton className="h-28 rounded-3xl" />
+            <Skeleton className="h-28 rounded-3xl" />
+          </div>
         ) : workouts.length === 0 ? (
-          <div className="space-y-4 rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center">
+          <div className="space-y-3 rounded-3xl border border-line bg-surface p-8 text-center">
             <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
-            <h2 className="text-sm font-black uppercase text-zinc-400">Sem treinos ativos</h2>
+            <h2 className="font-display text-2xl font-bold uppercase text-zinc-300">Sem treinos ativos</h2>
+            <p className="text-xs text-zinc-500">Seu treinador ainda não liberou a rotina.</p>
           </div>
         ) : (
-          <ul className="space-y-3">
+          <Stagger className="space-y-3">
             {workouts.map((workout, index) => {
               const isNext = workout.id === nextWorkoutId
+              const letter = index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
               return (
-                <li key={workout.id}>
+                <m.div key={workout.id} variants={tileVariants}>
                   <Link
                     href={`/student/workout/${workout.id}`}
                     className={cn(
-                      'group flex items-center justify-between gap-3 rounded-3xl border bg-zinc-950 p-5 transition-all active:scale-[0.98]',
-                      isNext ? 'border-emerald-800/60' : 'border-zinc-900 hover:border-zinc-700',
+                      'group relative flex items-center gap-4 overflow-hidden rounded-3xl border bg-surface p-4 transition active:scale-[0.99]',
+                      isNext ? 'glow-brand border-brand/35' : 'border-line hover:border-line-strong',
                     )}
                   >
-                    <div className="flex min-w-0 items-center gap-4">
-                      <div
-                        className={cn(
-                          'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg font-black transition-colors',
-                          isNext
-                            ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-400'
-                            : 'border-zinc-800 bg-zinc-900 text-zinc-500 group-hover:text-white',
+                    <span
+                      className={cn(
+                        'grid h-16 w-16 shrink-0 place-items-center rounded-2xl font-display text-4xl font-bold',
+                        isNext ? 'bg-brand text-black' : 'bg-white/[0.06] text-zinc-300',
+                      )}
+                      aria-hidden="true"
+                    >
+                      {letter}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        {isNext && (
+                          <span
+                            className={cn(
+                              'rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider',
+                              workout.inProgress ? 'bg-gold text-black' : 'bg-brand text-black',
+                            )}
+                          >
+                            {workout.inProgress ? 'Em andamento' : 'Próximo'}
+                          </span>
                         )}
-                        aria-hidden="true"
-                      >
-                        {index < 26 ? String.fromCharCode(65 + index) : index + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h2 className="truncate text-base font-black text-white">{workout.name}</h2>
-                          {isNext && (
-                            <span className="shrink-0 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-black">
-                              {workout.inProgress ? 'Em andamento' : 'Próximo'}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                          {workout.exerciseCount} exercícios ·{' '}
-                          {workout.lastDoneAt
-                            ? `feito em ${new Date(workout.lastDoneAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
-                            : 'ainda não feito'}
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-5 w-5 shrink-0 text-zinc-600 transition-colors group-hover:text-white" aria-hidden="true" />
+                        <span className="text-[11px] font-semibold text-zinc-500">
+                          {workout.lastDoneAt ? `Feito ${relativeDay(new Date(workout.lastDoneAt))}` : 'Ainda não feito'}
+                        </span>
+                      </span>
+                      <span className="mt-1 block font-display text-2xl font-bold uppercase leading-[0.95] text-white">
+                        {workout.name}
+                      </span>
+                      <span className="mt-1.5 block truncate text-[11px] text-zinc-500">
+                        {workout.exerciseCount} {workout.exerciseCount === 1 ? 'exercício' : 'exercícios'}
+                        {workout.muscles.length > 0 && ` · ${workout.muscles.slice(0, 3).join(', ')}`}
+                      </span>
+                    </span>
+                    <ArrowUpRight
+                      className="h-5 w-5 shrink-0 text-zinc-600 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white"
+                      aria-hidden="true"
+                    />
                   </Link>
-                </li>
+                </m.div>
               )
             })}
-          </ul>
+          </Stagger>
         )}
       </section>
 
-      <div className="rounded-3xl border border-zinc-900 bg-zinc-950/60 p-5">
-        <WeeklyTrainingInsights mode="student" />
-      </div>
+      <WeeklyTrainingInsights mode="student" />
     </div>
   )
 }

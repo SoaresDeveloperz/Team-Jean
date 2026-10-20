@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoaderCircle, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { resetNotifications } from '@/lib/notifications'
 import { cn } from '@/lib/cn'
 
 export function LogoutButton({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
@@ -13,6 +14,7 @@ export function LogoutButton({ className, showLabel = false }: { className?: str
   const handleLogout = async () => {
     setLoading(true)
     await createClient().auth.signOut()
+    resetNotifications()
     router.replace('/login')
     router.refresh()
   }

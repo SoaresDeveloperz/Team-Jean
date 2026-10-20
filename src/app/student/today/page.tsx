@@ -1,36 +1,47 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Activity, CalendarDays, ChevronRight, Clock, Dumbbell, Flame, Play, RotateCcw } from 'lucide-react'
+import { m } from 'framer-motion'
+import { Check, ChevronRight, Clock, Dumbbell, Flame, Megaphone, Moon, Play, RotateCcw, Sparkles, Target } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
-import type { AssignedWorkout, PrescribedExercise } from '@/lib/types'
-import { getSetsCount, pickNextWorkout } from '@/lib/workouts'
+import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
+import { getPlannedSets, getSetsCount, pickNextWorkout } from '@/lib/workouts'
 import { readActiveSession } from '@/lib/active-session'
+import { REGION_LABELS, computeRecovery, loadFill, muscleLoad, recoveryFill, splitSecondary, type MuscleRegion } from '@/lib/muscles'
+import { WEEKDAY_INITIALS, countInMonth, isSameDay, relativeDay, startOfWeek, weekDayCounts, weekStreak } from '@/lib/stats'
+import { usePreferences } from '@/lib/preferences'
+import { openNotifications, useNotifications } from '@/lib/notifications'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
-import { PageLoader } from '@/components/ui/page-loader'
+import { PageSkeleton } from '@/components/ui/skeleton'
+import { ProgressRing } from '@/components/ui/progress-ring'
+import { AnimatedNumber } from '@/components/ui/animated-number'
+import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
+import { MuscleMap } from '@/components/fitness/MuscleMap'
+import { ReadinessCard } from '@/components/fitness/ReadinessCard'
 
-type ExerciseRow = PrescribedExercise & { exercises: { name: string | null; muscle_group: string | null } | null }
+type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null }
 
 type TodayData = {
   firstName: string
-  completedThisMonth: number
-  workout: AssignedWorkout | null
+  workouts: AssignedWorkout[]
+  next: AssignedWorkout | null
   inProgress: boolean
-  lastDoneAt: string | null
+  lastDoneByWorkout: Map<string, string>
+  completedDates: Date[]
   exercises: ExerciseRow[]
-  activeWorkoutsCount: number
+  recovery: Partial<Record<MuscleRegion, number>>
 }
 
 const READINESS_SAVE_DELAY_MS = 700
 // Estimativa: execução + descanso médio por série.
 const MINUTES_PER_SET = 2.5
+// Janela para calcular recuperação: o maior tempo de recuperação (72h) + folga.
+const RECOVERY_WINDOW_MS = 4 * 86_400_000
 
-function getReadinessColor(value: number) {
-  if (value >= 80) return 'text-emerald-400'
-  if (value >= 50) return 'text-amber-400'
-  return 'text-rose-400'
+function workoutLetter(index: number) {
+  return index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
 }
 
 export default function StudentTodayPage() {
@@ -42,6 +53,8 @@ export default function StudentTodayPage() {
   const [readinessStatus, setReadinessStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const saveTimer = useRef<number | null>(null)
   const saveRequest = useRef(0)
+  const { weeklyGoal } = usePreferences()
+  const { items: notices, unseen } = useNotifications()
 
   useEffect(() => {
     let active = true
@@ -51,18 +64,8 @@ export default function StudentTodayPage() {
       if (!active || !user) return
       setUserId(user.id)
 
-      const startOfMonth = new Date()
-      startOfMonth.setDate(1)
-      startOfMonth.setHours(0, 0, 0, 0)
-
-      const [profileResult, monthResult, workoutsResult, sessionsResult] = await Promise.all([
+      const [profileResult, workoutsResult, sessionsResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-        supabase
-          .from('workout_sessions')
-          .select('id', { count: 'exact', head: true })
-          .eq('student_id', user.id)
-          .eq('status', 'completed')
-          .gte('completed_at', startOfMonth.toISOString()),
         supabase
           .from('assigned_workouts')
           .select('*')
@@ -71,7 +74,7 @@ export default function StudentTodayPage() {
           .order('name', { ascending: true }),
         supabase
           .from('workout_sessions')
-          .select('assigned_workout_id, completed_at')
+          .select('id, assigned_workout_id, completed_at')
           .eq('student_id', user.id)
           .eq('status', 'completed')
           .order('completed_at', { ascending: false })
@@ -86,40 +89,65 @@ export default function StudentTodayPage() {
       }
 
       const workouts = (workoutsResult.data ?? []) as AssignedWorkout[]
-      const sessions = (sessionsResult.data ?? []) as { assigned_workout_id: string; completed_at: string | null }[]
+      const sessions = (
+        (sessionsResult.data ?? []) as { id: string; assigned_workout_id: string; completed_at: string | null }[]
+      ).filter((session): session is { id: string; assigned_workout_id: string; completed_at: string } => Boolean(session.completed_at))
 
       const lastDoneByWorkout = new Map<string, string>()
       for (const session of sessions) {
-        if (session.completed_at && !lastDoneByWorkout.has(session.assigned_workout_id)) {
+        if (!lastDoneByWorkout.has(session.assigned_workout_id)) {
           lastDoneByWorkout.set(session.assigned_workout_id, session.completed_at)
         }
       }
       const inProgressWorkoutId = readActiveSession(user.id)?.workoutId ?? null
+      const next = workouts.length > 0 ? pickNextWorkout(workouts, lastDoneByWorkout, inProgressWorkoutId) : null
+      const recentSessions = sessions.filter((session) => Date.now() - new Date(session.completed_at).getTime() < RECOVERY_WINDOW_MS)
 
-      const workout = workouts.length > 0 ? pickNextWorkout(workouts, lastDoneByWorkout, inProgressWorkoutId) : null
+      const [exercisesResult, recentSetsResult] = await Promise.all([
+        next
+          ? supabase
+              .from('assigned_workout_exercises')
+              .select('*, exercises(*)')
+              .eq('assigned_workout_id', next.id)
+              .order('order', { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
+        recentSessions.length > 0
+          ? supabase
+              .from('session_sets')
+              .select('session_id, exercises(*)')
+              .in(
+                'session_id',
+                recentSessions.map((session) => session.id),
+              )
+              .eq('completed', true)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+      if (!active) return
 
-      let exercises: ExerciseRow[] = []
-      if (workout) {
-        const { data: exerciseRows } = await supabase
-          .from('assigned_workout_exercises')
-          .select('*, exercises(name, muscle_group)')
-          .eq('assigned_workout_id', workout.id)
-          .order('order', { ascending: true })
-        if (!active) return
-        exercises = (exerciseRows ?? []) as ExerciseRow[]
-      }
+      const completedAtBySession = new Map(recentSessions.map((session) => [session.id, new Date(session.completed_at)]))
+      const recoveryEntries = (
+        (recentSetsResult.data ?? []) as unknown as { session_id: string; exercises: ExerciseRow['exercises'] }[]
+      ).flatMap((set) => {
+        const completedAt = completedAtBySession.get(set.session_id)
+        if (!completedAt) return []
+        return [
+          { completedAt, muscle: set.exercises?.muscle_group, amount: 1 },
+          ...splitSecondary(set.exercises?.secondary_muscle).map((muscle) => ({ completedAt, muscle, amount: 0.5 })),
+        ]
+      })
 
-      const profile = profileResult.data as { full_name: string | null; readiness_score: number | null } | null
+      const profile = profileResult.data as { full_name?: string | null; readiness_score?: number | null } | null
       if (typeof profile?.readiness_score === 'number') setReadiness(profile.readiness_score)
 
       setData({
         firstName: profile?.full_name?.trim().split(' ')[0] || 'Atleta',
-        completedThisMonth: monthResult.count ?? 0,
-        workout,
-        inProgress: workout !== null && workout.id === inProgressWorkoutId,
-        lastDoneAt: workout ? (lastDoneByWorkout.get(workout.id) ?? null) : null,
-        exercises,
-        activeWorkoutsCount: workouts.length,
+        workouts,
+        next,
+        inProgress: next !== null && next.id === inProgressWorkoutId,
+        lastDoneByWorkout,
+        completedDates: sessions.map((session) => new Date(session.completed_at)),
+        exercises: (exercisesResult.data ?? []) as ExerciseRow[],
+        recovery: computeRecovery(recoveryEntries),
       })
     }
 
@@ -136,8 +164,7 @@ export default function StudentTodayPage() {
     [],
   )
 
-  // Salva só depois que o aluno para de arrastar (antes era um UPDATE a cada
-  // movimento do slider, com respostas podendo chegar fora de ordem).
+  // Salva só depois que o aluno para de arrastar.
   const handleReadinessChange = (value: number) => {
     setReadiness(value)
     if (!userId) return
@@ -151,185 +178,391 @@ export default function StudentTodayPage() {
     }, READINESS_SAVE_DELAY_MS)
   }
 
-  if (loadError) return <Alert variant="error">{loadError}</Alert>
-  if (!data) return <PageLoader label="Carregando seu dia" />
+  const derived = useMemo(() => {
+    if (!data) return null
+    const now = new Date()
+    const totalSets = data.exercises.reduce((total, item) => total + getSetsCount(item), 0)
+    const load = muscleLoad(
+      data.exercises.flatMap((item) => [
+        { muscle: item.exercises?.muscle_group, amount: getSetsCount(item) },
+        ...splitSecondary(item.exercises?.secondary_muscle).map((muscle) => ({ muscle, amount: getSetsCount(item) / 2 })),
+      ]),
+    )
+    const workFills: Partial<Record<MuscleRegion, string>> = {}
+    for (const [region, intensity] of Object.entries(load) as [MuscleRegion, number][]) {
+      workFills[region] = loadFill(intensity)
+    }
+    const recoveryFills: Partial<Record<MuscleRegion, string>> = {}
+    for (const [region, value] of Object.entries(data.recovery) as [MuscleRegion, number][]) {
+      const fill = recoveryFill(value)
+      if (fill) recoveryFills[region] = fill
+    }
+    const recovering = (Object.entries(data.recovery) as [MuscleRegion, number][])
+      .filter(([, value]) => value < 0.85)
+      .sort((first, second) => first[1] - second[1])
 
-  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' })
-  const totalSets = data.exercises.reduce((total, item) => total + getSetsCount(item), 0)
-  const estimatedMinutes = Math.max(10, Math.round((totalSets * MINUTES_PER_SET) / 5) * 5)
-  const muscles = [
-    ...new Set(data.exercises.map((item) => item.exercises?.muscle_group).filter((muscle): muscle is string => Boolean(muscle))),
-  ]
+    return {
+      totalSets,
+      estimatedMinutes: Math.max(10, Math.round((totalSets * MINUTES_PER_SET) / 5) * 5),
+      muscles: [
+        ...new Set(data.exercises.map((item) => item.exercises?.muscle_group).filter((muscle): muscle is string => Boolean(muscle))),
+      ],
+      workFills,
+      recoveryFills,
+      recovering,
+      streak: weekStreak(data.completedDates, now),
+      monthCount: countInMonth(data.completedDates, now),
+      weekDays: weekDayCounts(data.completedDates, now),
+      weekCount: data.completedDates.filter((date) => date >= startOfWeek(now)).length,
+      trainedToday: data.completedDates.some((date) => isSameDay(date, now)),
+      todayIndex: (now.getDay() + 6) % 7,
+    }
+  }, [data])
+
+  if (loadError) return <Alert variant="error">{loadError}</Alert>
+  if (!data || !derived) return <PageSkeleton label="Carregando seu dia" />
+
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const next = data.next
+  const lastDone = next ? data.lastDoneByWorkout.get(next.id) : undefined
+  const latestNotice = unseen[0] ?? notices[0]
+  const goalProgress = Math.min(1, derived.weekCount / Math.max(1, weeklyGoal))
+  const doneForToday = derived.trainedToday && !data.inProgress
+
+  let subtitle = 'Seu treinador ainda não liberou um treino. Aproveite para recuperar.'
+  if (data.inProgress) subtitle = 'Você tem um treino em andamento. Bora terminar?'
+  else if (derived.trainedToday) subtitle = 'Missão de hoje cumprida. Recuperação também é treino.'
+  else if (next) subtitle = `Bora pro ${next.name}?`
 
   return (
-    <div className="space-y-7">
-      <div className="flex items-end justify-between gap-3 px-1">
-        <div className="min-w-0 space-y-0.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500">{today}</p>
-          <h1 className="truncate text-3xl font-black tracking-tight text-white">Fala, {data.firstName}!</h1>
-        </div>
+    <Stagger className="space-y-4">
+      <m.header variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="px-1 pb-1 pt-1">
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{today}</p>
+        <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9] tracking-tight">
+          Fala, {data.firstName}!
+        </h1>
+        <p className="mt-2 text-sm text-zinc-400">{subtitle}</p>
+      </m.header>
 
-        <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/80 px-3 py-1.5 backdrop-blur-md">
-          <Flame className="h-5 w-5 fill-amber-500/20 text-amber-500" aria-hidden="true" />
-          <div className="flex flex-col items-end leading-none">
-            <span className="text-sm font-black text-white">{data.completedThisMonth}</span>
-            <span className="mt-0.5 text-[7px] font-black uppercase tracking-widest text-zinc-500">Treinos no mês</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-4 rounded-3xl border border-zinc-900 bg-[#0c0c0c] p-5 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={cn('rounded-lg bg-zinc-900/50 p-1.5', getReadinessColor(readiness))}>
-              <Activity className="h-4 w-4" aria-hidden="true" />
-            </div>
-            <label htmlFor="readiness" className="text-xs font-extrabold uppercase tracking-widest text-zinc-400">
-              Prontidão
-            </label>
-          </div>
-          <div className="text-right">
-            <span className={cn('text-xl font-black', getReadinessColor(readiness))}>{readiness}%</span>
-            <span className="block h-3 text-[9px] font-bold text-zinc-600" aria-live="polite">
-              {readinessStatus === 'saving' && 'Salvando...'}
-              {readinessStatus === 'saved' && 'Salvo'}
-              {readinessStatus === 'error' && <span className="text-rose-400">Erro ao salvar</span>}
-            </span>
-          </div>
-        </div>
-
-        <div className="relative pt-1">
-          <input
-            id="readiness"
-            type="range"
-            min={10}
-            max={100}
-            step={10}
-            value={readiness}
-            onChange={(event) => handleReadinessChange(Number(event.target.value))}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-zinc-800 accent-white"
-          />
-          <div className="mt-2 flex justify-between px-1">
-            <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-600">Fadigado</span>
-            <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-600">Recuperado</span>
-          </div>
-        </div>
-      </div>
-
-      {!data.workout ? (
-        <div className="space-y-3 rounded-3xl border border-zinc-900 bg-[#0c0c0c] p-10 text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
-            <Dumbbell className="h-5 w-5 text-zinc-500" aria-hidden="true" />
-          </div>
-          <h2 className="text-sm font-black uppercase tracking-widest text-zinc-400">Dia de descanso</h2>
-          <p className="text-xs text-zinc-600">Quando o treinador liberar um treino, ele aparece aqui.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="relative overflow-hidden rounded-[2rem] border border-zinc-800/60 bg-zinc-950 p-6 shadow-2xl">
-            <div className="absolute inset-0 z-0 bg-gradient-to-br from-zinc-900/80 via-black to-black" aria-hidden="true" />
-            <div className="absolute -right-24 -top-24 z-0 h-64 w-64 rounded-full bg-emerald-500/10 blur-[80px]" aria-hidden="true" />
-
-            <div className="relative z-10 space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="rounded-full border border-emerald-900/50 bg-emerald-950/30 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">
-                    {data.inProgress ? 'Em andamento' : 'Próximo treino'}
-                  </span>
-                  <span className="flex items-center gap-1 rounded-full bg-zinc-900/50 px-2 py-1 text-[10px] font-bold text-zinc-400 backdrop-blur-sm">
-                    <Clock className="h-3 w-3" aria-hidden="true" /> ~{estimatedMinutes} min
-                  </span>
-                </div>
-
-                <div className="pt-2">
-                  <h2 className="text-3xl font-black uppercase leading-none tracking-tight text-white">{data.workout.name}</h2>
-                  <p className="mt-2 text-[10px] font-semibold text-zinc-500">
-                    {data.lastDoneAt
-                      ? `Feito pela última vez em ${new Date(data.lastDoneAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
-                      : 'Você ainda não fez este treino'}
-                  </p>
-
-                  {muscles.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {muscles.slice(0, 4).map((muscle) => (
-                        <span
-                          key={muscle}
-                          className="rounded-md bg-zinc-800/80 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-zinc-300"
-                        >
-                          {muscle}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <Link
-                href={`/student/workout/${data.workout.id}`}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 text-sm font-black uppercase tracking-[0.2em] text-black shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all hover:bg-zinc-200 active:scale-[0.98]"
+      {/* Treino do dia */}
+      {next ? (
+        <Tile className="glow-brand rounded-[2rem] p-0">
+          <div className="flex gap-3 p-5 pb-0">
+            <div className="min-w-0 flex-1">
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]',
+                  data.inProgress
+                    ? 'border-gold/30 bg-gold-soft text-gold'
+                    : doneForToday
+                      ? 'border-line-strong bg-white/5 text-zinc-300'
+                      : 'border-brand/30 bg-brand-soft text-brand',
+                )}
               >
                 {data.inProgress ? (
                   <>
-                    <RotateCcw className="h-5 w-5" aria-hidden="true" /> Continuar
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" /> Em andamento
+                  </>
+                ) : doneForToday ? (
+                  <>
+                    <Check className="h-3 w-3" aria-hidden="true" /> Próximo da rotina
                   </>
                 ) : (
                   <>
-                    <Play className="h-5 w-5 fill-black" aria-hidden="true" /> Começar
+                    <Sparkles className="h-3 w-3" aria-hidden="true" /> Treino de hoje
+                  </>
+                )}
+              </span>
+              <h2 className="mt-3 font-display text-[2.1rem] font-bold uppercase leading-[0.92]">{next.name}</h2>
+              <p className="mt-2 text-xs text-zinc-500">
+                {lastDone ? `Feito pela última vez ${relativeDay(new Date(lastDone))}` : 'Você ainda não fez este treino'}
+              </p>
+            </div>
+            <div className="w-[40%] max-w-[160px] shrink-0">
+              <MuscleMap fills={derived.workFills} />
+            </div>
+          </div>
+
+          <dl className="mx-5 mt-4 grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-black/30">
+            {[
+              { label: 'Exercícios', value: String(data.exercises.length) },
+              { label: 'Séries', value: String(derived.totalSets) },
+              { label: 'Duração', value: `~${derived.estimatedMinutes}′` },
+            ].map((stat) => (
+              <div key={stat.label} className="px-3 py-2.5 text-center">
+                <dt className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">{stat.label}</dt>
+                <dd className="font-display text-2xl font-bold leading-tight">{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          {derived.muscles.length > 0 && (
+            <ul className="mx-5 mt-3 flex flex-wrap gap-1.5" aria-label="Grupos musculares">
+              {derived.muscles.slice(0, 5).map((muscle) => (
+                <li
+                  key={muscle}
+                  className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-300"
+                >
+                  {muscle}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="p-5 pt-4">
+            <m.div whileTap={{ scale: 0.97 }}>
+              <Link
+                href={`/student/workout/${next.id}`}
+                className={cn(
+                  'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-sm font-black uppercase tracking-[0.18em] transition',
+                  doneForToday
+                    ? 'border border-line-strong bg-white/5 text-white hover:bg-white/10'
+                    : 'bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,0.12)] hover:bg-zinc-200',
+                )}
+              >
+                {data.inProgress ? (
+                  <>
+                    <RotateCcw className="h-5 w-5" aria-hidden="true" /> Continuar treino
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-5 w-5 fill-current" aria-hidden="true" /> Começar treino
                   </>
                 )}
               </Link>
-            </div>
+            </m.div>
           </div>
-
-          <div className="pt-2">
-            <div className="mb-3 flex items-center justify-between px-2">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Resumo da sessão</span>
-              <span className="text-[10px] font-bold text-zinc-600">
-                {data.exercises.length} exercícios · {totalSets} séries
-              </span>
-            </div>
-
-            <ol className="space-y-1.5">
-              {data.exercises.map((item, index) => {
-                const setsCount = getSetsCount(item)
-                return (
-                  <li
-                    key={item.id}
-                    className="flex items-center gap-4 rounded-2xl border border-zinc-900/80 bg-[#0c0c0c] p-3.5"
-                  >
-                    <span className="w-3 text-right text-[10px] font-black text-zinc-600">{index + 1}</span>
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-800/50 bg-zinc-900/80">
-                      <Dumbbell className="h-4 w-4 text-zinc-400" aria-hidden="true" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-xs font-extrabold leading-tight text-zinc-200">
-                        {item.exercises?.name ?? 'Exercício'}
-                      </h3>
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-zinc-500">
-                        {setsCount} {setsCount === 1 ? 'série' : 'séries'}
-                        {item.exercises?.muscle_group ? ` · ${item.exercises.muscle_group}` : ''}
-                      </p>
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
-          </div>
-
-          {data.activeWorkoutsCount > 1 && (
-            <Link
-              href="/student/week"
-              className="flex items-center justify-between rounded-2xl border border-zinc-900 bg-zinc-950 p-4 text-xs font-bold text-zinc-300 transition hover:border-zinc-700"
-            >
-              <span className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-emerald-400" aria-hidden="true" />
-                Ver os {data.activeWorkoutsCount} treinos da sua rotina
-              </span>
-              <ChevronRight className="h-4 w-4 text-zinc-600" aria-hidden="true" />
-            </Link>
-          )}
-        </div>
+        </Tile>
+      ) : (
+        <Tile className="rounded-[2rem] py-10 text-center">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/5 text-zinc-400">
+            <Moon className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <h2 className="mt-4 font-display text-3xl font-bold uppercase">Dia de descanso</h2>
+          <p className="mx-auto mt-1 max-w-[16rem] text-sm text-zinc-500">
+            Quando o treinador liberar seu treino, ele aparece aqui.
+          </p>
+        </Tile>
       )}
-    </div>
+
+      {/* Bento: sequência + meta semanal */}
+      <div className="grid grid-cols-2 gap-3">
+        <Tile className="flex flex-col justify-between">
+          <Eyebrow icon={Flame} className="text-gold/80">
+            Sequência
+          </Eyebrow>
+          <div className="mt-3">
+            <p className="font-display text-6xl font-bold leading-none text-white">
+              <AnimatedNumber value={derived.streak} />
+            </p>
+            <p className="mt-1 text-xs font-semibold text-zinc-400">
+              {derived.streak === 1 ? 'semana seguida' : 'semanas seguidas'}
+            </p>
+          </div>
+          <p className="mt-3 border-t border-line pt-2.5 text-[11px] text-zinc-500">
+            <span className="font-bold text-zinc-300">{derived.monthCount}</span> treinos neste mês
+          </p>
+        </Tile>
+
+        <Tile className="flex flex-col justify-between">
+          <Eyebrow icon={Target}>Meta da semana</Eyebrow>
+          <div className="mt-3 flex items-center gap-3">
+            <ProgressRing value={goalProgress} size={58} stroke={6} label={`${derived.weekCount} de ${weeklyGoal} treinos nesta semana`}>
+              <span className="font-display text-xl font-bold leading-none">
+                {derived.weekCount}
+                <span className="text-sm text-zinc-500">/{weeklyGoal}</span>
+              </span>
+            </ProgressRing>
+            <p className="text-[11px] leading-snug text-zinc-400">
+              {derived.weekCount >= weeklyGoal ? 'Meta batida!' : `Faltam ${weeklyGoal - derived.weekCount}`}
+            </p>
+          </div>
+          <ol className="mt-3 flex justify-between border-t border-line pt-2.5" aria-label="Dias treinados nesta semana">
+            {WEEKDAY_INITIALS.map((initial, index) => {
+              const trained = derived.weekDays[index] > 0
+              const isToday = index === derived.todayIndex
+              return (
+                <li key={index}>
+                  <span
+                    className={cn(
+                      'grid h-5 w-5 place-items-center rounded-full text-[9px] font-black',
+                      trained
+                        ? 'bg-brand text-black'
+                        : isToday
+                          ? 'text-white ring-1 ring-white/40'
+                          : 'bg-white/[0.06] text-zinc-500',
+                    )}
+                  >
+                    {trained ? <Check className="h-3 w-3" aria-label="treinou" /> : initial}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        </Tile>
+      </div>
+
+      <ReadinessCard value={readiness} onChange={handleReadinessChange} status={readinessStatus} />
+
+      {/* Recuperação muscular */}
+      <Tile>
+        <div className="flex gap-4">
+          <div className="min-w-0 flex-1">
+            <Eyebrow>Recuperação muscular</Eyebrow>
+            {derived.recovering.length === 0 ? (
+              <>
+                <p className="mt-2 font-display text-2xl font-bold uppercase leading-none text-brand">Tudo pronto</p>
+                <p className="mt-1.5 text-xs text-zinc-400">Nenhum músculo em recuperação. Corpo liberado pra treinar.</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-xs text-zinc-400">Com base nos seus últimos treinos:</p>
+                <ul className="mt-2.5 space-y-2">
+                  {derived.recovering.slice(0, 4).map(([region, value]) => (
+                    <li key={region}>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-zinc-200">{REGION_LABELS[region]}</span>
+                        <span className={cn('font-bold', value < 0.5 ? 'text-danger' : 'text-gold')}>
+                          {Math.round(value * 100)}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                        <m.div
+                          className={cn('h-full rounded-full', value < 0.5 ? 'bg-danger' : 'bg-gold')}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.max(6, value * 100)}%` }}
+                          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+          <div className="w-[38%] max-w-[150px] shrink-0">
+            <MuscleMap
+              fills={derived.recoveryFills}
+              label={
+                derived.recovering.length > 0
+                  ? `Em recuperação: ${derived.recovering.map(([region]) => REGION_LABELS[region]).join(', ')}`
+                  : 'Todos os músculos recuperados'
+              }
+            />
+          </div>
+        </div>
+        {derived.recovering.length > 0 && (
+          <div className="mt-3 flex gap-3 border-t border-line pt-2.5 text-[10px] font-semibold text-zinc-500">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-danger" /> Recuperando
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-gold" /> Quase pronto
+            </span>
+          </div>
+        )}
+      </Tile>
+
+      {/* Recado do treinador */}
+      {latestNotice && (
+        <Tile className="p-0">
+          <button type="button" onClick={openNotifications} className="flex w-full items-start gap-3 p-5 text-left">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-black">
+              <Megaphone className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <Eyebrow>Recado do treinador</Eyebrow>
+                {unseen.length > 0 && (
+                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-black uppercase text-black">
+                    {unseen.length} novo{unseen.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 block truncate text-sm font-bold text-white">{latestNotice.title}</span>
+              <span className="mt-0.5 line-clamp-2 block text-xs text-zinc-400">{latestNotice.message}</span>
+            </span>
+            <ChevronRight className="mt-3 h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+          </button>
+        </Tile>
+      )}
+
+      {/* Exercícios do próximo treino */}
+      {next && data.exercises.length > 0 && (
+        <Tile className="p-0">
+          <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-5">
+            <Eyebrow icon={Dumbbell} className="min-w-0 truncate">
+              O que vem aí
+            </Eyebrow>
+            <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-zinc-500">
+              <Clock className="h-3 w-3" aria-hidden="true" /> ~{derived.estimatedMinutes} min
+            </span>
+          </div>
+          <ol className="divide-y divide-line">
+            {data.exercises.map((item, index) => {
+              const sets = getPlannedSets(item)
+              // Mostra as repetições da série de trabalho, não as do aquecimento.
+              const mainReps = (sets.find((set) => set.type !== 'warmup') ?? sets[0])?.reps
+              return (
+                <li key={item.id} className="flex items-center gap-3.5 px-5 py-3">
+                  <span className="w-5 text-center font-display text-lg font-bold text-zinc-600">{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-zinc-100">{item.exercises?.name ?? 'Exercício'}</p>
+                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                      {sets.length} {sets.length === 1 ? 'série' : 'séries'}
+                      {mainReps ? ` · ${mainReps} reps` : ''}
+                      {item.exercises?.muscle_group ? ` · ${item.exercises.muscle_group}` : ''}
+                    </p>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        </Tile>
+      )}
+
+      {/* Rotina em carrossel */}
+      {data.workouts.length > 1 && (
+        <m.section variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }} aria-label="Sua rotina">
+          <div className="mb-2.5 flex items-center justify-between px-1">
+            <Eyebrow>Sua rotina</Eyebrow>
+            <Link href="/student/week" className="text-[11px] font-bold text-zinc-400 hover:text-white">
+              Ver semana
+            </Link>
+          </div>
+          <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+            {data.workouts.map((workout, index) => {
+              const isNext = workout.id === next?.id
+              const done = data.lastDoneByWorkout.get(workout.id)
+              return (
+                <li key={workout.id} className="w-[62%] max-w-[220px] shrink-0 snap-start">
+                  <Link
+                    href={`/student/workout/${workout.id}`}
+                    className={cn(
+                      'flex h-full flex-col gap-3 rounded-3xl border bg-surface p-4 transition hover:border-line-strong',
+                      isNext ? 'border-brand/40' : 'border-line',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'grid h-10 w-10 place-items-center rounded-xl font-display text-xl font-bold',
+                        isNext ? 'bg-brand text-black' : 'bg-white/[0.06] text-zinc-300',
+                      )}
+                      aria-hidden="true"
+                    >
+                      {workoutLetter(index)}
+                    </span>
+                    <span className="line-clamp-2 text-sm font-bold leading-snug text-white">{workout.name}</span>
+                    <span className="mt-auto text-[11px] text-zinc-500">
+                      {done ? `Feito ${relativeDay(new Date(done))}` : 'Ainda não feito'}
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </m.section>
+      )}
+    </Stagger>
   )
 }

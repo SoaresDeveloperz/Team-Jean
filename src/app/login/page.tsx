@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { m } from 'framer-motion'
 import { Eye, EyeOff, LoaderCircle, Lock, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Logo } from '@/components/ui/logo'
 import { Alert } from '@/components/ui/alert'
 
 const inputClassName =
-  'w-full rounded-2xl border border-zinc-800 bg-zinc-900 py-3.5 pl-11 pr-4 text-sm font-medium text-white transition-all placeholder:text-zinc-600 focus:border-white focus:outline-none'
+  'w-full rounded-2xl border border-line-strong bg-black/40 py-3.5 pl-11 pr-4 text-sm font-medium text-white transition-all placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 
 function translateLoginError(message: string) {
   const text = message.toLowerCase()
@@ -51,23 +52,39 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black p-6 text-white">
-      <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-zinc-900/40 blur-3xl" aria-hidden="true" />
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-black px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))] text-white">
+      <div className="glow-brand pointer-events-none absolute inset-0" aria-hidden="true" />
+      <m.div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
+        animate={{ scale: [1, 1.12, 1], opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+      />
 
-      <main className="z-10 flex w-full max-w-sm flex-col items-center space-y-8">
-        <div className="flex flex-col items-center space-y-3">
-          <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950 p-4 shadow-2xl">
+      <m.main
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 flex w-full max-w-sm flex-col items-center space-y-8"
+      >
+        <div className="flex flex-col items-center space-y-4">
+          <m.div
+            initial={{ scale: 0.6, rotate: -12, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.1 }}
+            className="rounded-[1.75rem] border border-line-strong bg-surface p-4 shadow-2xl shadow-black"
+          >
             <Logo className="h-16 w-16" />
-          </div>
+          </m.div>
           <div className="text-center">
-            <h1 className="text-2xl font-black uppercase tracking-widest text-white">Team Jean</h1>
-            <p className="mt-0.5 text-[10px] font-extrabold uppercase tracking-widest text-zinc-500">Consultoria esportiva</p>
+            <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-[0.12em] text-white">Team Jean</h1>
+            <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.3em] text-zinc-500">Consultoria esportiva</p>
           </div>
         </div>
 
         <form
           onSubmit={handleLogin}
-          className="w-full space-y-4 rounded-3xl border border-zinc-900 bg-zinc-950 p-6 shadow-2xl"
+          className="w-full space-y-4 rounded-[2rem] border border-line bg-surface/90 p-6 shadow-2xl shadow-black backdrop-blur-xl"
         >
           <div className="space-y-1">
             <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-zinc-400">
@@ -121,16 +138,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-white py-4 text-xs font-black uppercase tracking-widest text-black shadow-xl transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-70"
+            className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-white py-4 text-sm font-black uppercase tracking-[0.2em] text-black shadow-[0_10px_40px_rgba(255,255,255,0.12)] transition-all hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-70"
           >
             {loading ? <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Entrando" /> : 'Entrar no app'}
           </button>
         </form>
 
-        <p className="text-center text-[10px] font-extrabold uppercase tracking-widest text-zinc-600">
+        <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
           Acesso exclusivo para alunos cadastrados
         </p>
-      </main>
+      </m.main>
     </div>
   )
 }

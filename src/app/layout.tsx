@@ -1,7 +1,19 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactNode } from 'react'
+import { Barlow_Condensed } from 'next/font/google'
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister'
+import { MotionProvider } from '@/components/motion/MotionProvider'
+import { ToastProvider } from '@/components/ui/toast'
 import './globals.css'
+
+// Fonte condensada de placar para títulos e números grandes (classe font-display).
+// O texto corrido continua na fonte do sistema: mais leve e nativa no celular.
+const barlowCondensed = Barlow_Condensed({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+  display: 'swap',
+  variable: '--font-barlow-condensed',
+})
 
 const APP_ICON = 'https://iqoiyqjndyvcputmllwq.supabase.co/storage/v1/object/public/assets/icon-512.png'
 
@@ -31,9 +43,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className={barlowCondensed.variable}>
       <body className="bg-black text-white antialiased">
-        {children}
+        <MotionProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </MotionProvider>
         <ServiceWorkerRegister />
       </body>
     </html>

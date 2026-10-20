@@ -20,7 +20,8 @@ import {
 } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
-import { RESUME_WINDOW_MS, formatKg, formatSeconds, getPlannedSets, getSetTypeInfo, normalizeRir } from '@/lib/workouts'
+import { formatKg, formatSeconds, getPlannedSets, getSetTypeInfo, normalizeRir } from '@/lib/workouts'
+import { clearActiveSession, readActiveSession, saveActiveSession } from '@/lib/active-session'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
@@ -78,7 +79,7 @@ export default function WorkoutExecutionPage() {
   // Sessão criada só na primeira série concluída (antes era criada ao abrir a tela).
   const sessionIdRef = useRef<string | null>(null)
   const sessionPromiseRef = useRef<Promise<string> | null>(null)
-  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null)
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
 
   // Cronômetro baseado no horário de término: não atrasa quando o celular
   // bloqueia a tela e o navegador desacelera os intervalos.
@@ -105,32 +106,33 @@ export default function WorkoutExecutionPage() {
       }
       setUserId(user.id)
 
-      const [workoutResult, exercisesResult, resumableResult, lastCompletedResult] = await Promise.all([
+      // Retoma só a sessão iniciada neste aparelho nas últimas 12h.
+      const activeSession = readActiveSession(user.id)
+      const resumeCandidate = activeSession?.workoutId === workoutId ? activeSession : null
+
+      const [workoutResult, exercisesResult, resumableResult, completedSessionsResult] = await Promise.all([
         supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
         supabase
           .from('assigned_workout_exercises')
           .select('*, exercises(*)')
           .eq('assigned_workout_id', workoutId)
           .order('order', { ascending: true }),
+        resumeCandidate
+          ? supabase
+              .from('workout_sessions')
+              .select('id, status')
+              .eq('id', resumeCandidate.sessionId)
+              .eq('student_id', user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        // Últimos treinos concluídos do aluno: base do "último treino" e dos recordes.
         supabase
           .from('workout_sessions')
-          .select('id, created_at')
-          .eq('assigned_workout_id', workoutId)
-          .eq('student_id', user.id)
-          .eq('status', 'in_progress')
-          .gte('created_at', new Date(Date.now() - RESUME_WINDOW_MS).toISOString())
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('workout_sessions')
-          .select('id')
-          .eq('assigned_workout_id', workoutId)
+          .select('id, assigned_workout_id')
           .eq('student_id', user.id)
           .eq('status', 'completed')
           .order('completed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+          .limit(100),
       ])
       if (!active) return
 
@@ -145,11 +147,14 @@ export default function WorkoutExecutionPage() {
       }
 
       const rows = (exercisesResult.data ?? []) as ExerciseRow[]
-      const resumed = resumableResult.data as { id: string; created_at: string } | null
-      const lastCompleted = lastCompletedResult.data as { id: string } | null
+      const resumableRow = resumableResult.data as { id: string; status: string } | null
+      const resumed = resumableRow?.status === 'in_progress' ? resumableRow : null
+      if (resumeCandidate && !resumed) clearActiveSession()
+      const completedSessions = (completedSessionsResult.data ?? []) as { id: string; assigned_workout_id: string }[]
+      const lastCompleted = completedSessions.find((session) => session.assigned_workout_id === workoutId) ?? null
       const exerciseIds = [...new Set(rows.map((row) => row.exercise_id))]
 
-      const [resumedSetsResult, previousSetsResult, ...recordResults] = await Promise.all([
+      const [resumedSetsResult, previousSetsResult, recordSetsResult] = await Promise.all([
         resumed
           ? supabase
               .from('session_sets')
@@ -164,29 +169,32 @@ export default function WorkoutExecutionPage() {
               .eq('session_id', lastCompleted.id)
               .eq('completed', true)
           : Promise.resolve({ data: [], error: null }),
-        // Recorde de cada exercício considerando só as séries deste aluno.
-        ...exerciseIds.map((exerciseId) => {
-          let query = supabase
-            .from('session_sets')
-            .select('weight_kg, reps, workout_sessions!inner(student_id)')
-            .eq('workout_sessions.student_id', user.id)
-            .eq('exercise_id', exerciseId)
-            .eq('completed', true)
-          if (resumed) query = query.neq('session_id', resumed.id)
-          return query
-            .order('weight_kg', { ascending: false })
-            .order('reps', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        }),
+        // Recorde de cada exercício considerando só os treinos deste aluno.
+        completedSessions.length > 0 && exerciseIds.length > 0
+          ? supabase
+              .from('session_sets')
+              .select('exercise_id, weight_kg, reps')
+              .in(
+                'session_id',
+                completedSessions.map((session) => session.id),
+              )
+              .in('exercise_id', exerciseIds)
+              .eq('completed', true)
+              .order('weight_kg', { ascending: false })
+              .limit(1000)
+          : Promise.resolve({ data: [], error: null }),
       ])
       if (!active) return
 
       const pastRecords: Record<string, PreviousSet> = {}
-      recordResults.forEach((result, index) => {
-        const row = result.data as { weight_kg: number | null; reps: number | null } | null
-        if (row) pastRecords[exerciseIds[index]] = { weight: Number(row.weight_kg) || 0, reps: Number(row.reps) || 0 }
-      })
+      for (const row of (recordSetsResult.data ?? []) as { exercise_id: string; weight_kg: number | null; reps: number | null }[]) {
+        const weight = Number(row.weight_kg) || 0
+        const reps = Number(row.reps) || 0
+        const current = pastRecords[row.exercise_id]
+        if (!current || weight > current.weight || (weight === current.weight && reps > current.reps)) {
+          pastRecords[row.exercise_id] = { weight, reps }
+        }
+      }
 
       type StoredSet = { id?: string; assigned_exercise_id: string | null; set_number: number; weight_kg: number | null; reps: number | null }
       const resumedByKey = new Map(
@@ -224,9 +232,9 @@ export default function WorkoutExecutionPage() {
         })
       }
 
-      if (resumed) {
+      if (resumed && resumeCandidate) {
         sessionIdRef.current = resumed.id
-        setSessionStartedAt(resumed.created_at)
+        setSessionStartedAt(resumeCandidate.startedAt)
       }
       setWorkout(workoutResult.data as AssignedWorkout)
       setExercises(rows)
@@ -307,15 +315,17 @@ export default function WorkoutExecutionPage() {
         const { data, error } = await supabase
           .from('workout_sessions')
           .insert({ assigned_workout_id: workoutId, student_id: userId, status: 'in_progress' })
-          .select('id, created_at')
+          .select('id')
           .single()
 
-        if (error || !data) {
+        if (error || !data || !userId) {
           sessionPromiseRef.current = null
           throw new Error(error?.message ?? 'Não foi possível iniciar a sessão.')
         }
+        const startedAt = Date.now()
         sessionIdRef.current = data.id
-        setSessionStartedAt(data.created_at)
+        setSessionStartedAt(startedAt)
+        saveActiveSession({ userId, workoutId, sessionId: data.id, startedAt })
         return data.id as string
       })()
     }
@@ -431,13 +441,14 @@ export default function WorkoutExecutionPage() {
     }
 
     stopRest()
+    clearActiveSession()
     setShowFinishModal(false)
     setSummary({
       volume: progress.volume,
       sets: progress.done,
       prs: progress.prs,
       minutes: sessionStartedAt
-        ? Math.max(1, Math.round((completedAt.getTime() - new Date(sessionStartedAt).getTime()) / 60_000))
+        ? Math.max(1, Math.round((completedAt.getTime() - sessionStartedAt) / 60_000))
         : null,
     })
   }

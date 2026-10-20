@@ -37,12 +37,7 @@ export default function StudentProfilePage() {
 
       const [profileResult, notificationsResult, countResult] = await Promise.all([
         supabase.from('profiles').select('full_name, email').eq('id', user.id).maybeSingle(),
-        supabase
-          .from('notifications')
-          .select('*')
-          .eq('recipient_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(30),
+        supabase.from('notifications').select('*').eq('recipient_id', user.id),
         supabase
           .from('workout_sessions')
           .select('id', { count: 'exact', head: true })
@@ -57,7 +52,10 @@ export default function StudentProfilePage() {
       setData({
         profile: profileResult.data as ProfileData['profile'],
         email: user.email ?? null,
-        notifications: (notificationsResult.data ?? []) as AppNotification[],
+        // Mais recentes primeiro (a ordenação fica aqui porque a coluna de data pode não existir).
+        notifications: ((notificationsResult.data ?? []) as AppNotification[]).sort((first, second) =>
+          String(second.created_at ?? '').localeCompare(String(first.created_at ?? '')),
+        ),
         completedCount: countResult.count ?? 0,
       })
     }
@@ -168,9 +166,11 @@ export default function StudentProfilePage() {
           <ul className="space-y-3">
             {data.notifications.map((notification) => (
               <li key={notification.id} className="space-y-1 rounded-2xl border border-zinc-900 bg-zinc-950 p-4">
-                <span className="text-[9px] font-black uppercase text-emerald-500">
-                  {new Date(notification.created_at).toLocaleDateString('pt-BR')}
-                </span>
+                {notification.created_at && (
+                  <span className="text-[9px] font-black uppercase text-emerald-500">
+                    {new Date(notification.created_at).toLocaleDateString('pt-BR')}
+                  </span>
+                )}
                 <h3 className="text-sm font-bold text-white">{notification.title}</h3>
                 <p className="whitespace-pre-line text-xs text-zinc-400">{notification.message}</p>
               </li>

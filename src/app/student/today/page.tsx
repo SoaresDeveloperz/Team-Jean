@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Activity, CalendarDays, ChevronRight, Clock, Dumbbell, Flame, Play, RotateCcw } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, PrescribedExercise } from '@/lib/types'
-import { RESUME_WINDOW_MS, getSetsCount, pickNextWorkout } from '@/lib/workouts'
+import { getSetsCount, pickNextWorkout } from '@/lib/workouts'
+import { readActiveSession } from '@/lib/active-session'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { PageLoader } from '@/components/ui/page-loader'
@@ -55,7 +56,7 @@ export default function StudentTodayPage() {
       startOfMonth.setHours(0, 0, 0, 0)
 
       const [profileResult, monthResult, workoutsResult, sessionsResult] = await Promise.all([
-        supabase.from('profiles').select('full_name, readiness_score').eq('id', user.id).maybeSingle(),
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         supabase
           .from('workout_sessions')
           .select('id', { count: 'exact', head: true })
@@ -70,9 +71,10 @@ export default function StudentTodayPage() {
           .order('name', { ascending: true }),
         supabase
           .from('workout_sessions')
-          .select('assigned_workout_id, status, created_at, completed_at')
+          .select('assigned_workout_id, completed_at')
           .eq('student_id', user.id)
-          .order('created_at', { ascending: false })
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
           .limit(60),
       ])
       if (!active) return
@@ -84,23 +86,15 @@ export default function StudentTodayPage() {
       }
 
       const workouts = (workoutsResult.data ?? []) as AssignedWorkout[]
-      const sessions = (sessionsResult.data ?? []) as {
-        assigned_workout_id: string
-        status: string
-        created_at: string
-        completed_at: string | null
-      }[]
+      const sessions = (sessionsResult.data ?? []) as { assigned_workout_id: string; completed_at: string | null }[]
 
       const lastDoneByWorkout = new Map<string, string>()
       for (const session of sessions) {
-        if (session.status === 'completed' && session.completed_at && !lastDoneByWorkout.has(session.assigned_workout_id)) {
+        if (session.completed_at && !lastDoneByWorkout.has(session.assigned_workout_id)) {
           lastDoneByWorkout.set(session.assigned_workout_id, session.completed_at)
         }
       }
-      const resumeLimit = Date.now() - RESUME_WINDOW_MS
-      const inProgressWorkoutId =
-        sessions.find((session) => session.status === 'in_progress' && new Date(session.created_at).getTime() > resumeLimit)
-          ?.assigned_workout_id ?? null
+      const inProgressWorkoutId = readActiveSession(user.id)?.workoutId ?? null
 
       const workout = workouts.length > 0 ? pickNextWorkout(workouts, lastDoneByWorkout, inProgressWorkoutId) : null
 
@@ -152,10 +146,7 @@ export default function StudentTodayPage() {
     saveTimer.current = window.setTimeout(async () => {
       const requestId = ++saveRequest.current
       setReadinessStatus('saving')
-      const { error } = await supabase
-        .from('profiles')
-        .update({ readiness_score: value, readiness_updated_at: new Date().toISOString() })
-        .eq('id', userId)
+      const { error } = await supabase.from('profiles').update({ readiness_score: value }).eq('id', userId)
       if (requestId === saveRequest.current) setReadinessStatus(error ? 'error' : 'saved')
     }, READINESS_SAVE_DELAY_MS)
   }

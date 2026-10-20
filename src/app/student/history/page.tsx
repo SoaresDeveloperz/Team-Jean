@@ -22,13 +22,16 @@ type SetRow = {
   exercises: { name: string | null } | null
 }
 
+// A tabela não guarda a hora de início; se um dia tiver, a duração aparece.
 function getDurationMinutes(session: WorkoutSession) {
-  if (!session.completed_at) return null
-  const minutes = Math.round((new Date(session.completed_at).getTime() - new Date(session.created_at).getTime()) / 60_000)
+  const startedAt = session.started_at ?? session.created_at
+  if (!session.completed_at || !startedAt) return null
+  const minutes = Math.round((new Date(session.completed_at).getTime() - new Date(startedAt).getTime()) / 60_000)
   return minutes > 0 && minutes < 600 ? minutes : null
 }
 
-function monthLabel(date: string) {
+function monthLabel(date: string | null) {
+  if (!date) return 'Sem data'
   const label = new Date(date).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
@@ -80,7 +83,7 @@ export default function StudentHistoryPage() {
       .select('set_number, weight_kg, reps, exercises(name)')
       .eq('session_id', sessionId)
       .eq('completed', true)
-      .order('created_at', { ascending: true })
+      .order('set_number', { ascending: true })
 
     if (error) {
       setDetails((previous) => ({ ...previous, [sessionId]: 'error' }))
@@ -102,7 +105,7 @@ export default function StudentHistoryPage() {
 
   const months: { label: string; items: HistorySession[] }[] = []
   for (const session of sessions ?? []) {
-    const label = monthLabel(session.completed_at ?? session.created_at)
+    const label = monthLabel(session.completed_at)
     const month = months.find((item) => item.label === label)
     if (month) month.items.push(session)
     else months.push({ label, items: [session] })
@@ -159,11 +162,13 @@ export default function StudentHistoryPage() {
                       <div className="flex items-center justify-between border-t border-zinc-900 pt-2 text-xs font-medium text-zinc-500">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5 text-zinc-600" aria-hidden="true" />
-                          {new Date(session.completed_at ?? session.created_at).toLocaleDateString('pt-BR', {
-                            weekday: 'short',
-                            day: '2-digit',
-                            month: '2-digit',
-                          })}
+                          {session.completed_at
+                            ? new Date(session.completed_at).toLocaleDateString('pt-BR', {
+                                weekday: 'short',
+                                day: '2-digit',
+                                month: '2-digit',
+                              })
+                            : '—'}
                         </span>
                         {duration && (
                           <span className="flex items-center gap-1">

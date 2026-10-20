@@ -57,7 +57,7 @@ export default function AdminStudentsPage() {
     const loadStudents = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, role, full_name, email, readiness_score, created_at')
+        .select('*')
         .eq('role', 'student')
         .order('created_at', { ascending: false })
 

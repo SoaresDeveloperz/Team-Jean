@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Team Jean — Consultoria Esportiva
 
-## Getting Started
+App de treino (PWA) em Next.js 16 + Supabase. O treinador (admin) cadastra
+alunos, monta treinos e acompanha as cargas; o aluno executa o treino pelo
+celular, registra séries e acompanha a evolução.
 
-First, run the development server:
+## Rodando localmente
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # preencha com as chaves do seu projeto Supabase
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Variáveis de ambiente
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variável | Onde é usada |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | navegador e servidor |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | navegador e servidor (chave pública) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor**: cadastro de alunos pelo treinador |
 
-## Learn More
+Em produção, cadastre as três em **Vercel → Settings → Environment Variables**.
+O `.env.local` não deve ser commitado.
 
-To learn more about Next.js, take a look at the following resources:
+## Segurança do banco
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Todo o controle de acesso aos dados depende do RLS do Supabase. Revise e rode
+[`supabase/policies.sql`](supabase/policies.sql) no SQL Editor do projeto.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `pnpm dev`: servidor de desenvolvimento
+- `pnpm build`: build de produção
+- `pnpm lint`: ESLint

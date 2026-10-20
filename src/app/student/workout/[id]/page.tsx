@@ -98,7 +98,8 @@ export default function WorkoutExecutionPage() {
         }
         initialSets[item.id] = setsArray
 
-        const { data: pastSet } = await supabase.from('session_sets').select('weight_kg, reps').eq('exercise_id', item.exercise_id).eq('completed', true).order('weight_kg', { ascending: false }).limit(1).single()
+        // Recorde só do próprio aluno (antes considerava as séries de todos).
+        const { data: pastSet } = await supabase.from('session_sets').select('weight_kg, reps, workout_sessions!inner(student_id)').eq('workout_sessions.student_id', user.id).eq('exercise_id', item.exercise_id).eq('completed', true).order('weight_kg', { ascending: false }).limit(1).maybeSingle()
         if (pastSet) pastRecords[item.id] = pastSet
       }
     }

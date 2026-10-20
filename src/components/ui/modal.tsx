@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, m, useDragControls } from 'framer-motion'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -25,6 +26,8 @@ export function SheetFooter({ children }: { children: ReactNode }) {
     </div>
   )
 }
+
+const subscribeNothing = () => () => {}
 
 // Pilha de modais abertos: Esc e o foco preso valem só para o de cima.
 const openModalStack: string[] = []
@@ -87,7 +90,17 @@ export function Modal({ open, onClose, title, description, children, variant = '
     }
   }, [open, titleId])
 
-  return (
+  // Só no navegador: o portal precisa do document.body.
+  const mounted = useSyncExternalStore(
+    subscribeNothing,
+    () => true,
+    () => false,
+  )
+  if (!mounted) return null
+
+  // Portal no <body>: um ancestral com backdrop-filter/transform (ex.: o
+  // cabeçalho de vidro) prenderia o "fixed" do modal dentro dele.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <m.div
@@ -162,6 +175,7 @@ export function Modal({ open, onClose, title, description, children, variant = '
           </m.div>
         </m.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

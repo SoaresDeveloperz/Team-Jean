@@ -17,7 +17,20 @@ export function getSetTypeInfo(type: string | null | undefined) {
 
 export const REP_PRESETS = ['6-8', '8-10', '8-12', '10-12', '12-15', '15-20', 'Até a falha']
 
-export const MUSCLE_GROUPS = ['Peito', 'Costas', 'Pernas', 'Ombros', 'Bíceps', 'Tríceps', 'Abdômen', 'Panturrilhas']
+export const MUSCLE_GROUPS = [
+  'Peito',
+  'Costas',
+  'Pernas',
+  'Glúteos',
+  'Ombros',
+  'Bíceps',
+  'Tríceps',
+  'Abdômen',
+  'Panturrilhas',
+  'Trapézio',
+  'Antebraços',
+  'Lombar',
+]
 
 export function createDefaultPlannedSets(): PlannedSet[] {
   return [

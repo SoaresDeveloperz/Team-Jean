@@ -17,14 +17,38 @@ type MuscleMapProps = {
   showLabels?: boolean
   // Texto lido por leitores de tela; por padrão lista as regiões destacadas.
   label?: string
+  // Sem animação: para listas com muitos mapas (biblioteca de exercícios).
+  animated?: boolean
 }
 
-function Figure({ shapes, offsetX, fills }: { shapes: BodyShape[]; offsetX: number; fills: MuscleMapProps['fills'] }) {
+function Figure({
+  shapes,
+  offsetX,
+  fills,
+  animated,
+}: {
+  shapes: BodyShape[]
+  offsetX: number
+  fills: MuscleMapProps['fills']
+  animated: boolean
+}) {
   return (
     <g transform={`translate(${offsetX},0)`}>
       {shapes.map((shape, index) => {
         const fill = shape.region ? (fills[shape.region] ?? IDLE_FILL) : BASE_FILL
         const paths = shape.mirror ? [false, true] : [false]
+        if (!animated) {
+          return paths.map((mirrored) => (
+            <path
+              key={`${index}-${mirrored ? 'r' : 'l'}`}
+              d={shape.d}
+              fill={fill}
+              transform={mirrored ? 'translate(100,0) scale(-1,1)' : undefined}
+            />
+          ))
+        }
+        // Sem style={{ fill }}: o Framer anima o atributo fill, e um estilo
+        // inline (que ele congela no primeiro render) taparia as mudanças.
         return paths.map((mirrored) => (
           <m.path
             key={`${index}-${mirrored ? 'r' : 'l'}`}
@@ -33,7 +57,6 @@ function Figure({ shapes, offsetX, fills }: { shapes: BodyShape[]; offsetX: numb
             initial={false}
             animate={{ fill }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fill }}
           />
         ))
       })}
@@ -43,7 +66,7 @@ function Figure({ shapes, offsetX, fills }: { shapes: BodyShape[]; offsetX: numb
 
 // Corpo de frente e de costas com as regiões coloridas. As cores ficam em
 // atributos/estilos inline para o SVG poder ser exportado como imagem.
-export function MuscleMap({ fills, className, showLabels = false, label, ref }: MuscleMapProps) {
+export function MuscleMap({ fills, className, showLabels = false, label, ref, animated = true }: MuscleMapProps) {
   const highlighted = Object.keys(fills) as MuscleRegion[]
   const description =
     label ??
@@ -60,8 +83,8 @@ export function MuscleMap({ fills, className, showLabels = false, label, ref }: 
       aria-label={description}
       className={cn('h-auto w-full', className)}
     >
-      <Figure shapes={FRONT_SHAPES} offsetX={0} fills={fills} />
-      <Figure shapes={BACK_SHAPES} offsetX={112} fills={fills} />
+      <Figure shapes={FRONT_SHAPES} offsetX={0} fills={fills} animated={animated} />
+      <Figure shapes={BACK_SHAPES} offsetX={112} fills={fills} animated={animated} />
       {showLabels && (
         <g fill="#71717a" fontFamily="system-ui, -apple-system, sans-serif" fontSize="7" fontWeight="700" letterSpacing="1.4" textAnchor="middle">
           <text x="50" y="222">

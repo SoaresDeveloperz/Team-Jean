@@ -7,6 +7,7 @@ import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { WorkoutSession } from '@/lib/types'
 import { formatKg } from '@/lib/workouts'
 import { WEEKDAY_INITIALS, isSameDay, startOfDay, weekStreak } from '@/lib/stats'
+import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { AnimatedNumber } from '@/components/ui/animated-number'
@@ -249,7 +250,7 @@ export default function StudentHistoryPage() {
                         disabled={count === 0}
                         onClick={() => setSelectedDay(isSelected ? null : date)}
                         aria-pressed={isSelected}
-                        aria-label={`${date.getDate()} de ${monthTitle(month)}: ${count > 0 ? `${count} treino(s)` : 'sem treino'}`}
+                        aria-label={`${date.getDate()} de ${monthTitle(month)}: ${count > 0 ? plural(count, 'treino', 'treinos') : 'sem treino'}`}
                         className={cn(
                           'grid aspect-square w-full place-items-center rounded-xl text-xs font-bold transition',
                           count > 1

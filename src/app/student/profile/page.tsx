@@ -27,6 +27,7 @@ import {
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
 import { bestWeekStreak, weekStreak } from '@/lib/stats'
+import { plural } from '@/lib/text'
 import { setPreferences, usePreferences } from '@/lib/preferences'
 import { promptInstall, useInstallState } from '@/lib/install-prompt'
 import { openNotifications, useNotifications } from '@/lib/notifications'
@@ -41,6 +42,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { LogoutButton } from '@/components/layout/LogoutButton'
+import { ChangePasswordTile } from '@/components/account/ChangePasswordTile'
 
 type ProfileData = {
   profile: Pick<Profile, 'full_name' | 'email'> | null
@@ -334,12 +336,14 @@ export default function StudentProfilePage() {
           <span className="flex-1">
             <span className="block text-sm font-bold text-white">Avisos do treinador</span>
             <span className="block text-[11px] text-zinc-500">
-              {notices.length === 0 ? 'Nenhum aviso ainda' : `${notices.length} aviso(s) · ${unseen.length} novo(s)`}
+              {notices.length === 0 ? 'Nenhum aviso ainda' : `${plural(notices.length, 'aviso', 'avisos')} · ${plural(unseen.length, 'novo', 'novos')}`}
             </span>
           </span>
           <ChevronRight className="h-4 w-4 text-zinc-600" aria-hidden="true" />
         </button>
       </Tile>
+
+      <ChangePasswordTile />
 
       {/* Instalar app */}
       {(installState === 'available' || installState === 'ios') && (

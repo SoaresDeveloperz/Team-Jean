@@ -22,7 +22,7 @@ export function BottomNav({ items, label }: { items: NavItem[]; label: string })
   return (
     <nav
       aria-label={label}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/75 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl backdrop-saturate-150"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl backdrop-saturate-150"
     >
       <ul className="mx-auto grid max-w-md grid-cols-5">
         {items.map((item) => {

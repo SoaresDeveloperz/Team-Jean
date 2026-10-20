@@ -16,6 +16,16 @@ type ModalProps = {
   variant?: 'dialog' | 'sheet'
 }
 
+// Rodapé das folhas (variant "sheet"): fica colado na base enquanto o conteúdo
+// rola. Compensa o padding inferior da folha para nada aparecer por baixo.
+export function SheetFooter({ children }: { children: ReactNode }) {
+  return (
+    <div className="sticky -bottom-[calc(2rem+env(safe-area-inset-bottom))] z-10 -mx-4 -mb-[calc(2rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black from-60% to-transparent px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-8">
+      {children}
+    </div>
+  )
+}
+
 // Pilha de modais abertos: Esc e o foco preso valem só para o de cima.
 const openModalStack: string[] = []
 
@@ -100,6 +110,8 @@ export function Modal({ open, onClose, title, description, children, variant = '
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
+            // Mede a rolagem do modal para animações de layout (ex.: reordenar exercícios).
+            layoutScroll
             initial={isSheet ? { y: '100%' } : { y: 48, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={isSheet ? { y: '100%' } : { y: 64, opacity: 0 }}

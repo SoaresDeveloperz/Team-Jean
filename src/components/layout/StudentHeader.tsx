@@ -12,7 +12,7 @@ export function StudentHeader() {
   if (pathname.startsWith('/student/workout/')) return null
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-black/70 pt-[env(safe-area-inset-top)] backdrop-blur-2xl backdrop-saturate-150">
+    <header className="sticky top-0 z-40 border-b border-line bg-black/85 pt-[env(safe-area-inset-top)] backdrop-blur-2xl backdrop-saturate-150">
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-5 py-3">
         <Link href="/student/today" className="flex items-center gap-2.5" aria-label="Team Jean, ir para Hoje">
           <Logo className="h-7 w-7" />

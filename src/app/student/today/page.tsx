@@ -131,7 +131,7 @@ export default function StudentTodayPage() {
         const completedAt = completedAtBySession.get(set.session_id)
         if (!completedAt) return []
         return [
-          { completedAt, muscle: set.exercises?.muscle_group, amount: 1 },
+          { completedAt, muscle: set.exercises?.muscle_group, amount: 1, exercise: set.exercises?.name },
           ...splitSecondary(set.exercises?.secondary_muscle).map((muscle) => ({ completedAt, muscle, amount: 0.5 })),
         ]
       })
@@ -184,7 +184,7 @@ export default function StudentTodayPage() {
     const totalSets = data.exercises.reduce((total, item) => total + getSetsCount(item), 0)
     const load = muscleLoad(
       data.exercises.flatMap((item) => [
-        { muscle: item.exercises?.muscle_group, amount: getSetsCount(item) },
+        { muscle: item.exercises?.muscle_group, amount: getSetsCount(item), exercise: item.exercises?.name },
         ...splitSecondary(item.exercises?.secondary_muscle).map((muscle) => ({ muscle, amount: getSetsCount(item) / 2 })),
       ]),
     )

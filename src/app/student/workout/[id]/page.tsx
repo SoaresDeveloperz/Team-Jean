@@ -8,7 +8,7 @@ import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
 import { formatKg, getPlannedSets, normalizeRir } from '@/lib/workouts'
 import { clearActiveSession, readActiveSession, saveActiveSession } from '@/lib/active-session'
-import { loadFill, muscleLoad, splitSecondary, type MuscleRegion } from '@/lib/muscles'
+import { loadFill, muscleLoad, splitSecondary, type MuscleRegion, type MuscleWork } from '@/lib/muscles'
 import { usePreferences } from '@/lib/preferences'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
@@ -499,11 +499,11 @@ export default function WorkoutExecutionPage() {
     setShowFinish(false)
 
     const prs = new Map<string, { name: string; weight: number; reps: number }>()
-    const work: { muscle: string | null | undefined; amount: number }[] = []
+    const work: MuscleWork[] = []
     for (const row of exercises) {
       for (const entry of sets[row.id] ?? []) {
         if (!entry.completed) continue
-        work.push({ muscle: row.exercises?.muscle_group, amount: 1 })
+        work.push({ muscle: row.exercises?.muscle_group, amount: 1, exercise: row.exercises?.name })
         for (const muscle of splitSecondary(row.exercises?.secondary_muscle)) work.push({ muscle, amount: 0.5 })
         if (entry.isPR) {
           const name = row.exercises?.name ?? 'Exercício'

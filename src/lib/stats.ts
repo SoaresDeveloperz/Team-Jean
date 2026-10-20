@@ -75,6 +75,12 @@ export function relativeDay(date: Date, now = new Date()) {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 }
 
+// Para compor frases: "hoje", "há 3 dias", "em 05/10".
+export function relativeDayPhrase(date: Date, now = new Date()) {
+  const relative = relativeDay(date, now)
+  return /^\d/.test(relative) ? `em ${relative}` : relative
+}
+
 // Maior sequência de semanas seguidas com treino em todo o histórico.
 export function bestWeekStreak(dates: Date[]) {
   const weeks = [...new Set(dates.map((date) => startOfWeek(date).getTime()))].sort((first, second) => first - second)

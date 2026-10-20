@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { Bell, BellOff, Dumbbell, Megaphone } from 'lucide-react'
 import { markNotificationsSeen, onOpenNotifications, useNotifications } from '@/lib/notifications'
+import { plural } from '@/lib/text'
 import { Modal } from '@/components/ui/modal'
 import { cn } from '@/lib/cn'
 
@@ -26,7 +27,7 @@ export function NotificationsButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={unseenCount > 0 ? `Avisos do treinador: ${unseenCount} novo(s)` : 'Avisos do treinador'}
+        aria-label={unseenCount > 0 ? `Avisos do treinador: ${plural(unseenCount, 'novo', 'novos')}` : 'Avisos do treinador'}
         className="relative grid h-11 w-11 place-items-center rounded-2xl border border-line bg-surface text-zinc-300 transition hover:text-white"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />

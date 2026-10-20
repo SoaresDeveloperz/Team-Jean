@@ -10,8 +10,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   await requireAdmin()
 
   return (
-    <div className="min-h-screen bg-black pb-32 text-white">
-      <AppHeader badge="Admin" actions={<LogoutButton />} />
+    <div className="min-h-dvh bg-black pb-32 text-white">
+      <AppHeader
+        badge="Treinador"
+        homeHref="/admin"
+        actions={<LogoutButton className="h-10 w-10 justify-center rounded-2xl border border-line bg-surface text-zinc-300" />}
+      />
       <main className="mx-auto max-w-md p-4">{children}</main>
       <AdminNav />
     </div>

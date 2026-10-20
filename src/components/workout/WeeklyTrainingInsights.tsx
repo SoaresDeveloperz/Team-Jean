@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { Activity, ChevronLeft, ChevronRight, CircleAlert, Dumbbell, Flame, Gauge, Layers, Weight } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
-import { REGION_LABELS, loadFill, muscleLoad, regionsFor, splitSecondary, type MuscleRegion } from '@/lib/muscles'
+import { REGION_LABELS, loadFill, muscleLoad, regionsForExercise, splitSecondary, type MuscleRegion, type MuscleWork } from '@/lib/muscles'
 import { WEEKDAY_SHORT, startOfWeek } from '@/lib/stats'
+import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/cn'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -53,7 +54,6 @@ function formatRange(start: Date) {
   return `${format(start)} – ${format(end)}`
 }
 
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 const formatKg = (value: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value)
 
@@ -143,7 +143,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         }
 
         let totalVolume = 0
-        const work: { muscle: string | null | undefined; amount: number }[] = []
+        const work: MuscleWork[] = []
         for (const set of sets) {
           const session = sessionById.get(set.session_id)
           if (!session) continue
@@ -155,15 +155,17 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
 
           const exercise = exerciseById.get(set.exercise_id)
           if (exercise) {
-            work.push({ muscle: exercise.muscle_group, amount: 1 })
+            work.push({ muscle: exercise.muscle_group, amount: 1, exercise: exercise.name })
             for (const muscle of splitSecondary(exercise.secondary_muscle)) work.push({ muscle, amount: 0.5 })
           }
         }
 
         // Séries efetivas por região para o ranking (principal = 1, secundário = 0,5).
         const effective: Partial<Record<MuscleRegion, number>> = {}
-        for (const { muscle, amount } of work) {
-          for (const [region, factor] of regionsFor(muscle)) effective[region] = (effective[region] ?? 0) + amount * factor
+        for (const { muscle, amount, exercise } of work) {
+          for (const [region, factor] of regionsForExercise(exercise, muscle)) {
+            effective[region] = (effective[region] ?? 0) + amount * factor
+          }
         }
         const effectiveTotal = Object.values(effective).reduce((total, value) => total + value, 0)
         const ranking = (Object.entries(effective) as [MuscleRegion, number][])

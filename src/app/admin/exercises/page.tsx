@@ -1,34 +1,53 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Dumbbell, LibraryBig, LoaderCircle, Pencil, Plus, Search, Video } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { m } from 'framer-motion'
+import { Dumbbell, LibraryBig, LoaderCircle, Play, Plus, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Exercise } from '@/lib/types'
 import { MUSCLE_GROUPS } from '@/lib/workouts'
 import { baseExerciseCatalog } from '@/lib/exercises/catalog'
+import { plural } from '@/lib/text'
+import { summarizeWork } from '@/lib/workout-summary'
 import { cn } from '@/lib/cn'
-import { Alert, FeedbackAlert, type Feedback } from '@/components/ui/alert'
+import { MuscleMap } from '@/components/fitness/MuscleMap'
+import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
-import { PageLoader } from '@/components/ui/page-loader'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/components/ui/toast'
+import { Eyebrow } from '@/components/ui/tile'
 import { ExerciseMedia, getExerciseMedia } from '@/components/workout/ExerciseMedia'
 
 const ALL = 'Todos'
+const GENERAL = 'Geral'
 const inputClassName =
-  'w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white placeholder:text-zinc-600 focus:border-white focus:outline-none'
+  'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
+const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
 
 function normalizeName(name: string | null | undefined) {
   return String(name ?? '').trim().toLowerCase()
 }
 
+const normalizeText = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+// Mapa de um exercício só: principal aceso e secundários (pelo nome) mais suaves.
+function exerciseFills(name: string, muscle: string | null | undefined, secondary?: unknown) {
+  return summarizeWork([{ name, muscle, secondary, sets: 1 }]).fills
+}
+
 export default function AdminExercisesPage() {
   const [supabase] = useState(() => createClient())
+  const toast = useToast()
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [search, setSearch] = useState('')
   const [muscleFilter, setMuscleFilter] = useState(ALL)
-  const [feedback, setFeedback] = useState<Feedback>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
 
   const [editor, setEditor] = useState<{ id: string | null } | null>(null)
@@ -70,25 +89,26 @@ export default function AdminExercisesPage() {
     setEditorError('')
   }
 
+  const missingCatalog = useMemo(() => {
+    const existing = new Set(exercises.map((exercise) => normalizeName(exercise.name)))
+    return baseExerciseCatalog.filter((exercise) => !existing.has(normalizeName(exercise.name)))
+  }, [exercises])
+
   const handleAddCatalog = async () => {
+    if (missingCatalog.length === 0) return
     setCatalogLoading(true)
-    setFeedback(null)
-
-    const existingNames = new Set(exercises.map((exercise) => normalizeName(exercise.name)))
-    const missingExercises = baseExerciseCatalog.filter((exercise) => !existingNames.has(normalizeName(exercise.name)))
-
-    if (missingExercises.length === 0) {
-      setFeedback({ type: 'success', message: 'O catálogo base já está completo.' })
-    } else {
-      const { error } = await supabase.from('exercises').insert(missingExercises)
-      if (error) {
-        setFeedback({ type: 'error', message: `Não foi possível adicionar o catálogo: ${error.message}` })
-      } else {
-        setFeedback({ type: 'success', message: `${missingExercises.length} exercícios adicionados sem apagar os atuais.` })
-        reload()
-      }
-    }
+    const { error } = await supabase.from('exercises').insert(missingCatalog)
     setCatalogLoading(false)
+    if (error) {
+      toast({ tone: 'error', title: 'Não foi possível adicionar o catálogo', description: error.message })
+      return
+    }
+    toast({
+      tone: 'success',
+      title: 'Catálogo adicionado',
+      description: `${plural(missingCatalog.length, 'exercício novo', 'exercícios novos')}, sem apagar os atuais.`,
+    })
+    reload()
   }
 
   const handleSaveExercise = async (event: React.FormEvent) => {
@@ -119,132 +139,175 @@ export default function AdminExercisesPage() {
       return
     }
     setEditor(null)
-    setFeedback({ type: 'success', message: editor.id ? 'Exercício atualizado.' : 'Exercício criado.' })
+    toast({ tone: 'success', title: editor.id ? 'Exercício atualizado' : 'Exercício criado', description: trimmedName })
     reload()
   }
 
-  const term = search.trim().toLowerCase()
-  const muscleOptions = [ALL, ...new Set([...MUSCLE_GROUPS, ...exercises.map((exercise) => exercise.muscle_group || 'Geral')])]
+  const fillsById = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof exerciseFills>>()
+    for (const exercise of exercises) {
+      map.set(exercise.id, exerciseFills(exercise.name, exercise.muscle_group, exercise.secondary_muscle))
+    }
+    return map
+  }, [exercises])
+
+  const muscleOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const exercise of exercises) {
+      const muscle = exercise.muscle_group || GENERAL
+      counts.set(muscle, (counts.get(muscle) ?? 0) + 1)
+    }
+    const known = MUSCLE_GROUPS.filter((muscle) => counts.has(muscle))
+    const others = [...counts.keys()]
+      .filter((muscle) => !MUSCLE_GROUPS.includes(muscle) && muscle !== GENERAL)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    const ordered = [...known, ...others, ...(counts.has(GENERAL) ? [GENERAL] : [])]
+    return [{ muscle: ALL, count: exercises.length }, ...ordered.map((muscle) => ({ muscle, count: counts.get(muscle) ?? 0 }))]
+  }, [exercises])
+
+  const term = normalizeText(search.trim())
   const filteredExercises = exercises.filter((exercise) => {
-    const muscle = exercise.muscle_group || 'Geral'
+    const muscle = exercise.muscle_group || GENERAL
     const matchesMuscle = muscleFilter === ALL || muscle === muscleFilter
-    const matchesSearch =
-      !term || exercise.name.toLowerCase().includes(term) || muscle.toLowerCase().includes(term)
-    return matchesMuscle && matchesSearch
+    return matchesMuscle && (!term || normalizeText(`${exercise.name} ${muscle}`).includes(term))
   })
 
+  const withVideo = exercises.filter((exercise) => exercise.video_url).length
+  const editorFills = useMemo(() => exerciseFills(name, muscleGroup), [name, muscleGroup])
+  const groupOptions = [...new Set([...MUSCLE_GROUPS, muscleGroup])]
+
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-3 px-1">
         <div>
-          <h1 className="text-xl font-black uppercase tracking-wide">Biblioteca</h1>
-          <p className="text-xs font-medium text-zinc-500">{exercises.length} exercícios disponíveis</p>
+          <Eyebrow>Biblioteca</Eyebrow>
+          <h1 className="mt-1 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">Exercícios</h1>
+          {!loading && (
+            <p className="mt-1.5 text-xs text-zinc-500">
+              {plural(exercises.length, 'exercício', 'exercícios')} · {withVideo} com vídeo
+            </p>
+          )}
         </div>
-        <div className="flex shrink-0 flex-col gap-2">
+        <m.button
+          type="button"
+          whileTap={{ scale: 0.95 }}
+          onClick={() => openEditor()}
+          className="flex h-11 items-center gap-1.5 rounded-2xl bg-white px-4 text-xs font-black uppercase tracking-wider text-black"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          <span>
+            Novo<span className="sr-only"> exercício</span>
+          </span>
+        </m.button>
+      </div>
+
+      {!loading && !loadError && missingCatalog.length > 0 && (
+        <div className="flex items-center gap-3.5 rounded-3xl border border-gold/25 bg-gold-soft p-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gold text-black">
+            <LibraryBig className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white">Catálogo base</p>
+            <p className="text-[11px] leading-snug text-zinc-300">
+              {plural(missingCatalog.length, 'exercício pronto', 'exercícios prontos')} para completar a biblioteca, sem
+              apagar os atuais.
+            </p>
+          </div>
           <button
             type="button"
             onClick={handleAddCatalog}
             disabled={catalogLoading}
-            className="flex items-center gap-1.5 rounded-xl border border-zinc-700 px-3 py-2.5 text-[10px] font-extrabold uppercase text-zinc-200 transition hover:bg-zinc-900 disabled:opacity-50"
+            className="grid h-10 shrink-0 place-items-center rounded-xl bg-white px-3.5 text-xs font-black uppercase tracking-wider text-black disabled:opacity-60"
           >
-            {catalogLoading ? (
-              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <LibraryBig className="h-4 w-4" aria-hidden="true" />
-            )}
-            Catálogo base
-          </button>
-          <button
-            type="button"
-            onClick={() => openEditor()}
-            className="flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold uppercase text-black"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" /> Novo
+            {catalogLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Adicionando" /> : 'Adicionar'}
           </button>
         </div>
-      </div>
-
-      <FeedbackAlert feedback={feedback} />
+      )}
 
       <div className="relative">
-        <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-zinc-500" aria-hidden="true" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden="true" />
         <input
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Buscar exercício ou músculo..."
           aria-label="Buscar exercício"
-          className={cn(inputClassName, 'py-3 pl-10 text-xs')}
+          className={cn(inputClassName, 'h-12 py-0 pl-11')}
         />
       </div>
 
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4" role="group" aria-label="Filtrar por músculo">
-        {muscleOptions.map((muscle) => (
-          <button
-            key={muscle}
-            type="button"
-            aria-pressed={muscleFilter === muscle}
-            onClick={() => setMuscleFilter(muscle)}
-            className={cn(
-              'shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase transition',
-              muscleFilter === muscle
-                ? 'border-white bg-white text-black'
-                : 'border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white',
-            )}
-          >
-            {muscle}
-          </button>
-        ))}
-      </div>
+      {muscleOptions.length > 2 && (
+        <div role="radiogroup" aria-label="Filtrar por grupo muscular" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+          {muscleOptions.map(({ muscle, count }) => (
+            <button
+              key={muscle}
+              type="button"
+              role="radio"
+              aria-checked={muscleFilter === muscle}
+              onClick={() => setMuscleFilter(muscle)}
+              className={cn(
+                'flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[11px] font-bold transition',
+                muscleFilter === muscle ? 'border-white bg-white text-black' : 'border-line bg-surface text-zinc-400 hover:text-white',
+              )}
+            >
+              {muscle}
+              <span className={cn('tabular-nums', muscleFilter === muscle ? 'text-zinc-700' : 'text-zinc-500')}>{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
-        <PageLoader label="Carregando biblioteca" />
+        <div className="grid grid-cols-2 gap-2.5" role="status" aria-label="Carregando biblioteca">
+          {[0, 1, 2, 3].map((item) => (
+            <Skeleton key={item} className="h-52 rounded-3xl" />
+          ))}
+        </div>
       ) : loadError ? (
         <Alert variant="error">{loadError}</Alert>
       ) : filteredExercises.length === 0 ? (
-        <div className="rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center text-sm font-semibold text-zinc-400">
-          {exercises.length === 0 ? 'Nenhum exercício cadastrado. Use o "Catálogo base".' : 'Nenhum exercício encontrado.'}
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-line-strong p-8 text-center">
+          <Dumbbell className="h-9 w-9 text-zinc-600" aria-hidden="true" />
+          <p className="text-sm font-semibold text-zinc-300">
+            {exercises.length === 0 ? 'Nenhum exercício cadastrado ainda.' : 'Nenhum exercício encontrado.'}
+          </p>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {filteredExercises.map((exercise) => (
-            <li
-              key={exercise.id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-900 bg-zinc-950 p-3.5"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900">
-                  <Dumbbell className="h-5 w-5 text-zinc-400" aria-hidden="true" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold text-white">{exercise.name}</h3>
-                  <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase text-zinc-500">
-                    {exercise.muscle_group || 'Geral'}
-                    {exercise.video_url && (
-                      <span className="flex items-center gap-0.5 text-emerald-400">
-                        <Video className="h-3 w-3" aria-hidden="true" /> vídeo
+        <ul className="grid grid-cols-2 gap-2.5">
+          {filteredExercises.map((exercise) => {
+            const hasVideo = Boolean(exercise.video_url)
+            return (
+              <li key={exercise.id}>
+                <button
+                  type="button"
+                  onClick={() => openEditor(exercise)}
+                  className="flex h-full w-full flex-col rounded-3xl border border-line bg-surface p-2.5 text-left transition hover:border-line-strong active:scale-[0.98]"
+                >
+                  <span className="sr-only">Editar </span>
+                  <span aria-hidden="true" className="relative block rounded-2xl bg-black/40 px-2 py-2.5">
+                    <MuscleMap fills={fillsById.get(exercise.id) ?? {}} animated={false} />
+                    {hasVideo && (
+                      <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-brand text-black">
+                        <Play className="h-3 w-3 fill-current" />
                       </span>
                     )}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => openEditor(exercise)}
-                aria-label={`Editar ${exercise.name}`}
-                className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-900 p-2.5 text-emerald-400 hover:text-white"
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </li>
-          ))}
+                  </span>
+                  <span className="mt-2.5 line-clamp-2 px-1 text-[13px] font-bold leading-snug text-white">{exercise.name}</span>
+                  <span className="mt-auto px-1 pb-0.5 pt-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+                    {exercise.muscle_group || GENERAL}
+                    {hasVideo && <span className="sr-only">, com vídeo</span>}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
 
-      <Modal open={editor !== null} onClose={closeEditor} title={editor?.id ? 'Editar exercício' : 'Criar exercício'}>
-        <form onSubmit={handleSaveExercise} className="space-y-3">
+      <Modal open={editor !== null} onClose={closeEditor} title={editor?.id ? 'Editar exercício' : 'Novo exercício'}>
+        <form onSubmit={handleSaveExercise} className="space-y-4">
           <div>
-            <label htmlFor="exercise-name" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+            <label htmlFor="exercise-name" className={labelClassName}>
               Nome do exercício
             </label>
             <input
@@ -258,26 +321,36 @@ export default function AdminExercisesPage() {
             />
           </div>
 
-          <div>
-            <label htmlFor="exercise-muscle" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
-              Grupo muscular
-            </label>
-            <select
-              id="exercise-muscle"
-              value={muscleGroup}
-              onChange={(event) => setMuscleGroup(event.target.value)}
-              className={inputClassName}
-            >
-              {[...new Set([...MUSCLE_GROUPS, muscleGroup])].map((muscle) => (
-                <option key={muscle} value={muscle}>
-                  {muscle}
-                </option>
-              ))}
-            </select>
-          </div>
+          <fieldset>
+            <legend className={labelClassName}>Grupo muscular</legend>
+            <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3">
+              <div className="flex flex-wrap gap-1.5">
+                {groupOptions.map((muscle) => (
+                  <label
+                    key={muscle}
+                    className="cursor-pointer rounded-full border border-line px-3 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand"
+                  >
+                    <input
+                      type="radio"
+                      name="exercise-muscle"
+                      value={muscle}
+                      checked={muscleGroup === muscle}
+                      onChange={() => setMuscleGroup(muscle)}
+                      className="sr-only"
+                    />
+                    {muscle}
+                  </label>
+                ))}
+              </div>
+              <div className="rounded-2xl bg-black/40 p-1.5">
+                <MuscleMap fills={editorFills} label="Prévia dos músculos trabalhados" />
+                <p className="mt-1 text-center text-[9px] font-bold uppercase tracking-wider text-zinc-500">Prévia</p>
+              </div>
+            </div>
+          </fieldset>
 
           <div>
-            <label htmlFor="exercise-video" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+            <label htmlFor="exercise-video" className={labelClassName}>
               Vídeo ou GIF (opcional)
             </label>
             <input
@@ -297,21 +370,22 @@ export default function AdminExercisesPage() {
 
           {editorError && <Alert variant="error">{editorError}</Alert>}
 
-          <div className="flex gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               type="button"
               onClick={closeEditor}
-              className="w-1/2 rounded-xl bg-zinc-900 p-3 text-xs font-bold uppercase text-zinc-400"
+              className="h-12 rounded-2xl border border-line-strong text-xs font-black uppercase tracking-wider text-zinc-200"
             >
               Cancelar
             </button>
-            <button
+            <m.button
               type="submit"
               disabled={saving}
-              className="flex w-1/2 items-center justify-center rounded-xl bg-white p-3 text-xs font-extrabold uppercase text-black disabled:opacity-60"
+              whileTap={{ scale: 0.97 }}
+              className="flex h-12 items-center justify-center rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black disabled:opacity-60"
             >
               {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Salvando" /> : 'Salvar'}
-            </button>
+            </m.button>
           </div>
         </form>
       </Modal>

@@ -1,6 +1,36 @@
 @import "tailwindcss";
 @config "../../tailwind.config.js";
 
+/*
+ * Tokens do Team Jean: preto absoluto como base, superfícies grafite em
+ * camadas, esmeralda como cor de ação/progresso e âmbar reservado para
+ * recordes e sequências. Use as classes geradas (bg-surface, text-brand,
+ * border-line, font-display...) em vez de valores soltos.
+ */
+@theme {
+  --color-surface: #0c0c0d;
+  --color-surface-2: #141416;
+  --color-surface-3: #1c1c1f;
+  --color-line: rgb(255 255 255 / 0.07);
+  --color-line-strong: rgb(255 255 255 / 0.13);
+  --color-brand: #34d399;
+  --color-brand-soft: rgb(52 211 153 / 0.14);
+  --color-brand-deep: #059669;
+  --color-gold: #fbbf24;
+  --color-gold-soft: rgb(251 191 36 / 0.14);
+  --color-danger: #fb7185;
+  --color-danger-soft: rgb(251 113 133 / 0.14);
+
+  /* Cinzas de apoio clareados para contraste WCAG AA (4,5:1) sobre as
+     superfícies grafite; os valores padrão do Tailwind ficavam em 4,05:1. */
+  --color-zinc-500: #8f8f99;
+  --color-zinc-600: #80808a;
+
+  --font-display: var(--font-barlow-condensed), "Arial Narrow", system-ui, sans-serif;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 :root {
   --background: #000000;
   --foreground: #ffffff;
@@ -23,7 +53,18 @@ body {
   overflow-x: hidden;
 }
 
-/* Animações e efeitos de toque para Mobile */
+/* Números de placar/estatística sempre alinhados. */
+.font-display {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Foco visível consistente para quem navega por teclado (WCAG 2.4.7). */
+:where(a, button, [role="button"], [role="tab"], [role="radio"], [role="switch"], summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
 button:active {
   transform: scale(0.97);
   transition: transform 0.1s ease;
@@ -44,4 +85,44 @@ input, select, textarea {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Placeholder de carregamento com brilho deslizante. */
+.skeleton {
+  background: linear-gradient(
+    100deg,
+    rgb(255 255 255 / 0.035) 30%,
+    rgb(255 255 255 / 0.08) 50%,
+    rgb(255 255 255 / 0.035) 70%
+  );
+  background-size: 300% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* Textura sutil de brilho para cartões de destaque. */
+.glow-brand {
+  background-image:
+    radial-gradient(120% 80% at 100% 0%, rgb(52 211 153 / 0.16), transparent 55%),
+    radial-gradient(80% 60% at 0% 100%, rgb(255 255 255 / 0.04), transparent 60%);
+}
+
+/* Respeita "reduzir movimento" do sistema (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

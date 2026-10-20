@@ -1,60 +1,40 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Activity, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Dumbbell } from 'lucide-react'
+import { AnimatePresence, m } from 'framer-motion'
+import { Activity, ChevronLeft, ChevronRight, CircleAlert, Dumbbell, Flame, Gauge, Layers, Weight } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
+import { REGION_LABELS, loadFill, muscleLoad, regionsForExercise, splitSecondary, type MuscleRegion, type MuscleWork } from '@/lib/muscles'
+import { WEEKDAY_SHORT, startOfWeek } from '@/lib/stats'
+import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { AnimatedNumber } from '@/components/ui/animated-number'
+import { SegmentedControl } from '@/components/ui/segmented-control'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Eyebrow } from '@/components/ui/tile'
+import { MuscleMap } from '@/components/fitness/MuscleMap'
 
 type WeeklyTrainingInsightsProps = {
   mode: 'student' | 'admin'
 }
 
-type StudentProfile = {
-  id: string
-  full_name: string | null
-  email: string | null
-}
+type StudentProfile = { id: string; full_name: string | null; email: string | null }
 
-type WorkoutSessionRow = {
+type SessionRow = {
   id: string
   student_id: string
   completed_at: string
-  status: string
   session_rpe: number | null
   assigned_workouts: { name: string | null } | null
 }
 
-type CompletedSet = {
-  session_id: string
-  exercise_id: string
-  weight_kg: number | null
-  reps: number | null
-}
+type SetRow = { session_id: string; exercise_id: string; weight_kg: number | null; reps: number | null }
 
-type ExerciseMuscles = {
-  id: string
-  name: string
-  muscle_group: string | null
-  secondary_muscle?: string | null
-}
-
-type MusclePriority = {
-  name: string
-  effectiveSets: number
-  percentage: number
-  exercises: { name: string; sets: number }[]
-}
+type ExerciseRow = { id: string; name: string; muscle_group: string | null; secondary_muscle?: string | null }
 
 type DaySession = { id: string; workoutName: string; studentId: string }
 
-type DailyVolume = {
-  day: number
-  shortName: string
-  date: Date
-  sets: number
-  volume: number
-  sessions: DaySession[]
-}
+type DailyVolume = { sets: number; volume: number; sessions: DaySession[] }
 
 type InsightsData = {
   daily: DailyVolume[]
@@ -62,52 +42,28 @@ type InsightsData = {
   totalVolume: number
   completedSessions: number
   averageRpe: number | null
-  muscles: MusclePriority[]
+  fills: Partial<Record<MuscleRegion, string>>
+  ranking: { region: MuscleRegion; sets: number; share: number }[]
   studentsWithoutTraining: StudentProfile[]
 }
 
-const WEEKDAYS = [
-  { day: 1, shortName: 'Seg', fullName: 'Segunda-feira' },
-  { day: 2, shortName: 'Ter', fullName: 'Terça-feira' },
-  { day: 3, shortName: 'Qua', fullName: 'Quarta-feira' },
-  { day: 4, shortName: 'Qui', fullName: 'Quinta-feira' },
-  { day: 5, shortName: 'Sex', fullName: 'Sexta-feira' },
-  { day: 6, shortName: 'Sáb', fullName: 'Sábado' },
-  { day: 7, shortName: 'Dom', fullName: 'Domingo' },
-]
-
-function getWeekStart(offset: number) {
-  const start = new Date()
-  start.setHours(0, 0, 0, 0)
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) + offset * 7)
-  return start
+function formatRange(start: Date) {
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const format = (date: Date) => date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '')
+  return `${format(start)} – ${format(end)}`
 }
 
-function getWeekday(date: Date) {
-  const day = date.getDay()
-  return day === 0 ? 7 : day
-}
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace('.', '')
-}
-
-function formatCount(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace('.', ',')
-}
-
-function formatLoad(value: number) {
-  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value)
-}
+const formatKg = (value: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value)
 
 export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
   const [supabase] = useState(() => createClient())
   const [students, setStudents] = useState<StudentProfile[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState('all')
   const [weekOffset, setWeekOffset] = useState(0)
-  const [selectedDay, setSelectedDay] = useState(() => getWeekday(new Date()))
+  const [selectedDay, setSelectedDay] = useState(() => (new Date().getDay() + 6) % 7)
   const [chartMode, setChartMode] = useState<'sets' | 'load'>('sets')
-  const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null)
   const [insights, setInsights] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -132,14 +88,15 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         }
 
         const studentId = mode === 'student' ? user.id : selectedStudentId === 'all' ? null : selectedStudentId
-        const weekStart = getWeekStart(weekOffset)
+        const weekStart = startOfWeek(new Date())
+        weekStart.setDate(weekStart.getDate() + weekOffset * 7)
         const weekEnd = new Date(weekStart)
         weekEnd.setDate(weekEnd.getDate() + 7)
 
-        // Só treinos concluídos contam: a data de referência é a conclusão.
+        // Só treinos concluídos contam; a data de referência é a conclusão.
         let sessionsQuery = supabase
           .from('workout_sessions')
-          .select('id, student_id, completed_at, status, session_rpe, assigned_workouts(name)')
+          .select('id, student_id, completed_at, session_rpe, assigned_workouts(name)')
           .eq('status', 'completed')
           .gte('completed_at', weekStart.toISOString())
           .lt('completed_at', weekEnd.toISOString())
@@ -147,92 +104,80 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
 
         const { data: sessionRows, error: sessionsError } = await sessionsQuery
         if (sessionsError) throw sessionsError
-        const sessions = (sessionRows ?? []) as unknown as WorkoutSessionRow[]
-        const sessionIds = sessions.map((session) => session.id)
+        const sessions = (sessionRows ?? []) as unknown as SessionRow[]
 
-        let sets: CompletedSet[] = []
-        if (sessionIds.length > 0) {
+        let sets: SetRow[] = []
+        if (sessions.length > 0) {
           const { data, error } = await supabase
             .from('session_sets')
             .select('session_id, exercise_id, weight_kg, reps')
-            .in('session_id', sessionIds)
+            .in(
+              'session_id',
+              sessions.map((session) => session.id),
+            )
             .eq('completed', true)
           if (error) throw error
-          sets = (data ?? []) as CompletedSet[]
+          sets = (data ?? []) as SetRow[]
         }
 
         const exerciseIds = [...new Set(sets.map((set) => set.exercise_id))]
-        let exerciseRows: ExerciseMuscles[] = []
+        let exercises: ExerciseRow[] = []
         if (exerciseIds.length > 0) {
           // select('*'): secondary_muscle pode não existir na tabela.
           const { data, error } = await supabase.from('exercises').select('*').in('id', exerciseIds)
           if (error) throw error
-          exerciseRows = (data ?? []) as ExerciseMuscles[]
+          exercises = (data ?? []) as ExerciseRow[]
         }
 
-        const exerciseById = new Map(exerciseRows.map((exercise) => [exercise.id, exercise]))
+        const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]))
         const sessionById = new Map(sessions.map((session) => [session.id, session]))
-        const daily: DailyVolume[] = WEEKDAYS.map((weekday, index) => {
-          const date = new Date(weekStart)
-          date.setDate(date.getDate() + index)
-          return { day: weekday.day, shortName: weekday.shortName, date, sets: 0, volume: 0, sessions: [] }
-        })
+        const daily: DailyVolume[] = Array.from({ length: 7 }, () => ({ sets: 0, volume: 0, sessions: [] }))
+        const dayIndex = (iso: string) => (new Date(iso).getDay() + 6) % 7
 
         for (const session of sessions) {
-          const weekday = getWeekday(new Date(session.completed_at))
-          daily[weekday - 1].sessions.push({
+          daily[dayIndex(session.completed_at)].sessions.push({
             id: session.id,
             workoutName: session.assigned_workouts?.name || 'Treino',
             studentId: session.student_id,
           })
         }
 
-        const muscleTotals = new Map<string, { effectiveSets: number; exercises: Map<string, number> }>()
-        const addMuscleWork = (muscle: string | null | undefined, count: number, exerciseName: string) => {
-          const name = muscle?.trim()
-          if (!name) return
-          const current = muscleTotals.get(name) ?? { effectiveSets: 0, exercises: new Map<string, number>() }
-          current.effectiveSets += count
-          current.exercises.set(exerciseName, (current.exercises.get(exerciseName) ?? 0) + count)
-          muscleTotals.set(name, current)
-        }
-
         let totalVolume = 0
+        const work: MuscleWork[] = []
         for (const set of sets) {
           const session = sessionById.get(set.session_id)
-          const dayData = daily[getWeekday(new Date(session?.completed_at ?? weekStart)) - 1]
+          if (!session) continue
           const volume = Math.max(0, Number(set.weight_kg) || 0) * Math.max(0, Number(set.reps) || 0)
+          const day = daily[dayIndex(session.completed_at)]
+          day.sets += 1
+          day.volume += volume
           totalVolume += volume
-          dayData.sets += 1
-          dayData.volume += volume
 
           const exercise = exerciseById.get(set.exercise_id)
           if (exercise) {
-            addMuscleWork(exercise.muscle_group, 1, exercise.name)
-            const secondaryMuscles =
-              exercise.secondary_muscle
-                ?.split(/[,;/]/)
-                .map((muscle) => muscle.trim())
-                .filter((muscle) => muscle && muscle !== exercise.muscle_group) ?? []
-            for (const muscle of secondaryMuscles) addMuscleWork(muscle, 0.5, exercise.name)
+            work.push({ muscle: exercise.muscle_group, amount: 1, exercise: exercise.name })
+            for (const muscle of splitSecondary(exercise.secondary_muscle)) work.push({ muscle, amount: 0.5 })
           }
         }
 
-        const effectiveSetTotal = [...muscleTotals.values()].reduce((total, muscle) => total + muscle.effectiveSets, 0)
-        const muscles = [...muscleTotals.entries()]
-          .map(([name, muscle]) => ({
-            name,
-            effectiveSets: muscle.effectiveSets,
-            percentage: effectiveSetTotal > 0 ? Math.round((muscle.effectiveSets / effectiveSetTotal) * 100) : 0,
-            exercises: [...muscle.exercises.entries()]
-              .map(([exerciseName, exerciseSets]) => ({ name: exerciseName, sets: exerciseSets }))
-              .sort((first, second) => second.sets - first.sets),
-          }))
-          .sort((first, second) => second.effectiveSets - first.effectiveSets)
+        // Séries efetivas por região para o ranking (principal = 1, secundário = 0,5).
+        const effective: Partial<Record<MuscleRegion, number>> = {}
+        for (const { muscle, amount, exercise } of work) {
+          for (const [region, factor] of regionsForExercise(exercise, muscle)) {
+            effective[region] = (effective[region] ?? 0) + amount * factor
+          }
+        }
+        const effectiveTotal = Object.values(effective).reduce((total, value) => total + value, 0)
+        const ranking = (Object.entries(effective) as [MuscleRegion, number][])
+          .map(([region, value]) => ({ region, sets: value, share: effectiveTotal > 0 ? value / effectiveTotal : 0 }))
+          .sort((first, second) => second.sets - first.sets)
 
-        const rpeValues = sessions
-          .filter((session) => session.session_rpe != null)
-          .map((session) => Number(session.session_rpe))
+        const fills: Partial<Record<MuscleRegion, string>> = {}
+        for (const [region, intensity] of Object.entries(muscleLoad(work)) as [MuscleRegion, number][]) {
+          fills[region] = loadFill(intensity)
+        }
+
+        const rpeValues = sessions.filter((session) => session.session_rpe != null).map((session) => Number(session.session_rpe))
         const trainedStudentIds = new Set(sessions.map((session) => session.student_id))
 
         if (!active) return
@@ -243,7 +188,8 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           totalVolume,
           completedSessions: sessions.length,
           averageRpe: rpeValues.length > 0 ? rpeValues.reduce((total, value) => total + value, 0) / rpeValues.length : null,
-          muscles,
+          fills,
+          ranking,
           studentsWithoutTraining:
             mode === 'admin' && !studentId ? studentRows.filter((student) => !trainedStudentIds.has(student.id)) : [],
         })
@@ -273,36 +219,32 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
     setSelectedStudentId(studentId)
   }
 
-  const weekStart = getWeekStart(weekOffset)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekEnd.getDate() + 6)
+  const weekStart = startOfWeek(new Date())
+  weekStart.setDate(weekStart.getDate() + weekOffset * 7)
   const studentById = new Map(students.map((student) => [student.id, student]))
-  const selectedDayData = insights?.daily[selectedDay - 1]
-  const selectedMuscleData = insights?.muscles.find((muscle) => muscle.name === selectedMuscle)
   const chartMaximum = Math.max(1, ...(insights?.daily.map((day) => (chartMode === 'sets' ? day.sets : day.volume)) ?? [0]))
-  const topMuscle = insights?.muscles[0]
+  const selectedDayData = insights?.daily[selectedDay]
+  const selectedDate = new Date(weekStart)
+  selectedDate.setDate(selectedDate.getDate() + selectedDay)
 
   return (
-    <section className="space-y-5 text-white" aria-labelledby="weekly-training-title">
-      <header className="flex items-start justify-between gap-3">
+    <section className="space-y-4" aria-labelledby="weekly-training-title">
+      <header className="flex items-end justify-between gap-3">
         <div>
-          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500">
-            <Activity className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
-            {mode === 'admin' ? 'Painel do treinador' : 'Painel do atleta'}
-          </p>
-          <h2 id="weekly-training-title" className="mt-1 text-lg font-black">
-            Semana de treino
+          <Eyebrow icon={Activity} className="text-brand/80">
+            {mode === 'admin' ? 'Painel do treinador' : 'Seu painel'}
+          </Eyebrow>
+          <h2 id="weekly-training-title" className="mt-1 font-display text-3xl font-bold uppercase leading-none">
+            {weekOffset === 0 ? 'Esta semana' : weekOffset === -1 ? 'Semana passada' : 'Semana'}
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            {formatDate(weekStart)} – {formatDate(weekEnd)}
-          </p>
+          <p className="mt-1 text-xs text-zinc-500">{formatRange(weekStart)}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-line bg-surface p-1">
           <button
             type="button"
             aria-label="Semana anterior"
             onClick={() => changeWeek(weekOffset - 1)}
-            className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+            className="grid h-9 w-9 place-items-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -310,9 +252,9 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             <button
               type="button"
               onClick={() => changeWeek(0)}
-              className="rounded-lg px-2 py-1 text-[10px] font-bold text-emerald-300 hover:bg-zinc-900"
+              className="rounded-xl px-2 py-2 text-[11px] font-bold text-brand hover:bg-white/5"
             >
-              Esta semana
+              Hoje
             </button>
           )}
           <button
@@ -320,7 +262,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             aria-label="Próxima semana"
             disabled={weekOffset >= 0}
             onClick={() => changeWeek(weekOffset + 1)}
-            className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white disabled:opacity-30"
+            className="grid h-9 w-9 place-items-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -328,12 +270,12 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
       </header>
 
       {mode === 'admin' && (
-        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-          Atleta
+        <label className="block">
+          <span className="sr-only">Atleta</span>
           <select
             value={selectedStudentId}
             onChange={(event) => changeStudent(event.target.value)}
-            className="mt-1.5 h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-sm font-medium normal-case text-white outline-none focus:border-emerald-400"
+            className="h-12 w-full rounded-2xl border border-line bg-surface px-4 text-sm font-semibold text-white outline-none focus:border-brand"
           >
             <option value="all">Todos os atletas</option>
             {students.map((student) => (
@@ -345,215 +287,209 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         </label>
       )}
 
-      {loading ? (
-        <div className="py-8 text-center text-xs text-zinc-500" role="status">
-          Carregando semana...
-        </div>
-      ) : errorMessage ? (
-        <p role="alert" className="rounded-xl border border-red-900/60 bg-red-950/30 p-3 text-xs text-red-300">
-          {errorMessage}
-        </p>
-      ) : insights ? (
-        <>
-          <div className="grid grid-cols-2 divide-x divide-y divide-zinc-900 border-y border-zinc-900 sm:grid-cols-4 sm:divide-y-0">
-            <div className="py-3 pr-3">
-              <p className="text-[10px] font-bold uppercase text-zinc-500">Séries</p>
-              <p className="mt-1 text-xl font-black">{insights.totalSets}</p>
+      <AnimatePresence mode="wait" initial={false}>
+        {loading ? (
+          <m.div key="loading" exit={{ opacity: 0 }} className="space-y-3" role="status" aria-label="Carregando semana">
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1, 2, 3].map((item) => (
+                <Skeleton key={item} className="h-24 rounded-3xl" />
+              ))}
             </div>
-            <div className="py-3 pl-3 sm:px-3">
-              <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
-              <p className="mt-1 text-xl font-black">
-                {formatLoad(insights.totalVolume)} <span className="text-xs font-semibold text-zinc-500">kg</span>
-              </p>
-            </div>
-            <div className="py-3 pr-3 sm:px-3">
-              <p className="text-[10px] font-bold uppercase text-zinc-500">Treinos</p>
-              <p className="mt-1 text-xl font-black">{insights.completedSessions}</p>
-            </div>
-            <div className="py-3 pl-3 sm:pl-3">
-              <p className="text-[10px] font-bold uppercase text-zinc-500">RPE médio</p>
-              <p className="mt-1 text-xl font-black">
-                {insights.averageRpe?.toFixed(1).replace('.', ',') ?? '—'}
-                <span className="text-xs font-semibold text-zinc-500">/10</span>
-              </p>
-            </div>
-          </div>
+            <Skeleton className="h-52 rounded-3xl" />
+          </m.div>
+        ) : errorMessage ? (
+          <m.p
+            key="error"
+            role="alert"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-2xl border border-danger/30 bg-danger-soft p-4 text-xs text-danger"
+          >
+            {errorMessage}
+          </m.p>
+        ) : insights ? (
+          <m.div
+            key={`${weekOffset}-${selectedStudentId}`}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-3"
+          >
+            <dl className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Treinos', icon: Flame, value: insights.completedSessions, format: undefined, suffix: '' },
+                { label: 'Séries', icon: Layers, value: insights.totalSets, format: undefined, suffix: '' },
+                { label: 'Volume', icon: Weight, value: insights.totalVolume, format: formatKg, suffix: 'kg' },
+                {
+                  label: 'RPE médio',
+                  icon: Gauge,
+                  value: insights.averageRpe ?? 0,
+                  format: (value: number) => (insights.averageRpe === null ? '—' : value.toFixed(1).replace('.', ',')),
+                  suffix: insights.averageRpe === null ? '' : '/10',
+                },
+              ].map((stat) => (
+                <div key={stat.label} className="rounded-3xl border border-line bg-surface p-4">
+                  <dt>
+                    <Eyebrow icon={stat.icon}>{stat.label}</Eyebrow>
+                  </dt>
+                  <dd className="mt-2 font-display text-4xl font-bold leading-none">
+                    <AnimatedNumber value={stat.value} format={stat.format} />
+                    {stat.suffix && <span className="ml-1 text-base font-semibold text-zinc-500">{stat.suffix}</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
 
-          {insights.studentsWithoutTraining.length > 0 && weekOffset === 0 && (
-            <div className="rounded-xl border border-amber-900/50 bg-amber-950/20 p-3">
-              <p className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-400">
-                <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-                Sem treino concluído nesta semana ({insights.studentsWithoutTraining.length})
-              </p>
-              <p className="mt-1.5 text-xs text-zinc-300">
-                {insights.studentsWithoutTraining
-                  .slice(0, 8)
-                  .map((student) => student.full_name || student.email || 'Atleta')
-                  .join(', ')}
-                {insights.studentsWithoutTraining.length > 8 && '…'}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-extrabold">Volume diário</h3>
-              <div className="flex rounded-lg border border-zinc-800 bg-zinc-950 p-0.5" role="group" aria-label="Métrica do gráfico semanal">
-                {(
-                  [
-                    { id: 'sets', label: 'Séries' },
-                    { id: 'load', label: 'Kg × reps' },
-                  ] as const
-                ).map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    aria-pressed={chartMode === option.id}
-                    onClick={() => setChartMode(option.id)}
-                    className={cn(
-                      'rounded-md px-2 py-1.5 text-[10px] font-bold transition',
-                      chartMode === option.id ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            {insights.studentsWithoutTraining.length > 0 && weekOffset === 0 && (
+              <div className="rounded-3xl border border-gold/25 bg-gold-soft p-4">
+                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-gold">
+                  <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+                  Sem treino nesta semana ({insights.studentsWithoutTraining.length})
+                </p>
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-200">
+                  {insights.studentsWithoutTraining
+                    .slice(0, 8)
+                    .map((student) => student.full_name || student.email || 'Atleta')
+                    .join(', ')}
+                  {insights.studentsWithoutTraining.length > 8 && '…'}
+                </p>
               </div>
-            </div>
-            <div className="grid grid-cols-7 gap-1.5">
-              {insights.daily.map((day) => {
-                const value = chartMode === 'sets' ? day.sets : day.volume
-                const height = value > 0 ? Math.max(8, (value / chartMaximum) * 100) : 3
-                return (
-                  <button
-                    key={day.day}
-                    type="button"
-                    aria-pressed={selectedDay === day.day}
-                    aria-label={`${WEEKDAYS[day.day - 1].fullName}: ${day.sets} séries e ${formatLoad(day.volume)} kg vezes reps`}
-                    onClick={() => setSelectedDay(day.day)}
-                    className="flex min-w-0 flex-col items-center gap-1 rounded-lg p-1 transition hover:bg-zinc-900"
-                  >
-                    <span className="h-3 text-[9px] font-bold text-zinc-400">
-                      {value > 0 ? (chartMode === 'sets' ? value : formatLoad(value)) : ''}
-                    </span>
-                    <span className="flex h-20 w-full items-end rounded-md bg-zinc-900/70 p-1">
-                      <span
-                        className={cn('w-full rounded-sm transition-all', selectedDay === day.day ? 'bg-emerald-400' : 'bg-sky-500')}
-                        style={{ height: `${height}%` }}
-                      />
-                    </span>
-                    <span
-                      className={cn('text-[9px] font-bold', selectedDay === day.day ? 'text-emerald-300' : 'text-zinc-500')}
-                    >
-                      {day.shortName}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+            )}
 
-          <div className="space-y-3 border-t border-zinc-900 pt-4">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-emerald-400" aria-hidden="true" />
-              <h3 className="text-sm font-extrabold">
-                {WEEKDAYS[selectedDay - 1].fullName} · {formatDate(selectedDayData?.date ?? weekStart)}
-              </h3>
-            </div>
-            <p className="text-[10px] text-zinc-500">
-              {selectedDayData?.sets ?? 0} séries concluídas · {formatLoad(selectedDayData?.volume ?? 0)} kg
-            </p>
-            {selectedDayData && selectedDayData.sessions.length > 0 ? (
-              <ul className="divide-y divide-zinc-900">
-                {selectedDayData.sessions.map((session) => {
-                  const student = studentById.get(session.studentId)
+            {/* Volume diário */}
+            <div className="rounded-3xl border border-line bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Eyebrow>Volume diário</Eyebrow>
+                <SegmentedControl
+                  size="sm"
+                  label="Métrica do gráfico"
+                  value={chartMode}
+                  onChange={setChartMode}
+                  options={[
+                    { value: 'sets', label: 'Séries' },
+                    { value: 'load', label: 'Kg×reps' },
+                  ]}
+                  className="w-40"
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-7 gap-1.5">
+                {insights.daily.map((day, index) => {
+                  const value = chartMode === 'sets' ? day.sets : day.volume
+                  const height = value > 0 ? Math.max(10, (value / chartMaximum) * 100) : 4
+                  const selected = selectedDay === index
                   return (
-                    <li key={session.id} className="flex items-center justify-between gap-3 py-2.5">
-                      <span className="truncate text-sm font-semibold text-white">{session.workoutName}</span>
-                      {mode === 'admin' && (
-                        <span className="shrink-0 text-[10px] text-zinc-500">
-                          {student?.full_name || student?.email || 'Atleta'}
+                    <button
+                      key={index}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setSelectedDay(index)}
+                      className="flex min-w-0 flex-col items-center gap-1.5 rounded-xl py-1 transition hover:bg-white/[0.03]"
+                    >
+                      <span className="h-3.5 text-[10px] font-bold text-zinc-400" aria-hidden="true">
+                        {value > 0 ? (chartMode === 'sets' ? value : `${(value / 1000).toFixed(1).replace('.', ',')}k`) : ''}
+                      </span>
+                      <span className="flex h-24 w-full items-end justify-center">
+                        <m.span
+                          className={cn(
+                            'w-full max-w-7 rounded-lg',
+                            selected ? 'bg-brand' : value > 0 ? 'bg-white/25' : 'bg-white/[0.06]',
+                          )}
+                          initial={{ height: 0 }}
+                          animate={{ height: `${height}%` }}
+                          transition={{ type: 'spring', stiffness: 220, damping: 26, delay: index * 0.03 }}
+                        />
+                      </span>
+                      <span className={cn('text-[10px] font-bold', selected ? 'text-brand' : 'text-zinc-500')}>
+                        {WEEKDAY_SHORT[index]}
+                        <span className="sr-only">
+                          : {day.sets} séries, {formatKg(day.volume)} kg
                         </span>
-                      )}
-                    </li>
+                      </span>
+                    </button>
                   )
                 })}
-              </ul>
-            ) : (
-              <p className="flex items-center gap-2 rounded-xl bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
-                <Dumbbell className="h-4 w-4" aria-hidden="true" />
-                Nenhum treino concluído neste dia
-              </p>
-            )}
-          </div>
+              </div>
 
-          <div className="space-y-3 border-t border-zinc-900 pt-4">
-            <div>
-              <h3 className="text-sm font-extrabold">Mapa de foco muscular</h3>
-              <p className="mt-0.5 text-[10px] text-zinc-500">Toque em um músculo para ver os exercícios</p>
+              <div className="mt-3 border-t border-line pt-3">
+                <p className="text-[11px] font-semibold text-zinc-400">
+                  {capitalize(selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' }))}
+                  <span className="text-zinc-600">
+                    {' '}
+                    · {selectedDayData?.sets ?? 0} séries · {formatKg(selectedDayData?.volume ?? 0)} kg
+                  </span>
+                </p>
+                {selectedDayData && selectedDayData.sessions.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {selectedDayData.sessions.map((session) => {
+                      const student = studentById.get(session.studentId)
+                      return (
+                        <li
+                          key={session.id}
+                          className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2"
+                        >
+                          <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
+                            <Dumbbell className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden="true" />
+                            <span className="truncate">{session.workoutName}</span>
+                          </span>
+                          {mode === 'admin' && (
+                            <span className="shrink-0 text-[11px] text-zinc-500">
+                              {student?.full_name || student?.email || 'Atleta'}
+                            </span>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-1.5 text-xs text-zinc-600">Nenhum treino concluído neste dia.</p>
+                )}
+              </div>
             </div>
 
-            {insights.muscles.length > 0 ? (
-              <div className="space-y-1">
-                {insights.muscles.map((muscle) => (
-                  <button
-                    key={muscle.name}
-                    type="button"
-                    aria-pressed={selectedMuscle === muscle.name}
-                    onClick={() => setSelectedMuscle((current) => (current === muscle.name ? null : muscle.name))}
-                    className={cn(
-                      'w-full rounded-lg px-2 py-2 text-left transition',
-                      selectedMuscle === muscle.name ? 'bg-zinc-900' : 'hover:bg-zinc-900/60',
-                    )}
-                  >
-                    <span className="flex items-center justify-between gap-3 text-xs">
-                      <span className="min-w-0 truncate font-semibold text-zinc-200">{muscle.name}</span>
-                      <span className="shrink-0 font-bold text-zinc-400">{muscle.percentage}%</span>
-                    </span>
-                    <span className="mt-1.5 flex items-center gap-2">
-                      <span className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
-                        <span className="block h-full rounded-full bg-sky-500 transition-all" style={{ width: `${muscle.percentage}%` }} />
-                      </span>
-                      <span className="w-16 shrink-0 text-right text-[9px] text-zinc-500">
-                        {formatCount(muscle.effectiveSets)} séries
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-zinc-800 px-4 py-5 text-center text-xs text-zinc-500">
-                Conclua séries nesta semana para ver a distribuição muscular.
-              </p>
-            )}
-
-            {selectedMuscleData && (
-              <div className="rounded-xl border-l-2 border-sky-400 bg-zinc-950 px-3 py-2.5">
-                <p className="text-[10px] font-bold uppercase text-sky-300">Foco selecionado</p>
-                <p className="mt-1 text-sm font-black">
-                  {selectedMuscleData.name} · {selectedMuscleData.percentage}%
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {selectedMuscleData.exercises.slice(0, 4).map((exercise) => (
-                    <span key={exercise.name} className="rounded-md bg-zinc-900 px-2 py-1 text-[10px] text-zinc-400">
-                      {exercise.name} · {formatCount(exercise.sets)}
-                    </span>
-                  ))}
+            {/* Foco muscular */}
+            <div className="rounded-3xl border border-line bg-surface p-4">
+              <Eyebrow>Foco muscular</Eyebrow>
+              {insights.ranking.length === 0 ? (
+                <p className="mt-2 text-xs text-zinc-500">Conclua séries nesta semana para ver os músculos trabalhados.</p>
+              ) : (
+                <div className="mt-3 flex gap-4">
+                  <div className="w-[42%] shrink-0">
+                    <MuscleMap fills={insights.fills} showLabels />
+                  </div>
+                  <ul className="min-w-0 flex-1 space-y-2.5">
+                    {insights.ranking.slice(0, 6).map((item, index) => (
+                      <li key={item.region}>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className={cn('font-semibold', index === 0 ? 'text-white' : 'text-zinc-300')}>
+                            {REGION_LABELS[item.region]}
+                          </span>
+                          <span className="text-zinc-500">{Math.round(item.share * 100)}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                          <m.div
+                            className="h-full rounded-full bg-brand"
+                            style={{ opacity: 0.45 + 0.55 * (item.sets / insights.ranking[0].sets) }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.max(6, (item.sets / insights.ranking[0].sets) * 100)}%` }}
+                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            )}
-            <p className="text-[9px] text-zinc-600">Série principal = 1; músculo secundário = 0,5 série efetiva.</p>
-          </div>
-
-          {topMuscle && insights.totalSets > 0 && (
-            <p className="text-[10px] text-zinc-500">
-              {mode === 'admin' ? 'O maior foco' : 'Seu maior foco'} nesta semana é{' '}
-              <span className="font-bold text-emerald-300">{topMuscle.name}</span>, com {topMuscle.percentage}% das séries
-              efetivas.
-            </p>
-          )}
-        </>
-      ) : null}
+              )}
+              {insights.ranking.length > 0 && (
+                <p className="mt-3 border-t border-line pt-2.5 text-[11px] text-zinc-500">
+                  Maior foco: <span className="font-bold text-brand">{REGION_LABELS[insights.ranking[0].region]}</span> · série
+                  principal = 1, músculo secundário = 0,5.
+                </p>
+              )}
+            </div>
+          </m.div>
+        ) : null}
+      </AnimatePresence>
     </section>
   )
 }

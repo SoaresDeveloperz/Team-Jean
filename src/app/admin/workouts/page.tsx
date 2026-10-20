@@ -1,16 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { AnimatePresence, m } from 'framer-motion'
 import {
   Archive,
   ArchiveRestore,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
+  ArrowDownUp,
+  Check,
   ChevronDown,
-  ChevronUp,
-  Dumbbell,
-  Eye,
   FolderKanban,
   History,
   LoaderCircle,
@@ -19,98 +18,177 @@ import {
   Search,
   Send,
   Trash2,
-  Users,
-  X,
+  UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PlannedSet, PrescribedExercise, Profile, WorkoutSession } from '@/lib/types'
-import {
-  REP_PRESETS,
-  SET_TYPES,
-  createDefaultPlannedSets,
-  formatKg,
-  getPlannedSets,
-  normalizeRir,
-} from '@/lib/workouts'
+import { createDefaultPlannedSets, getPlannedSets, normalizeRir } from '@/lib/workouts'
+import { plural } from '@/lib/text'
+import { summarizePrescription, summarizeWork, summaryLine, type WorkoutSummary } from '@/lib/workout-summary'
 import { cn } from '@/lib/cn'
-import { Alert, FeedbackAlert, type Feedback } from '@/components/ui/alert'
-import { Modal } from '@/components/ui/modal'
-import { PageLoader } from '@/components/ui/page-loader'
+import { MuscleMap } from '@/components/fitness/MuscleMap'
+import { BuilderExerciseCard, type BuilderExercise, type BuilderSet } from '@/components/admin/BuilderExerciseCard'
+import { ExercisePicker } from '@/components/admin/ExercisePicker'
+import { ReorderList } from '@/components/admin/ReorderList'
+import { WorkoutHistory, groupHistory, type HistorySession, type HistorySet } from '@/components/admin/WorkoutHistory'
+import { Alert } from '@/components/ui/alert'
+import { AnimatedNumber } from '@/components/ui/animated-number'
+import { Avatar } from '@/components/ui/avatar'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Modal, SheetFooter } from '@/components/ui/modal'
+import { SegmentedControl } from '@/components/ui/segmented-control'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { useToast } from '@/components/ui/toast'
+import { Eyebrow } from '@/components/ui/tile'
 
-type WorkoutWithMeta = AssignedWorkout
 type TemplateWithMeta = { id: string; name: string }
-
-type BuilderExercise = {
-  key: string
-  rowId: string | null
-  exercise_id: string
-  name: string
-  muscle_group: string
-  notes: string
-  planned_sets: PlannedSet[]
-}
-
-type HistorySet = {
-  id: string
-  session_id: string
-  set_number: number
-  weight_kg: number | null
-  reps: number | null
-  rir: number | null
-  exercises: { name: string | null } | null
-}
-
-type HistorySession = WorkoutSession & { groups: { name: string; sets: HistorySet[] }[] }
-
 type BuilderMode = { kind: 'workout' | 'template'; editingId: string | null }
+type Tab = 'students' | 'templates'
+type SummaryRow = Pick<PrescribedExercise, 'id' | 'planned_sets' | 'sets_count' | 'target_reps' | 'exercises'> & {
+  assigned_workout_id?: string
+  template_id?: string
+}
+type ConfirmState = { title: string; description: string; confirmLabel: string; run: () => Promise<void> }
+
+const WORKOUT_SUMMARY_COLUMNS = 'id, assigned_workout_id, sets_count, target_reps, planned_sets, exercises(*)'
+const TEMPLATE_SUMMARY_COLUMNS = 'id, template_id, sets_count, target_reps, planned_sets, exercises(*)'
 
 const inputClassName =
-  'w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white placeholder:text-zinc-600 focus:border-white focus:outline-none'
+  'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
+const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const ease = [0.22, 1, 0.36, 1] as const
+
+const normalizeText = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+function groupSummaries(rows: SummaryRow[], parentKey: 'assigned_workout_id' | 'template_id', ids: string[]) {
+  const byParent = new Map<string, SummaryRow[]>(ids.map((id) => [id, []]))
+  for (const row of rows) {
+    const list = row[parentKey] ? byParent.get(row[parentKey] as string) : undefined
+    if (list) list.push(row)
+  }
+  const result: Record<string, WorkoutSummary> = {}
+  for (const [id, list] of byParent) result[id] = summarizePrescription(list)
+  return result
+}
+
+function IconButton({
+  label,
+  onClick,
+  disabled,
+  tone = 'default',
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  tone?: 'default' | 'brand' | 'danger'
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-black/30 transition disabled:opacity-40',
+        tone === 'brand' && 'text-brand hover:border-brand/40 hover:bg-brand-soft',
+        tone === 'danger' && 'text-zinc-500 hover:border-danger/40 hover:bg-danger-soft hover:text-danger',
+        tone === 'default' && 'text-zinc-300 hover:border-line-strong hover:text-white',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function SummaryMap({ summary, className }: { summary: WorkoutSummary | undefined; className?: string }) {
+  return (
+    <div aria-hidden="true" className={cn('shrink-0 rounded-2xl bg-black/40 p-1.5', className)}>
+      {summary ? (
+        <MuscleMap fills={summary.fills} animated={false} />
+      ) : (
+        <Skeleton className="aspect-square w-full rounded-xl" />
+      )}
+    </div>
+  )
+}
 
 export default function AdminWorkoutsPage() {
   const [supabase] = useState(() => createClient())
-  const [activeTab, setActiveTab] = useState<'students' | 'templates'>('students')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const toast = useToast()
 
-  const [workouts, setWorkouts] = useState<WorkoutWithMeta[]>([])
+  // Links da ficha do aluno: ?aluno=ID abre o acordeão dele; ?novo=ID abre o
+  // construtor já com o aluno escolhido.
+  const [deepLink] = useState(() => ({ aluno: searchParams.get('aluno'), novo: searchParams.get('novo') }))
+  const deepLinkHandled = useRef(false)
+
+  const [activeTab, setActiveTab] = useState<Tab>('students')
+  const [workouts, setWorkouts] = useState<AssignedWorkout[]>([])
   const [templates, setTemplates] = useState<TemplateWithMeta[]>([])
   const [students, setStudents] = useState<Profile[]>([])
   const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([])
+  const [summaries, setSummaries] = useState<Record<string, WorkoutSummary>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
-  const [feedback, setFeedback] = useState<Feedback>(null)
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
+    deepLink.aluno ? { [deepLink.aluno]: true } : {},
+  )
+  const [highlightId, setHighlightId] = useState<string | null>(deepLink.aluno)
 
-  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({})
-
-  const [historyWorkout, setHistoryWorkout] = useState<WorkoutWithMeta | null>(null)
+  const [historyWorkout, setHistoryWorkout] = useState<AssignedWorkout | null>(null)
   const [historySessions, setHistorySessions] = useState<HistorySession[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState('')
 
-  const [builder, setBuilder] = useState<BuilderMode | null>(null)
-  const [selectedStudent, setSelectedStudent] = useState('')
+  const [builder, setBuilder] = useState<BuilderMode | null>(() =>
+    deepLink.novo ? { kind: 'workout', editingId: null } : null,
+  )
+  const [selectedStudent, setSelectedStudent] = useState(deepLink.novo ?? '')
   const [workoutName, setWorkoutName] = useState('')
   const [selectedExercises, setSelectedExercises] = useState<BuilderExercise[]>([])
   const [originalRowIds, setOriginalRowIds] = useState<string[]>([])
+  const [notifyStudent, setNotifyStudent] = useState(true)
+  const [reordering, setReordering] = useState(false)
   const [builderError, setBuilderError] = useState('')
-  const [openingBuilder, setOpeningBuilder] = useState(false)
+  const [openingId, setOpeningId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showExPicker, setShowExPicker] = useState(false)
+  const keyCounter = useRef(0)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   const [templateToAssign, setTemplateToAssign] = useState<TemplateWithMeta | null>(null)
   const [assignStudentId, setAssignStudentId] = useState('')
+  const [assignSearch, setAssignSearch] = useState('')
+  const [assignNotify, setAssignNotify] = useState(true)
   const [assignError, setAssignError] = useState('')
+  const [assigning, setAssigning] = useState(false)
 
-  const [showExPicker, setShowExPicker] = useState(false)
-  const [exSearch, setExSearch] = useState('')
-  const keyCounter = useRef(0)
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   const reload = () => setReloadKey((key) => key + 1)
+
+  useEffect(() => {
+    if (searchParams.get('aluno') || searchParams.get('novo')) router.replace(pathname, { scroll: false })
+  }, [searchParams, router, pathname])
 
   useEffect(() => {
     let active = true
 
     const load = async () => {
-      const [workoutsResult, templatesResult, studentsResult, exercisesResult] = await Promise.all([
+      const [workoutsResult, templatesResult, studentsResult, exercisesResult, templateRowsResult] = await Promise.all([
         supabase
           .from('assigned_workouts')
           .select('*, profiles(full_name, email)')
@@ -118,34 +196,97 @@ export default function AdminWorkoutsPage() {
         supabase.from('workout_templates').select('id, name').order('name'),
         supabase.from('profiles').select('id, role, full_name, email').eq('role', 'student').order('full_name'),
         supabase.from('exercises').select('*').order('name'),
+        supabase.from('workout_template_exercises').select(TEMPLATE_SUMMARY_COLUMNS).limit(1000),
       ])
       if (!active) return
 
       const error = workoutsResult.error ?? templatesResult.error ?? studentsResult.error ?? exercisesResult.error
       if (error) {
         setLoadError(`Não foi possível carregar os dados: ${error.message}`)
-      } else {
-        setLoadError('')
-        setWorkouts((workoutsResult.data ?? []) as WorkoutWithMeta[])
-        setTemplates((templatesResult.data ?? []) as TemplateWithMeta[])
-        setStudents((studentsResult.data ?? []) as Profile[])
-        setExerciseLibrary((exercisesResult.data ?? []) as Exercise[])
+        setLoading(false)
+        return
+      }
+
+      const workoutList = (workoutsResult.data ?? []) as AssignedWorkout[]
+      const templateList = (templatesResult.data ?? []) as TemplateWithMeta[]
+      setLoadError('')
+      setWorkouts(workoutList)
+      setTemplates(templateList)
+      setStudents((studentsResult.data ?? []) as Profile[])
+      setExerciseLibrary((exercisesResult.data ?? []) as Exercise[])
+      // O resumo dos modelos é um extra: se falhar, os cartões só ficam sem mapa.
+      if (!templateRowsResult.error) {
+        const rows = (templateRowsResult.data ?? []) as unknown as SummaryRow[]
+        setSummaries((previous) => ({
+          ...previous,
+          ...groupSummaries(
+            rows,
+            'template_id',
+            templateList.map((template) => template.id),
+          ),
+        }))
       }
       setLoading(false)
+
+      const target = deepLink.aluno
+      if (target && !deepLinkHandled.current) {
+        deepLinkHandled.current = true
+        const ids = workoutList.filter((workout) => workout.student_id === target).map((workout) => workout.id)
+        if (ids.length > 0) {
+          const { data } = await supabase
+            .from('assigned_workout_exercises')
+            .select(WORKOUT_SUMMARY_COLUMNS)
+            .in('assigned_workout_id', ids)
+          if (!active) return
+          setSummaries((previous) => ({
+            ...previous,
+            ...groupSummaries((data ?? []) as unknown as SummaryRow[], 'assigned_workout_id', ids),
+          }))
+        }
+        window.requestAnimationFrame(() =>
+          document.getElementById(`student-${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+        )
+        window.setTimeout(() => {
+          if (active) setHighlightId(null)
+        }, 2400)
+      }
     }
 
     void load()
     return () => {
       active = false
     }
-  }, [supabase, reloadKey])
+  }, [supabase, reloadKey, deepLink])
 
-  const nextKey = () => `new-${keyCounter.current++}`
+  const loadWorkoutSummaries = async (ids: string[], force = false) => {
+    const missing = force ? ids : ids.filter((id) => !summaries[id])
+    if (missing.length === 0) return
+    const { data, error } = await supabase
+      .from('assigned_workout_exercises')
+      .select(WORKOUT_SUMMARY_COLUMNS)
+      .in('assigned_workout_id', missing)
+    if (error) return
+    setSummaries((previous) => ({
+      ...previous,
+      ...groupSummaries((data ?? []) as unknown as SummaryRow[], 'assigned_workout_id', missing),
+    }))
+  }
+
+  const toggleStudent = (studentId: string) => {
+    const opening = !expanded[studentId]
+    setExpanded((previous) => ({ ...previous, [studentId]: opening }))
+    if (opening) {
+      void loadWorkoutSummaries(workouts.filter((workout) => workout.student_id === studentId).map((workout) => workout.id))
+    }
+  }
+
+  const createKey = useCallback(() => `item-${keyCounter.current++}`, [])
+  const toBuilderSets = (sets: PlannedSet[]): BuilderSet[] => sets.map((set) => ({ ...set, key: createKey() }))
 
   // ---------------------------------------------------------------------------
   // Histórico de cargas do treino
   // ---------------------------------------------------------------------------
-  const handleOpenWorkoutHistory = async (workout: WorkoutWithMeta) => {
+  const handleOpenWorkoutHistory = async (workout: AssignedWorkout) => {
     setHistoryWorkout(workout)
     setHistorySessions([])
     setHistoryError('')
@@ -168,7 +309,7 @@ export default function AdminWorkoutsPage() {
     const sessionRows = (sessions ?? []) as WorkoutSession[]
     let setRows: HistorySet[] = []
     if (sessionRows.length > 0) {
-      // Uma consulta só para todas as sessões (antes era uma por sessão).
+      // Uma consulta só para todas as sessões.
       const { data: setsData, error: setsError } = await supabase
         .from('session_sets')
         .select('id, session_id, set_number, weight_kg, reps, rir, exercises(name)')
@@ -182,18 +323,7 @@ export default function AdminWorkoutsPage() {
       setRows = (setsData ?? []) as unknown as HistorySet[]
     }
 
-    setHistorySessions(
-      sessionRows.map((session) => {
-        const groups: HistorySession['groups'] = []
-        for (const set of setRows.filter((row) => row.session_id === session.id)) {
-          const name = set.exercises?.name || 'Exercício'
-          const group = groups.find((item) => item.name === name)
-          if (group) group.sets.push(set)
-          else groups.push({ name, sets: [set] })
-        }
-        return { ...session, groups }
-      }),
-    )
+    setHistorySessions(groupHistory(sessionRows, setRows))
     setLoadingHistory(false)
   }
 
@@ -208,24 +338,27 @@ export default function AdminWorkoutsPage() {
     setWorkoutName(options.name ?? '')
     setSelectedExercises([])
     setOriginalRowIds([])
+    setReordering(false)
+    // Treino novo avisa o aluno por padrão; edição só se o treinador pedir.
+    setNotifyStudent(mode.kind === 'workout' && !mode.editingId)
 
     if (!mode.editingId) {
       setBuilder(mode)
       return
     }
 
-    setOpeningBuilder(true)
+    setOpeningId(mode.editingId)
     const table = mode.kind === 'workout' ? 'assigned_workout_exercises' : 'workout_template_exercises'
     const parentColumn = mode.kind === 'workout' ? 'assigned_workout_id' : 'template_id'
     const { data, error } = await supabase
       .from(table)
-      .select('*, exercises(name, muscle_group)')
+      .select('*, exercises(*)')
       .eq(parentColumn, mode.editingId)
       .order('order', { ascending: true })
-    setOpeningBuilder(false)
+    setOpeningId(null)
 
     if (error) {
-      setFeedback({ type: 'error', message: `Não foi possível abrir para edição: ${error.message}` })
+      toast({ tone: 'error', title: 'Não foi possível abrir para edição', description: error.message })
       return
     }
 
@@ -234,14 +367,16 @@ export default function AdminWorkoutsPage() {
     setSelectedExercises(
       rows.map((row) => {
         const plannedSets = getPlannedSets(row)
+        const secondary = row.exercises?.secondary_muscle
         return {
           key: row.id,
           rowId: row.id,
           exercise_id: row.exercise_id,
           name: row.exercises?.name || 'Exercício',
           muscle_group: row.exercises?.muscle_group || 'Geral',
+          secondary: typeof secondary === 'string' ? secondary : null,
           notes: row.notes || '',
-          planned_sets: plannedSets.length > 0 ? plannedSets.map((set) => ({ ...set })) : createDefaultPlannedSets(),
+          planned_sets: toBuilderSets(plannedSets.length > 0 ? plannedSets : createDefaultPlannedSets()),
         }
       }),
     )
@@ -251,35 +386,39 @@ export default function AdminWorkoutsPage() {
   const closeBuilder = useCallback(() => setBuilder(null), [])
   const closePicker = useCallback(() => setShowExPicker(false), [])
 
-  const updateExerciseAt = (index: number, update: (item: BuilderExercise) => BuilderExercise) => {
-    setSelectedExercises((items) => items.map((item, itemIndex) => (itemIndex === index ? update(item) : item)))
-  }
+  const updateExercise = useCallback((key: string, update: (item: BuilderExercise) => BuilderExercise) => {
+    setSelectedExercises((items) => items.map((item) => (item.key === key ? update(item) : item)))
+  }, [])
 
-  const updateSetAt = (exIndex: number, setIndex: number, patch: Partial<PlannedSet>) => {
-    updateExerciseAt(exIndex, (item) => ({
-      ...item,
-      planned_sets: item.planned_sets.map((set, index) => (index === setIndex ? { ...set, ...patch } : set)),
+  const removeExercise = useCallback((key: string) => {
+    setSelectedExercises((items) => items.filter((item) => item.key !== key))
+  }, [])
+
+  const handleAddExercises = (exercises: Exercise[]) => {
+    const added: BuilderExercise[] = exercises.map((exercise) => ({
+      key: createKey(),
+      rowId: null,
+      exercise_id: exercise.id,
+      name: exercise.name,
+      muscle_group: exercise.muscle_group || 'Geral',
+      secondary: typeof exercise.secondary_muscle === 'string' ? exercise.secondary_muscle : null,
+      notes: '',
+      planned_sets: toBuilderSets(createDefaultPlannedSets()),
     }))
-  }
-
-  const handleAddExercise = (exercise: Exercise) => {
-    setSelectedExercises((items) => [
-      ...items,
-      {
-        key: nextKey(),
-        rowId: null,
-        exercise_id: exercise.id,
-        name: exercise.name,
-        muscle_group: exercise.muscle_group || 'Geral',
-        notes: '',
-        planned_sets: createDefaultPlannedSets(),
-      },
-    ])
+    setSelectedExercises((items) => [...items, ...added])
+    setReordering(false)
     setShowExPicker(false)
-    setExSearch('')
+    if (added.length > 0) {
+      window.setTimeout(() => {
+        document
+          .getElementById(`builder-exercise-${added[0].key}`)
+          ?.closest('article')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 260)
+    }
   }
 
-  const handleMoveExercise = (index: number, direction: -1 | 1) => {
+  const handleMoveExercise = useCallback((index: number, direction: -1 | 1) => {
     setSelectedExercises((items) => {
       const target = index + direction
       if (target < 0 || target >= items.length) return items
@@ -287,7 +426,36 @@ export default function AdminWorkoutsPage() {
       ;[updated[index], updated[target]] = [updated[target], updated[index]]
       return updated
     })
-  }
+  }, [])
+
+  const builderSummary = useMemo(
+    () =>
+      summarizeWork(
+        selectedExercises.map((item) => ({
+          name: item.name,
+          muscle: item.muscle_group,
+          secondary: item.secondary,
+          sets: item.planned_sets.length,
+        })),
+      ),
+    [selectedExercises],
+  )
+
+  const inWorkout = useMemo(() => new Set(selectedExercises.map((item) => item.exercise_id)), [selectedExercises])
+
+  // Sugestões de nome enquanto o campo está vazio: próxima letra livre da rotação do aluno.
+  const nameSuggestions = useMemo(() => {
+    if (!builder || workoutName.trim()) return []
+    const used = (
+      builder.kind === 'workout'
+        ? workouts.filter((workout) => workout.student_id === selectedStudent).map((workout) => workout.name)
+        : templates.map((template) => template.name)
+    ).map((name) => name.trim().toLowerCase())
+    const letters = ['A', 'B', 'C', 'D', 'E']
+      .map((letter) => `Treino ${letter}`)
+      .filter((name) => !used.some((existing) => existing.startsWith(name.toLowerCase())))
+    return [...letters.slice(0, 3), 'Full body', 'Superiores', 'Inferiores']
+  }, [builder, workoutName, workouts, templates, selectedStudent])
 
   const buildRow = (item: BuilderExercise, index: number) => {
     const plannedSets = item.planned_sets.map((set) => ({
@@ -306,8 +474,8 @@ export default function AdminWorkoutsPage() {
   }
 
   // Atualiza linhas existentes, insere as novas e só então remove as que
-  // saíram. Antes tudo era apagado e reinserido: se o insert falhasse, o
-  // treino ficava vazio, e as séries já registradas perdiam a referência.
+  // saíram. Apagar tudo e reinserir deixaria o treino vazio se o insert
+  // falhasse, e as séries já registradas perderiam a referência.
   const syncExercises = async (kind: BuilderMode['kind'], parentId: string) => {
     const table = kind === 'workout' ? 'assigned_workout_exercises' : 'workout_template_exercises'
     const parentColumn = kind === 'workout' ? 'assigned_workout_id' : 'template_id'
@@ -356,6 +524,7 @@ export default function AdminWorkoutsPage() {
     if (emptyExercise) return setBuilderError(`"${emptyExercise.name}" precisa de pelo menos 1 série.`)
 
     setSaving(true)
+    const isNew = !builder.editingId
     let parentId = builder.editingId
 
     try {
@@ -389,9 +558,33 @@ export default function AdminWorkoutsPage() {
       setBuilder({ kind: builder.kind, editingId: parentId })
       await syncExercises(builder.kind, parentId as string)
 
+      let notified = false
+      if (builder.kind === 'workout' && notifyStudent) {
+        const { error } = await supabase.from('notifications').insert({
+          recipient_id: selectedStudent,
+          type: 'workout_updated',
+          title: isNew ? 'Treino lançado! 💪' : 'Treino atualizado ✏️',
+          message: isNew ? `Seu treinador atribuiu o treino: ${name}.` : `Seu treinador atualizou o treino: ${name}.`,
+        })
+        notified = !error
+      }
+
       setBuilder(null)
-      setFeedback({ type: 'success', message: builder.kind === 'template' ? 'Modelo salvo.' : 'Treino salvo.' })
-      if (builder.kind === 'workout') setExpandedStudents((previous) => ({ ...previous, [selectedStudent]: true }))
+      toast({
+        tone: 'success',
+        title: builder.kind === 'template' ? 'Modelo salvo' : 'Treino salvo',
+        description:
+          builder.kind === 'workout' && notifyStudent
+            ? notified
+              ? 'O aluno foi avisado no app.'
+              : 'Salvo, mas o aviso ao aluno não pôde ser enviado.'
+            : name,
+      })
+      if (builder.kind === 'workout') {
+        setActiveTab('students')
+        setExpanded((previous) => ({ ...previous, [selectedStudent]: true }))
+        void loadWorkoutSummaries([parentId as string], true)
+      }
       reload()
     } catch (error) {
       setBuilderError(error instanceof Error ? error.message : 'Erro ao salvar.')
@@ -421,53 +614,90 @@ export default function AdminWorkoutsPage() {
   // ---------------------------------------------------------------------------
   // Ações nos cartões
   // ---------------------------------------------------------------------------
-  const handleToggleActive = async (workout: WorkoutWithMeta) => {
-    const { error } = await supabase
-      .from('assigned_workouts')
-      .update({ is_current: !workout.is_current })
-      .eq('id', workout.id)
+  const handleToggleActive = async (workout: AssignedWorkout) => {
+    const next = !workout.is_current
+    // Otimista: o cartão muda na hora e volta se o banco recusar.
+    setWorkouts((items) => items.map((item) => (item.id === workout.id ? { ...item, is_current: next } : item)))
+    const { error } = await supabase.from('assigned_workouts').update({ is_current: next }).eq('id', workout.id)
     if (error) {
-      setFeedback({ type: 'error', message: `Não foi possível alterar o status: ${error.message}` })
+      setWorkouts((items) =>
+        items.map((item) => (item.id === workout.id ? { ...item, is_current: workout.is_current } : item)),
+      )
+      toast({ tone: 'error', title: 'Não foi possível alterar o status', description: error.message })
       return
     }
-    setFeedback({
-      type: 'success',
-      message: workout.is_current ? `"${workout.name}" foi arquivado.` : `"${workout.name}" está ativo de novo.`,
+    toast({ tone: 'success', title: next ? 'Treino reativado' : 'Treino arquivado', description: workout.name })
+  }
+
+  const askDeleteWorkout = (workout: AssignedWorkout) =>
+    setConfirmState({
+      title: 'Apagar treino?',
+      description: `"${workout.name}" sai da lista do aluno. Se ele já registrou cargas nesse treino, prefira arquivar.`,
+      confirmLabel: 'Apagar',
+      run: async () => {
+        const { error } = await supabase.from('assigned_workouts').delete().eq('id', workout.id)
+        if (error) {
+          toast({
+            tone: 'error',
+            title: 'Não foi possível apagar',
+            description: `${error.message}. Se o treino já tem histórico, prefira arquivá-lo.`,
+          })
+          return
+        }
+        toast({ tone: 'success', title: 'Treino apagado', description: workout.name })
+        reload()
+      },
     })
-    reload()
+
+  const askDeleteTemplate = (template: TemplateWithMeta) =>
+    setConfirmState({
+      title: 'Apagar modelo?',
+      description: `"${template.name}" sai da pastinha. Os treinos já lançados para alunos não mudam.`,
+      confirmLabel: 'Apagar',
+      run: async () => {
+        const { error } = await supabase.from('workout_templates').delete().eq('id', template.id)
+        if (error) {
+          toast({ tone: 'error', title: 'Não foi possível apagar o modelo', description: error.message })
+          return
+        }
+        toast({ tone: 'success', title: 'Modelo apagado', description: template.name })
+        reload()
+      },
+    })
+
+  const runConfirm = async () => {
+    if (!confirmState) return
+    setConfirmBusy(true)
+    try {
+      await confirmState.run()
+    } finally {
+      setConfirmBusy(false)
+      setConfirmState(null)
+    }
   }
 
-  const handleDeleteWorkout = async (workout: WorkoutWithMeta) => {
-    if (!window.confirm(`Apagar o treino "${workout.name}"? O histórico de cargas dele pode ser perdido.`)) return
-    const { error } = await supabase.from('assigned_workouts').delete().eq('id', workout.id)
-    if (error) {
-      setFeedback({
-        type: 'error',
-        message: `Não foi possível apagar (${error.message}). Se o treino já tem histórico, prefira arquivá-lo.`,
-      })
-      return
-    }
-    setFeedback({ type: 'success', message: 'Treino apagado.' })
-    reload()
-  }
+  const closeConfirm = useCallback(() => {
+    if (!confirmBusy) setConfirmState(null)
+  }, [confirmBusy])
 
-  const handleDeleteTemplate = async (template: TemplateWithMeta) => {
-    if (!window.confirm(`Apagar o modelo "${template.name}"?`)) return
-    const { error } = await supabase.from('workout_templates').delete().eq('id', template.id)
-    if (error) {
-      setFeedback({ type: 'error', message: `Não foi possível apagar o modelo: ${error.message}` })
-      return
-    }
-    setFeedback({ type: 'success', message: 'Modelo apagado.' })
-    reload()
+  const openAssign = (template: TemplateWithMeta) => {
+    setTemplateToAssign(template)
+    setAssignStudentId('')
+    setAssignSearch('')
+    setAssignNotify(true)
+    setAssignError('')
   }
 
   const closeAssign = useCallback(() => setTemplateToAssign(null), [])
 
   const handleAssignTemplateToStudent = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!templateToAssign || !assignStudentId) return
-    setSaving(true)
+    if (!templateToAssign) return
+    if (!assignStudentId) {
+      setAssignError('Escolha um aluno.')
+      return
+    }
+    setAssigning(true)
     setAssignError('')
 
     try {
@@ -504,295 +734,370 @@ export default function AdminWorkoutsPage() {
         }
       }
 
-      const { error: notificationError } = await supabase.from('notifications').insert({
-        recipient_id: assignStudentId,
-        type: 'workout_updated',
-        title: 'Treino lançado! 💪',
-        message: `Seu treinador atribuiu o treino: ${templateToAssign.name}.`,
-      })
+      let notified = false
+      if (assignNotify) {
+        const { error: notificationError } = await supabase.from('notifications').insert({
+          recipient_id: assignStudentId,
+          type: 'workout_updated',
+          title: 'Treino lançado! 💪',
+          message: `Seu treinador atribuiu o treino: ${templateToAssign.name}.`,
+        })
+        notified = !notificationError
+      }
 
       setTemplateToAssign(null)
       setActiveTab('students')
-      setExpandedStudents((previous) => ({ ...previous, [assignStudentId]: true }))
-      setFeedback(
-        notificationError
-          ? { type: 'success', message: 'Treino atribuído (o aviso ao aluno não pôde ser enviado).' }
-          : { type: 'success', message: 'Treino atribuído e aluno avisado.' },
-      )
+      setExpanded((previous) => ({ ...previous, [assignStudentId]: true }))
+      void loadWorkoutSummaries([newWorkout.id as string], true)
+      toast({
+        tone: 'success',
+        title: 'Treino lançado',
+        description: assignNotify
+          ? notified
+            ? 'O aluno foi avisado no app.'
+            : 'O aviso ao aluno não pôde ser enviado.'
+          : templateToAssign.name,
+      })
       reload()
     } catch (error) {
       setAssignError(error instanceof Error ? error.message : 'Erro ao atribuir.')
     } finally {
-      setSaving(false)
+      setAssigning(false)
     }
   }
 
-  const searchTerm = exSearch.trim().toLowerCase()
-  const filteredLibrary = exerciseLibrary.filter(
-    (exercise) =>
-      (exercise.name ?? '').toLowerCase().includes(searchTerm) ||
-      (exercise.muscle_group ?? '').toLowerCase().includes(searchTerm),
-  )
+  const term = normalizeText(search.trim())
+  const studentGroups = students
+    .filter((student) => !term || normalizeText(`${student.full_name ?? ''} ${student.email ?? ''}`).includes(term))
+    .map((student) => ({ student, workouts: workouts.filter((workout) => workout.student_id === student.id) }))
 
-  const studentGroups = students.map((student) => ({
-    student,
-    workouts: workouts.filter((workout) => workout.student_id === student.id),
-  }))
+  const assignTerm = normalizeText(assignSearch.trim())
+  const assignOptions = students.filter(
+    (student) => !assignTerm || normalizeText(`${student.full_name ?? ''} ${student.email ?? ''}`).includes(assignTerm),
+  )
+  const assignSummary = templateToAssign ? summaries[templateToAssign.id] : undefined
 
   return (
-    <div className="space-y-6">
-      <div className="flex rounded-2xl border border-zinc-900 bg-zinc-950 p-1.5 shadow-xl" role="tablist">
-        {(
-          [
-            { id: 'students', label: `Alunos (${students.length})`, icon: Users },
-            { id: 'templates', label: `Pastinha (${templates.length})`, icon: FolderKanban },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-xs font-black uppercase tracking-wider transition-all',
-              activeTab === tab.id ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-white',
-            )}
-          >
-            <tab.icon className="h-4 w-4" aria-hidden="true" /> {tab.label}
-          </button>
-        ))}
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-3 px-1">
+        <div>
+          <Eyebrow>Prescrição</Eyebrow>
+          <h1 className="mt-1 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">Treinos</h1>
+        </div>
+        <m.button
+          type="button"
+          whileTap={{ scale: 0.95 }}
+          onClick={() => openBuilder({ kind: activeTab === 'templates' ? 'template' : 'workout', editingId: null })}
+          className="flex h-11 items-center gap-1.5 rounded-2xl bg-white px-4 text-xs font-black uppercase tracking-wider text-black"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          <span>
+            <span className="sr-only">Criar </span>
+            {activeTab === 'templates' ? 'Modelo' : 'Treino'}
+          </span>
+        </m.button>
       </div>
 
-      <FeedbackAlert feedback={feedback} />
+      <SegmentedControl
+        label="Ver treinos"
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          { value: 'students', label: `Alunos · ${students.length}` },
+          { value: 'templates', label: `Pastinha · ${templates.length}` },
+        ]}
+      />
+
       {loadError && <Alert variant="error">{loadError}</Alert>}
 
-      {activeTab === 'students' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-black uppercase tracking-wide">Treinos atribuídos</h1>
-              <p className="text-xs font-medium text-zinc-500">Prescreva treinos e veja as cargas</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openBuilder({ kind: 'workout', editingId: null })}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold uppercase text-black shadow-lg active:scale-95"
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" /> Criar treino
-            </button>
-          </div>
+      <AnimatePresence mode="wait" initial={false}>
+        {activeTab === 'students' ? (
+          <m.section
+            key="students"
+            aria-label="Treinos por aluno"
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.18 }}
+            className="space-y-3"
+          >
+            {students.length > 4 && (
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500"
+                  aria-hidden="true"
+                />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar aluno..."
+                  aria-label="Buscar aluno"
+                  className={cn(inputClassName, 'h-12 py-0 pl-11')}
+                />
+              </div>
+            )}
 
-          {loading ? (
-            <PageLoader label="Carregando treinos" />
-          ) : studentGroups.length === 0 ? (
-            <div className="rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center text-sm font-semibold text-zinc-400">
-              Cadastre um aluno na aba Alunos para prescrever treinos.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {studentGroups.map(({ student, workouts: studentWorkouts }) => {
-                const isExpanded = Boolean(expandedStudents[student.id])
+            {loading ? (
+              <div className="space-y-2.5" role="status" aria-label="Carregando treinos">
+                {[0, 1, 2].map((item) => (
+                  <Skeleton key={item} className="h-[4.75rem] rounded-3xl" />
+                ))}
+              </div>
+            ) : students.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-line-strong p-8 text-center">
+                <UserPlus className="h-9 w-9 text-zinc-600" aria-hidden="true" />
+                <p className="text-sm font-semibold text-zinc-300">Cadastre um aluno para prescrever treinos.</p>
+                <Link
+                  href="/admin/students?novo=1"
+                  className="rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-black"
+                >
+                  Cadastrar aluno
+                </Link>
+              </div>
+            ) : studentGroups.length === 0 ? (
+              <p className="rounded-3xl border border-dashed border-line-strong p-8 text-center text-sm text-zinc-400">
+                Nenhum aluno encontrado.
+              </p>
+            ) : (
+              studentGroups.map(({ student, workouts: studentWorkouts }) => {
+                const isExpanded = Boolean(expanded[student.id])
                 const activeCount = studentWorkouts.filter((workout) => workout.is_current).length
+                const archivedCount = studentWorkouts.length - activeCount
 
                 return (
-                  <div key={student.id} className="overflow-hidden rounded-3xl border border-zinc-900 bg-zinc-950 shadow-xl">
+                  <div
+                    key={student.id}
+                    id={`student-${student.id}`}
+                    className={cn(
+                      'scroll-mt-24 overflow-hidden rounded-3xl border bg-surface transition-[border-color,box-shadow] duration-700',
+                      highlightId === student.id ? 'border-brand/60 shadow-[0_0_0_4px_rgba(52,211,153,0.12)]' : 'border-line',
+                    )}
+                  >
                     <button
                       type="button"
                       aria-expanded={isExpanded}
-                      onClick={() => setExpandedStudents((previous) => ({ ...previous, [student.id]: !isExpanded }))}
-                      className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-zinc-900/50"
+                      onClick={() => toggleStudent(student.id)}
+                      className="flex w-full items-center gap-3.5 p-4 text-left transition-colors hover:bg-white/[0.02]"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900 text-sm font-black text-white">
-                          {student.full_name ? student.full_name.substring(0, 2).toUpperCase() : 'AL'}
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="truncate text-base font-extrabold text-white">
-                            {student.full_name || student.email || 'Aluno sem nome'}
-                          </h3>
-                          <p className="text-[11px] font-medium text-zinc-500">
-                            {activeCount} {activeCount === 1 ? 'treino ativo' : 'treinos ativos'}
-                            {studentWorkouts.length > activeCount && ` · ${studentWorkouts.length - activeCount} arquivado(s)`}
-                          </p>
-                        </div>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronUp className="h-5 w-5 shrink-0 text-white" aria-hidden="true" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 shrink-0 text-zinc-500" aria-hidden="true" />
-                      )}
+                      <Avatar name={student.full_name ?? student.email} seed={student.id} size="md" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-white">
+                          {student.full_name || student.email || 'Aluno sem nome'}
+                        </span>
+                        <span className="block text-[11px] text-zinc-500">
+                          {plural(activeCount, 'treino ativo', 'treinos ativos')}
+                          {archivedCount > 0 && ` · ${plural(archivedCount, 'arquivado', 'arquivados')}`}
+                        </span>
+                      </span>
+                      <m.span
+                        animate={{ rotate: isExpanded ? 180 : 0 }}
+                        transition={{ duration: 0.25, ease }}
+                        className={cn('shrink-0', isExpanded ? 'text-white' : 'text-zinc-500')}
+                      >
+                        <ChevronDown className="h-5 w-5" aria-hidden="true" />
+                      </m.span>
                     </button>
 
-                    {isExpanded && (
-                      <div className="space-y-3 border-t border-zinc-900 bg-black/60 p-4">
-                        {studentWorkouts.length === 0 && (
-                          <p className="p-4 text-center text-xs font-medium text-zinc-600">
-                            Nenhum treino prescrito para este aluno.
-                          </p>
-                        )}
-
-                        {studentWorkouts.map((workout) => (
-                          <div
-                            key={workout.id}
-                            className={cn(
-                              'space-y-3 rounded-2xl border p-4',
-                              workout.is_current ? 'border-zinc-800 bg-zinc-900/90' : 'border-zinc-900 bg-zinc-950 opacity-70',
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <m.div
+                          key="content"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease }}
+                          className="overflow-hidden"
+                        >
+                          <div className="space-y-2.5 border-t border-line p-3">
+                            {studentWorkouts.length === 0 && (
+                              <p className="p-3 text-center text-xs text-zinc-500">Nenhum treino prescrito para este aluno.</p>
                             )}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="truncate text-base font-extrabold text-white">{workout.name}</h4>
-                                  {!workout.is_current && (
-                                    <span className="rounded-md border border-zinc-800 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-500">
-                                      Arquivado
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="mt-0.5 block text-[10px] font-bold text-zinc-500">
-                                  Criado em {new Date(workout.created_at).toLocaleDateString('pt-BR')}
-                                </span>
-                              </div>
 
-                              <div className="flex shrink-0 items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openBuilder(
-                                      { kind: 'workout', editingId: workout.id },
-                                      { studentId: workout.student_id, name: workout.name },
-                                    )
-                                  }
-                                  disabled={openingBuilder}
-                                  aria-label={`Editar ${workout.name}`}
-                                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-emerald-400 hover:text-white"
-                                >
-                                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleActive(workout)}
-                                  aria-label={workout.is_current ? `Arquivar ${workout.name}` : `Reativar ${workout.name}`}
-                                  title={workout.is_current ? 'Arquivar' : 'Reativar'}
-                                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-zinc-400 hover:text-white"
-                                >
-                                  {workout.is_current ? (
-                                    <Archive className="h-4 w-4" aria-hidden="true" />
-                                  ) : (
-                                    <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
+                            {studentWorkouts.map((workout) => {
+                              const summary = summaries[workout.id]
+                              return (
+                                <article
+                                  key={workout.id}
+                                  className={cn(
+                                    'rounded-2xl border p-3 transition-colors',
+                                    workout.is_current ? 'border-line bg-black/30' : 'border-dashed border-line-strong',
                                   )}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteWorkout(workout)}
-                                  aria-label={`Apagar ${workout.name}`}
-                                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-zinc-500 hover:text-red-400"
                                 >
-                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                </button>
-                              </div>
-                            </div>
+                                  <div className="flex gap-3">
+                                    {/* Arquivado: só o mapa (decorativo) fica apagado; os textos mantêm o contraste. */}
+                                    <SummaryMap
+                                      summary={summary}
+                                      className={cn('w-[4.5rem] transition', !workout.is_current && 'opacity-40 grayscale')}
+                                    />
+                                    <div className="min-w-0 flex-1 py-0.5">
+                                      <div className="flex items-center gap-2">
+                                        <h3
+                                          className={cn(
+                                            'truncate text-sm font-bold',
+                                            workout.is_current ? 'text-white' : 'text-zinc-300',
+                                          )}
+                                        >
+                                          {workout.name}
+                                        </h3>
+                                        {!workout.is_current && (
+                                          <span className="shrink-0 rounded-md border border-line-strong px-1.5 py-0.5 text-[9px] font-black uppercase text-zinc-400">
+                                            Arquivado
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                                        {summary ? summaryLine(summary) : 'Carregando resumo...'}
+                                      </p>
+                                      {summary && summary.focus.length > 0 && (
+                                        <p className="mt-1 truncate text-[11px] font-semibold text-brand">
+                                          {summary.focus.join(' · ')}
+                                        </p>
+                                      )}
+                                      <p className="mt-1 text-[10px] text-zinc-600">
+                                        Criado em {new Date(workout.created_at).toLocaleDateString('pt-BR')}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 flex gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenWorkoutHistory(workout)}
+                                      className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] px-2 text-[11px] font-bold text-zinc-200 transition hover:bg-white/10"
+                                    >
+                                      <History className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                      <span className="truncate">Ver cargas registradas</span>
+                                    </button>
+                                    <IconButton
+                                      label={`Editar ${workout.name}`}
+                                      tone="brand"
+                                      disabled={openingId !== null}
+                                      onClick={() =>
+                                        openBuilder(
+                                          { kind: 'workout', editingId: workout.id },
+                                          { studentId: workout.student_id, name: workout.name },
+                                        )
+                                      }
+                                    >
+                                      {openingId === workout.id ? (
+                                        <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                      ) : (
+                                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                                      )}
+                                    </IconButton>
+                                    <IconButton
+                                      label={workout.is_current ? `Arquivar ${workout.name}` : `Reativar ${workout.name}`}
+                                      onClick={() => handleToggleActive(workout)}
+                                    >
+                                      {workout.is_current ? (
+                                        <Archive className="h-4 w-4" aria-hidden="true" />
+                                      ) : (
+                                        <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
+                                      )}
+                                    </IconButton>
+                                    <IconButton label={`Apagar ${workout.name}`} tone="danger" onClick={() => askDeleteWorkout(workout)}>
+                                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                    </IconButton>
+                                  </div>
+                                </article>
+                              )
+                            })}
 
                             <button
                               type="button"
-                              onClick={() => handleOpenWorkoutHistory(workout)}
-                              className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 py-2.5 text-xs font-bold uppercase text-emerald-400 transition-all hover:bg-emerald-500 hover:text-black active:scale-95"
+                              onClick={() => openBuilder({ kind: 'workout', editingId: null }, { studentId: student.id })}
+                              className="flex h-11 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line-strong text-xs font-bold uppercase tracking-wider text-zinc-400 transition hover:border-brand/50 hover:text-white"
                             >
-                              <Eye className="h-4 w-4" aria-hidden="true" /> Ver cargas registradas
+                              <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar treino
                             </button>
                           </div>
-                        ))}
-
-                        <button
-                          type="button"
-                          onClick={() => openBuilder({ kind: 'workout', editingId: null }, { studentId: student.id })}
-                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900 py-3 text-xs font-bold uppercase text-zinc-400 transition-all hover:text-white"
-                        >
-                          <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar treino
-                        </button>
-                      </div>
-                    )}
+                        </m.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'templates' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-black uppercase tracking-wide">Modelos prontos</h1>
-              <p className="text-xs font-medium text-zinc-500">Treinos pré-definidos para reusar</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => openBuilder({ kind: 'template', editingId: null })}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold uppercase text-black shadow-lg active:scale-95"
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" /> Criar modelo
-            </button>
-          </div>
-
-          {loading ? (
-            <PageLoader label="Carregando modelos" />
-          ) : templates.length === 0 ? (
-            <div className="space-y-3 rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center">
-              <FolderKanban className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm font-semibold text-zinc-400">Pastinha de modelos vazia.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {templates.map((template) => (
-                <div key={template.id} className="space-y-4 rounded-3xl border border-zinc-900 bg-zinc-950 p-5 shadow-xl">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="rounded-md border border-amber-800/40 bg-amber-950/60 px-2 py-0.5 text-[9px] font-black uppercase text-amber-400">
-                        Modelo pré-definido
-                      </span>
-                      <h3 className="mt-1 truncate text-base font-extrabold text-white">{template.name}</h3>
+              })
+            )}
+          </m.section>
+        ) : (
+          <m.section
+            key="templates"
+            aria-label="Pastinha de modelos"
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 12 }}
+            transition={{ duration: 0.18 }}
+            className="space-y-3"
+          >
+            <p className="px-1 text-xs text-zinc-500">Modelos prontos para lançar a qualquer aluno com um toque.</p>
+            {loading ? (
+              <div className="space-y-2.5" role="status" aria-label="Carregando modelos">
+                {[0, 1].map((item) => (
+                  <Skeleton key={item} className="h-40 rounded-3xl" />
+                ))}
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-line-strong p-8 text-center">
+                <FolderKanban className="h-10 w-10 text-zinc-600" aria-hidden="true" />
+                <p className="text-sm font-semibold text-zinc-300">Pastinha de modelos vazia.</p>
+                <button
+                  type="button"
+                  onClick={() => openBuilder({ kind: 'template', editingId: null })}
+                  className="rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-black"
+                >
+                  Criar modelo
+                </button>
+              </div>
+            ) : (
+              templates.map((template) => {
+                const summary = summaries[template.id]
+                return (
+                  <article key={template.id} className="rounded-3xl border border-line bg-surface p-4">
+                    <div className="flex gap-3.5">
+                      <SummaryMap summary={summary} className="w-24" />
+                      <div className="min-w-0 flex-1 py-0.5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Modelo</p>
+                        <h3 className="mt-0.5 truncate text-base font-bold text-white">{template.name}</h3>
+                        <p className="mt-1 text-[11px] text-zinc-500">{summary ? summaryLine(summary) : 'Carregando resumo...'}</p>
+                        {summary && summary.focus.length > 0 && (
+                          <p className="mt-1 truncate text-[11px] font-semibold text-brand">{summary.focus.join(' · ')}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
+                    <div className="mt-3.5 flex gap-1.5">
+                      <m.button
                         type="button"
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => openAssign(template)}
+                        className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black"
+                      >
+                        <Send className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="truncate">Atribuir a um aluno</span>
+                      </m.button>
+                      <IconButton
+                        label={`Editar modelo ${template.name}`}
+                        tone="brand"
+                        disabled={openingId !== null}
                         onClick={() => openBuilder({ kind: 'template', editingId: template.id }, { name: template.name })}
-                        disabled={openingBuilder}
-                        aria-label={`Editar modelo ${template.name}`}
-                        className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-emerald-400"
                       >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTemplate(template)}
-                        aria-label={`Apagar modelo ${template.name}`}
-                        className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-zinc-500 hover:text-red-400"
-                      >
+                        {openingId === template.id ? (
+                          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </IconButton>
+                      <IconButton label={`Apagar modelo ${template.name}`} tone="danger" onClick={() => askDeleteTemplate(template)}>
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </button>
+                      </IconButton>
                     </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTemplateToAssign(template)
-                      setAssignStudentId('')
-                      setAssignError('')
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 py-3 text-xs font-black uppercase text-white transition-all hover:bg-white hover:text-black active:scale-95"
-                  >
-                    <Send className="h-4 w-4" aria-hidden="true" /> Atribuir a um aluno
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                  </article>
+                )
+              })
+            )}
+          </m.section>
+        )}
+      </AnimatePresence>
 
       {/* Histórico de cargas do treino */}
       <Modal
@@ -802,77 +1107,7 @@ export default function AdminWorkoutsPage() {
         title={historyWorkout?.name}
         description={`Cargas registradas por ${historyWorkout?.profiles?.full_name || historyWorkout?.profiles?.email || 'aluno'}`}
       >
-        {loadingHistory ? (
-          <PageLoader label="Buscando histórico de cargas" />
-        ) : (
-          <div className="space-y-6">
-            {historyError && <Alert variant="error">{historyError}</Alert>}
-            {historySessions.length === 0 && !historyError ? (
-              <div className="space-y-3 rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center">
-                <History className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
-                <p className="text-sm font-semibold text-zinc-400">Nenhum treino concluído ainda.</p>
-                <p className="text-xs text-zinc-600">
-                  Quando o aluno marcar as séries e finalizar o treino, as cargas aparecem aqui.
-                </p>
-              </div>
-            ) : (
-              historySessions.map((session) => (
-                <div key={session.id} className="space-y-4 rounded-3xl border border-zinc-800 bg-zinc-950 p-5 shadow-xl">
-                  <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-                    <div>
-                      <span className="block text-[9px] font-black uppercase text-zinc-500">Sessão concluída</span>
-                      <p className="mt-0.5 flex items-center gap-1 text-xs font-extrabold text-white">
-                        <Calendar className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
-                        {session.completed_at
-                          ? new Date(session.completed_at).toLocaleString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '—'}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-right">
-                      <span className="block text-[8px] font-bold uppercase text-zinc-500">Esforço</span>
-                      <span className="text-xs font-black text-amber-400">RPE {session.session_rpe ?? '-'}/10</span>
-                    </div>
-                  </div>
-
-                  {session.groups.length === 0 ? (
-                    <p className="py-2 text-center text-xs text-zinc-600">Nenhuma série registrada.</p>
-                  ) : (
-                    session.groups.map((group) => (
-                      <div key={group.name} className="space-y-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-3.5">
-                        <h4 className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                          <Dumbbell className="h-3.5 w-3.5" aria-hidden="true" /> {group.name}
-                        </h4>
-                        <div className="space-y-1.5 pt-1">
-                          {group.sets.map((set) => (
-                            <div key={set.id} className="flex items-center justify-between rounded-xl bg-black/60 px-3 py-2 text-xs">
-                              <span className="text-[11px] font-bold text-zinc-400">Série #{set.set_number}</span>
-                              <div className="flex items-center gap-3 font-extrabold text-white">
-                                <span className="text-emerald-400">{formatKg(Number(set.weight_kg) || 0)} kg</span>
-                                <span className="text-zinc-500">×</span>
-                                <span>{set.reps} reps</span>
-                                {set.rir !== null && (
-                                  <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
-                                    RIR {set.rir}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        <WorkoutHistory sessions={historySessions} loading={loadingHistory} error={historyError} />
       </Modal>
 
       {/* Construtor / editor */}
@@ -890,10 +1125,10 @@ export default function AdminWorkoutsPage() {
               : 'Novo treino'
         }
       >
-        <form onSubmit={handleSave} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-5">
           {builder?.kind === 'workout' && (
             <div>
-              <label htmlFor="builder-student" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+              <label htmlFor="builder-student" className={labelClassName}>
                 Aluno
               </label>
               <select
@@ -914,10 +1149,11 @@ export default function AdminWorkoutsPage() {
           )}
 
           <div>
-            <label htmlFor="builder-name" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+            <label htmlFor="builder-name" className={labelClassName}>
               Nome
             </label>
             <input
+              ref={nameInputRef}
               id="builder-name"
               type="text"
               required
@@ -926,261 +1162,287 @@ export default function AdminWorkoutsPage() {
               placeholder="Ex: Treino A - Peito e tríceps"
               className={inputClassName}
             />
+            {nameSuggestions.length > 0 && (
+              <div role="group" aria-label="Sugestões de nome" className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4">
+                {nameSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => {
+                      setWorkoutName(suggestion)
+                      nameInputRef.current?.focus()
+                    }}
+                    className="h-8 shrink-0 rounded-full border border-line px-3 text-[11px] font-bold text-zinc-300 transition hover:border-line-strong hover:text-white"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-zinc-400">Exercícios ({selectedExercises.length})</span>
+          {selectedExercises.length > 0 && (
+            <div className="rounded-3xl border border-line bg-surface p-4">
+              <div className="flex items-center gap-4">
+                <div className="min-w-0 flex-1">
+                  <Eyebrow>Resumo do treino</Eyebrow>
+                  <p className="mt-2 text-sm font-bold leading-snug text-white">
+                    {builderSummary.focus.join(' · ') || 'Grupo muscular não identificado'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-zinc-500">Regiões mais trabalhadas, pelo número de séries.</p>
+                </div>
+                <div className="w-32 shrink-0">
+                  <MuscleMap fills={builderSummary.fills} />
+                </div>
+              </div>
+              <dl className="mt-3 grid grid-cols-3 divide-x divide-line border-t border-line pt-3 text-center">
+                <div>
+                  <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Exercícios</dt>
+                  <dd className="font-display text-3xl font-bold leading-tight">
+                    <AnimatedNumber value={builderSummary.exercises} />
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Séries</dt>
+                  <dd className="font-display text-3xl font-bold leading-tight">
+                    <AnimatedNumber value={builderSummary.sets} />
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Duração</dt>
+                  <dd className="font-display text-3xl font-bold leading-tight text-zinc-300">
+                    <AnimatedNumber value={builderSummary.minutes} format={(value) => `≈${Math.round(value)}`} />
+                    <span className="ml-0.5 text-sm text-zinc-500">min</span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
+
+          <section aria-labelledby="builder-exercises-title" className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="builder-exercises-title" className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+                Exercícios ({selectedExercises.length})
+              </h3>
+              <div className="flex gap-1.5">
+                {selectedExercises.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setReordering((value) => !value)}
+                    className={cn(
+                      'flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition',
+                      reordering
+                        ? 'border-brand/50 bg-brand-soft text-brand'
+                        : 'border-line-strong text-zinc-300 hover:text-white',
+                    )}
+                  >
+                    {reordering ? (
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <ArrowDownUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {reordering ? 'Concluir' : 'Reordenar'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowExPicker(true)}
+                  className="flex h-9 items-center gap-1 rounded-xl bg-white px-3 text-xs font-bold text-black"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar
+                </button>
+              </div>
+            </div>
+
+            {selectedExercises.length === 0 ? (
               <button
                 type="button"
                 onClick={() => setShowExPicker(true)}
-                className="flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-xs font-bold text-black"
+                className="flex w-full flex-col items-center gap-2 rounded-3xl border border-dashed border-line-strong p-8 text-center transition hover:border-brand/50"
               >
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand">
+                  <Plus className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <span className="text-sm font-bold text-white">Escolher exercícios</span>
+                <span className="text-xs text-zinc-500">Marque vários da biblioteca de uma vez.</span>
               </button>
-            </div>
-
-            {selectedExercises.length === 0 && (
-              <p className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-xs text-zinc-500">
-                Nenhum exercício ainda. Toque em &quot;Adicionar&quot;.
-              </p>
-            )}
-
-            {selectedExercises.map((item, exIndex) => (
-              <div key={item.key} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-                <div className="flex items-start justify-between gap-2 border-b border-zinc-800 pb-2">
-                  <div className="min-w-0">
-                    <h4 className="truncate text-sm font-extrabold text-white">
-                      #{exIndex + 1} {item.name}
-                    </h4>
-                    <p className="text-[10px] font-bold uppercase text-zinc-500">{item.muscle_group}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleMoveExercise(exIndex, -1)}
-                      disabled={exIndex === 0}
-                      aria-label={`Mover ${item.name} para cima`}
-                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-white disabled:opacity-30"
+            ) : reordering && selectedExercises.length > 1 ? (
+              <>
+                <p className="text-[11px] text-zinc-500">Arraste pela alça ou use as setas para mudar a ordem.</p>
+                <ReorderList items={selectedExercises} onReorder={setSelectedExercises} onMove={handleMoveExercise} />
+              </>
+            ) : (
+              <div className="space-y-3">
+                <AnimatePresence initial={false}>
+                  {selectedExercises.map((item, index) => (
+                    <m.div
+                      key={item.key}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease }}
                     >
-                      <ArrowUp className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveExercise(exIndex, 1)}
-                      disabled={exIndex === selectedExercises.length - 1}
-                      aria-label={`Mover ${item.name} para baixo`}
-                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-white disabled:opacity-30"
-                    >
-                      <ArrowDown className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedExercises((items) => items.filter((_, index) => index !== exIndex))}
-                      aria-label={`Remover ${item.name}`}
-                      className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-red-400"
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5" aria-label="Aplicar repetições a todas as séries">
-                  {REP_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() =>
-                        updateExerciseAt(exIndex, (current) => ({
-                          ...current,
-                          planned_sets: current.planned_sets.map((set) => ({ ...set, reps: preset })),
-                        }))
-                      }
-                      className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-[10px] font-bold text-zinc-400 hover:border-zinc-600 hover:text-white"
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-2">
-                  {item.planned_sets.map((set, setIndex) => (
-                    <div key={setIndex} className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-2">
-                      <span className="w-5 text-xs font-bold text-zinc-500">#{setIndex + 1}</span>
-                      <select
-                        value={set.type}
-                        onChange={(event) => updateSetAt(exIndex, setIndex, { type: event.target.value })}
-                        aria-label={`Tipo da série ${setIndex + 1}`}
-                        className="min-w-0 flex-1 rounded border border-zinc-800 bg-black p-1 text-[11px] text-white"
-                      >
-                        {SET_TYPES.map((setType) => (
-                          <option key={setType.value} value={setType.value}>
-                            {setType.label}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        value={set.reps ?? ''}
-                        onChange={(event) => updateSetAt(exIndex, setIndex, { reps: event.target.value })}
-                        placeholder="Reps"
-                        aria-label={`Repetições da série ${setIndex + 1}`}
-                        className="w-16 rounded border border-zinc-800 bg-black p-1 text-center text-xs text-white"
+                      <BuilderExerciseCard
+                        item={item}
+                        index={index}
+                        onChange={updateExercise}
+                        onRemove={removeExercise}
+                        createKey={createKey}
                       />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={set.rir ?? ''}
-                        onChange={(event) => updateSetAt(exIndex, setIndex, { rir: event.target.value })}
-                        placeholder="RIR"
-                        aria-label={`RIR da série ${setIndex + 1}`}
-                        className="w-12 rounded border border-zinc-800 bg-black p-1 text-center text-xs text-white"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateExerciseAt(exIndex, (current) => ({
-                            ...current,
-                            planned_sets: current.planned_sets.filter((_, index) => index !== setIndex),
-                          }))
-                        }
-                        aria-label={`Remover série ${setIndex + 1}`}
-                        className="rounded p-1 text-zinc-600 hover:text-red-400"
-                      >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
-                    </div>
+                    </m.div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateExerciseAt(exIndex, (current) => ({
-                        ...current,
-                        planned_sets: [...current.planned_sets, { type: 'working', reps: '8-12', rir: 1 }],
-                      }))
-                    }
-                    className="w-full rounded-lg border border-dashed border-zinc-800 py-1.5 text-[10px] text-zinc-400 hover:text-white"
-                  >
-                    + Série
-                  </button>
-                </div>
-
-                <textarea
-                  value={item.notes}
-                  onChange={(event) => updateExerciseAt(exIndex, (current) => ({ ...current, notes: event.target.value }))}
-                  placeholder="Observações para o aluno (opcional)"
-                  aria-label={`Observações de ${item.name}`}
-                  rows={2}
-                  className="w-full rounded-xl border border-zinc-800 bg-black p-2.5 text-xs text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
-                />
+                </AnimatePresence>
               </div>
-            ))}
-          </div>
+            )}
+          </section>
+
+          {builder?.kind === 'workout' && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white">Avisar o aluno</p>
+                <p className="text-[11px] text-zinc-500">
+                  {builder.editingId ? 'Envia um aviso de treino atualizado.' : 'Envia um aviso de treino novo no app.'}
+                </p>
+              </div>
+              <Switch checked={notifyStudent} onChange={setNotifyStudent} label="Avisar o aluno" />
+            </div>
+          )}
 
           {builderError && <Alert variant="error">{builderError}</Alert>}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="mt-4 flex w-full items-center justify-center rounded-xl bg-white py-4 text-xs font-black uppercase text-black disabled:opacity-60"
-          >
-            {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Salvando" /> : 'Salvar'}
-          </button>
+          <SheetFooter>
+            <m.button
+              type="submit"
+              disabled={saving}
+              whileTap={{ scale: 0.98 }}
+              className="flex h-14 w-full items-center justify-center rounded-2xl bg-white text-sm font-black uppercase tracking-[0.16em] text-black disabled:opacity-60"
+            >
+              {saving ? (
+                <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Salvando" />
+              ) : builder?.kind === 'template' ? (
+                'Salvar modelo'
+              ) : (
+                'Salvar treino'
+              )}
+            </m.button>
+          </SheetFooter>
         </form>
       </Modal>
 
-      {/* Escolher exercício da biblioteca */}
-      <Modal
+      <ExercisePicker
         open={showExPicker}
         onClose={closePicker}
-        variant="sheet"
-        title="Adicionar exercício"
-      >
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-zinc-500" aria-hidden="true" />
-            <input
-              type="search"
-              value={exSearch}
-              onChange={(event) => setExSearch(event.target.value)}
-              placeholder="Buscar por nome ou músculo..."
-              aria-label="Buscar exercício"
-              className={cn(inputClassName, 'pl-10')}
-            />
-          </div>
-          <ul className="space-y-2">
-            {filteredLibrary.map((exercise) => (
-              <li key={exercise.id}>
-                <button
-                  type="button"
-                  onClick={() => handleAddExercise(exercise)}
-                  className="flex w-full items-center justify-between gap-3 rounded-xl bg-zinc-900 p-3 text-left hover:bg-zinc-800"
-                >
-                  <span>
-                    <span className="block text-xs font-bold text-white">{exercise.name}</span>
-                    <span className="block text-[10px] font-semibold uppercase text-zinc-500">
-                      {exercise.muscle_group || 'Geral'}
-                    </span>
-                  </span>
-                  <Plus className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-            {filteredLibrary.length === 0 && (
-              <li className="py-6 text-center text-xs text-zinc-500">Nenhum exercício encontrado.</li>
-            )}
-          </ul>
-        </div>
-      </Modal>
+        library={exerciseLibrary}
+        inWorkout={inWorkout}
+        onAdd={handleAddExercises}
+      />
 
       {/* Atribuir modelo */}
-      <Modal open={templateToAssign !== null} onClose={closeAssign} title="Lançar treino">
-        <div className="mb-4 space-y-1">
-          <span className="text-[10px] font-black uppercase text-amber-400">Modelo selecionado</span>
-          <p className="text-base font-extrabold text-white">{templateToAssign?.name}</p>
-        </div>
-
+      <Modal
+        open={templateToAssign !== null}
+        onClose={closeAssign}
+        title="Lançar treino"
+        description="Copia o modelo para o aluno escolhido."
+      >
         <form onSubmit={handleAssignTemplateToStudent} className="space-y-4">
-          <div>
-            <label htmlFor="assign-student" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
-              Escolha o aluno
-            </label>
-            <select
-              id="assign-student"
-              required
-              value={assignStudentId}
-              onChange={(event) => setAssignStudentId(event.target.value)}
-              className={inputClassName}
-            >
-              <option value="">Selecione um aluno...</option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.full_name || student.email}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-3 rounded-2xl border border-line bg-black/30 p-3">
+            <SummaryMap summary={assignSummary} className="w-16 p-1" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Modelo</p>
+              <p className="truncate text-sm font-bold text-white">{templateToAssign?.name}</p>
+              {assignSummary && <p className="text-[11px] text-zinc-500">{summaryLine(assignSummary)}</p>}
+            </div>
+          </div>
+
+          <fieldset className="space-y-2">
+            <legend className={labelClassName}>Escolha o aluno</legend>
+            {students.length > 6 && (
+              <input
+                type="search"
+                value={assignSearch}
+                onChange={(event) => setAssignSearch(event.target.value)}
+                placeholder="Buscar aluno..."
+                aria-label="Buscar aluno para lançar"
+                className={cn(inputClassName, 'h-11 py-0')}
+              />
+            )}
+            <div className="max-h-[38vh] space-y-1.5 overflow-y-auto">
+              {assignOptions.map((student) => {
+                const checked = assignStudentId === student.id
+                return (
+                  <label
+                    key={student.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line bg-surface p-2.5 pr-3.5 transition has-[:checked]:border-brand/60 has-[:checked]:bg-brand-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand"
+                  >
+                    <input
+                      type="radio"
+                      name="assign-student"
+                      value={student.id}
+                      checked={checked}
+                      onChange={() => setAssignStudentId(student.id)}
+                      className="sr-only"
+                    />
+                    <Avatar name={student.full_name ?? student.email} seed={student.id} size="sm" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                      {student.full_name || student.email}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-colors',
+                        checked ? 'border-brand bg-brand text-black' : 'border-line-strong',
+                      )}
+                    >
+                      {checked && <Check className="h-3 w-3 stroke-[3]" />}
+                    </span>
+                  </label>
+                )
+              })}
+              {assignOptions.length === 0 && (
+                <p className="py-4 text-center text-xs text-zinc-500">Nenhum aluno encontrado.</p>
+              )}
+            </div>
+          </fieldset>
+
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white">Avisar o aluno</p>
+              <p className="text-[11px] text-zinc-500">Envia um aviso de treino novo no app.</p>
+            </div>
+            <Switch checked={assignNotify} onChange={setAssignNotify} label="Avisar o aluno" />
           </div>
 
           {assignError && <Alert variant="error">{assignError}</Alert>}
 
-          <div className="flex gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={closeAssign}
-              className="w-1/2 rounded-xl bg-zinc-900 p-3.5 text-xs font-bold uppercase text-zinc-400"
+              className="h-12 rounded-2xl border border-line-strong text-xs font-black uppercase tracking-wider text-zinc-200"
             >
               Cancelar
             </button>
-            <button
+            <m.button
               type="submit"
-              disabled={saving}
-              className="flex w-1/2 items-center justify-center rounded-xl bg-white p-3.5 text-xs font-extrabold uppercase text-black disabled:opacity-60"
+              disabled={assigning}
+              whileTap={{ scale: 0.97 }}
+              className="flex h-12 items-center justify-center rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black disabled:opacity-60"
             >
-              {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Lançando" /> : 'Lançar treino'}
-            </button>
+              {assigning ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Lançando" /> : 'Lançar treino'}
+            </m.button>
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmState?.title ?? ''}
+        description={confirmState?.description}
+        confirmLabel={confirmState?.confirmLabel ?? 'Confirmar'}
+        busy={confirmBusy}
+        onConfirm={runConfirm}
+        onClose={closeConfirm}
+      />
     </div>
   )
 }

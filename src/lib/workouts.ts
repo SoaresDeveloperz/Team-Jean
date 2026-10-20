@@ -1,13 +1,14 @@
 import type { PlannedSet, PrescribedExercise } from './types'
 
+// letter: rótulo curto na tabela de séries (séries "working" são numeradas).
 export const SET_TYPES = [
-  { value: 'warmup', label: 'Aquecimento', badge: 'Aquecimento', className: 'border-amber-800/40 bg-amber-950/40 text-amber-400' },
-  { value: 'feeder', label: 'Feeder', badge: 'Feeder set', className: 'border-sky-800/40 bg-sky-950/40 text-sky-400' },
-  { value: 'working', label: 'Working', badge: 'Working set', className: 'border-zinc-800 bg-zinc-900 text-zinc-400' },
-  { value: 'top', label: 'Top set', badge: 'Top set', className: 'border-rose-800/40 bg-rose-950/40 text-rose-400' },
-  { value: 'backoff', label: 'Back-off', badge: 'Back-off set', className: 'border-purple-800/40 bg-purple-950/40 text-purple-400' },
-  { value: 'cluster', label: 'Cluster', badge: 'Cluster', className: 'border-indigo-800/40 bg-indigo-950/40 text-indigo-400' },
-  { value: 'myo_reps', label: 'Myo reps', badge: 'Myo reps', className: 'border-emerald-800/40 bg-emerald-950/40 text-emerald-400' },
+  { value: 'warmup', label: 'Aquecimento', badge: 'Aquecimento', letter: 'A', className: 'border-amber-800/40 bg-amber-950/40 text-amber-400' },
+  { value: 'feeder', label: 'Feeder', badge: 'Feeder set', letter: 'F', className: 'border-sky-800/40 bg-sky-950/40 text-sky-400' },
+  { value: 'working', label: 'Working', badge: 'Working set', letter: 'W', className: 'border-zinc-800 bg-zinc-900 text-zinc-400' },
+  { value: 'top', label: 'Top set', badge: 'Top set', letter: 'T', className: 'border-rose-800/40 bg-rose-950/40 text-rose-400' },
+  { value: 'backoff', label: 'Back-off', badge: 'Back-off set', letter: 'B', className: 'border-purple-800/40 bg-purple-950/40 text-purple-400' },
+  { value: 'cluster', label: 'Cluster', badge: 'Cluster', letter: 'C', className: 'border-indigo-800/40 bg-indigo-950/40 text-indigo-400' },
+  { value: 'myo_reps', label: 'Myo reps', badge: 'Myo reps', letter: 'M', className: 'border-emerald-800/40 bg-emerald-950/40 text-emerald-400' },
 ] as const
 
 export function getSetTypeInfo(type: string | null | undefined) {
@@ -16,7 +17,20 @@ export function getSetTypeInfo(type: string | null | undefined) {
 
 export const REP_PRESETS = ['6-8', '8-10', '8-12', '10-12', '12-15', '15-20', 'Até a falha']
 
-export const MUSCLE_GROUPS = ['Peito', 'Costas', 'Pernas', 'Ombros', 'Bíceps', 'Tríceps', 'Abdômen', 'Panturrilhas']
+export const MUSCLE_GROUPS = [
+  'Peito',
+  'Costas',
+  'Pernas',
+  'Glúteos',
+  'Ombros',
+  'Bíceps',
+  'Tríceps',
+  'Abdômen',
+  'Panturrilhas',
+  'Trapézio',
+  'Antebraços',
+  'Lombar',
+]
 
 export function createDefaultPlannedSets(): PlannedSet[] {
   return [

@@ -1,352 +1,873 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { createClient } from '../../../../lib/supabase/client'
-import { Check, ArrowLeft, Loader2, Info, Timer, Trophy, Play, Pause, RotateCcw, Share2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  Clock,
+  Dumbbell,
+  Info,
+  LoaderCircle,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  Share2,
+  Timer,
+  Trophy,
+  X,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
+import { formatKg, formatSeconds, getPlannedSets, getSetTypeInfo, normalizeRir } from '@/lib/workouts'
+import { cn } from '@/lib/cn'
+import { Alert } from '@/components/ui/alert'
+import { Modal } from '@/components/ui/modal'
+import { PageLoader } from '@/components/ui/page-loader'
+import { Logo } from '@/components/ui/logo'
+import { ExerciseMedia } from '@/components/workout/ExerciseMedia'
+
+type ExerciseRow = PrescribedExercise & { exercises: Exercise | null }
+
+type PreviousSet = { weight: number; reps: number }
+
+type SetEntry = {
+  setNumber: number
+  type: string
+  targetReps: string
+  targetRir: number | null
+  weight: string
+  reps: string
+  previous: PreviousSet | null
+  completed: boolean
+  rowId: string | null
+  saving: boolean
+  isPR: boolean
+}
+
+type LoadState = { status: 'loading' } | { status: 'ready' } | { status: 'not-found' } | { status: 'error'; message: string }
+
+type Summary = { volume: number; sets: number; prs: number; minutes: number | null }
+
+const DEFAULT_REST_SECONDS = 90
+// Uma sessão "em andamento" mais nova que isso é retomada ao reabrir o treino.
+const RESUME_WINDOW_HOURS = 12
+
+function parseNumber(value: string) {
+  const number = Number(value.replace(',', '.'))
+  return Number.isFinite(number) ? number : 0
+}
+
+function setKey(assignedExerciseId: string | null, setNumber: number) {
+  return `${assignedExerciseId}:${setNumber}`
+}
 
 export default function WorkoutExecutionPage() {
-  const { id } = useParams()
+  const { id: workoutId } = useParams<{ id: string }>()
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
-  const [workout, setWorkout] = useState<any>(null)
-  const [assignedExercises, setAssignedExercises] = useState<any[]>([])
-  const [session, setSession] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
+  const [reloadKey, setReloadKey] = useState(0)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [workout, setWorkout] = useState<AssignedWorkout | null>(null)
+  const [exercises, setExercises] = useState<ExerciseRow[]>([])
+  const [sets, setSets] = useState<Record<string, SetEntry[]>>({})
+  const [records, setRecords] = useState<Record<string, PreviousSet>>({})
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const [setsData, setSetsData] = useState<Record<string, any[]>>({})
-  const [lastRecords, setLastRecords] = useState<Record<string, any>>({})
-  
-  // TIMER DE DESCANSO
-  const [restSeconds, setRestSeconds] = useState(0)
-  const [isTimerRunning, setIsTimerRunning] = useState(false)
-  const timerRef = useRef<any>(null)
+  // Sessão criada só na primeira série concluída (antes era criada ao abrir a tela).
+  const sessionIdRef = useRef<string | null>(null)
+  const sessionPromiseRef = useRef<Promise<string> | null>(null)
+  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null)
 
-  // RECORDES PESSOAIS (PRs)
-  const [newPRs, setNewPRs] = useState<Record<string, boolean>>({})
+  // Cronômetro baseado no horário de término: não atrasa quando o celular
+  // bloqueia a tela e o navegador desacelera os intervalos.
+  const [restEndsAt, setRestEndsAt] = useState<number | null>(null)
+  const [pausedRemaining, setPausedRemaining] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
 
-  // MODAL FINALIZAÇÃO & STORIES
-  const [showFinishModal, setShowModal] = useState(false)
+  const [showFinishModal, setShowFinishModal] = useState(false)
   const [sessionRpe, setSessionRpe] = useState(8)
   const [finishing, setFinishing] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(false)
+  const [finishError, setFinishError] = useState('')
+  const [summary, setSummary] = useState<Summary | null>(null)
+  const [shareMessage, setShareMessage] = useState('')
 
   useEffect(() => {
-    initWorkoutSession()
-    return () => clearInterval(timerRef.current)
+    let active = true
+
+    const load = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!active) return
+      if (!user) {
+        router.replace('/login')
+        return
+      }
+      setUserId(user.id)
+
+      const [workoutResult, exercisesResult, resumableResult, lastCompletedResult] = await Promise.all([
+        supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
+        supabase
+          .from('assigned_workout_exercises')
+          .select('*, exercises(*)')
+          .eq('assigned_workout_id', workoutId)
+          .order('order', { ascending: true }),
+        supabase
+          .from('workout_sessions')
+          .select('id, created_at')
+          .eq('assigned_workout_id', workoutId)
+          .eq('student_id', user.id)
+          .eq('status', 'in_progress')
+          .gte('created_at', new Date(Date.now() - RESUME_WINDOW_HOURS * 3_600_000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('workout_sessions')
+          .select('id')
+          .eq('assigned_workout_id', workoutId)
+          .eq('student_id', user.id)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+      if (!active) return
+
+      const firstError = workoutResult.error ?? exercisesResult.error
+      if (firstError) {
+        setLoadState({ status: 'error', message: firstError.message })
+        return
+      }
+      if (!workoutResult.data) {
+        setLoadState({ status: 'not-found' })
+        return
+      }
+
+      const rows = (exercisesResult.data ?? []) as ExerciseRow[]
+      const resumed = resumableResult.data as { id: string; created_at: string } | null
+      const lastCompleted = lastCompletedResult.data as { id: string } | null
+      const exerciseIds = [...new Set(rows.map((row) => row.exercise_id))]
+
+      const [resumedSetsResult, previousSetsResult, ...recordResults] = await Promise.all([
+        resumed
+          ? supabase
+              .from('session_sets')
+              .select('id, assigned_exercise_id, set_number, weight_kg, reps')
+              .eq('session_id', resumed.id)
+              .eq('completed', true)
+          : Promise.resolve({ data: [], error: null }),
+        lastCompleted
+          ? supabase
+              .from('session_sets')
+              .select('assigned_exercise_id, set_number, weight_kg, reps')
+              .eq('session_id', lastCompleted.id)
+              .eq('completed', true)
+          : Promise.resolve({ data: [], error: null }),
+        // Recorde de cada exercício considerando só as séries deste aluno.
+        ...exerciseIds.map((exerciseId) => {
+          let query = supabase
+            .from('session_sets')
+            .select('weight_kg, reps, workout_sessions!inner(student_id)')
+            .eq('workout_sessions.student_id', user.id)
+            .eq('exercise_id', exerciseId)
+            .eq('completed', true)
+          if (resumed) query = query.neq('session_id', resumed.id)
+          return query
+            .order('weight_kg', { ascending: false })
+            .order('reps', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        }),
+      ])
+      if (!active) return
+
+      const pastRecords: Record<string, PreviousSet> = {}
+      recordResults.forEach((result, index) => {
+        const row = result.data as { weight_kg: number | null; reps: number | null } | null
+        if (row) pastRecords[exerciseIds[index]] = { weight: Number(row.weight_kg) || 0, reps: Number(row.reps) || 0 }
+      })
+
+      type StoredSet = { id?: string; assigned_exercise_id: string | null; set_number: number; weight_kg: number | null; reps: number | null }
+      const resumedByKey = new Map(
+        ((resumedSetsResult.data ?? []) as StoredSet[]).map((row) => [setKey(row.assigned_exercise_id, row.set_number), row]),
+      )
+      const previousByKey = new Map(
+        ((previousSetsResult.data ?? []) as StoredSet[]).map((row) => [setKey(row.assigned_exercise_id, row.set_number), row]),
+      )
+
+      const bestInSession: Record<string, number> = {}
+      const initialSets: Record<string, SetEntry[]> = {}
+      for (const row of rows) {
+        initialSets[row.id] = getPlannedSets(row).map((plan, index) => {
+          const setNumber = index + 1
+          const saved = resumedByKey.get(setKey(row.id, setNumber))
+          const previous = previousByKey.get(setKey(row.id, setNumber))
+          const weight = Number(saved?.weight_kg) || 0
+          const best = Math.max(pastRecords[row.exercise_id]?.weight ?? 0, bestInSession[row.exercise_id] ?? 0)
+          const isPR = Boolean(saved) && weight > 0 && weight > best
+          if (saved) bestInSession[row.exercise_id] = Math.max(bestInSession[row.exercise_id] ?? 0, weight)
+
+          return {
+            setNumber,
+            type: plan.type,
+            targetReps: String(plan.reps || '8-12'),
+            targetRir: normalizeRir(plan.rir),
+            weight: saved ? String(saved.weight_kg ?? '') : '',
+            reps: saved ? String(saved.reps ?? '') : '',
+            previous: previous ? { weight: Number(previous.weight_kg) || 0, reps: Number(previous.reps) || 0 } : null,
+            completed: Boolean(saved),
+            rowId: saved?.id ?? null,
+            saving: false,
+            isPR,
+          }
+        })
+      }
+
+      if (resumed) {
+        sessionIdRef.current = resumed.id
+        setSessionStartedAt(resumed.created_at)
+      }
+      setWorkout(workoutResult.data as AssignedWorkout)
+      setExercises(rows)
+      setRecords(pastRecords)
+      setSets(initialSets)
+      setLoadState({ status: 'ready' })
+    }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [supabase, router, workoutId, reloadKey])
+
+  // Atualiza o relógio só enquanto o descanso está correndo.
+  useEffect(() => {
+    if (restEndsAt === null) return
+    const interval = window.setInterval(() => {
+      const current = Date.now()
+      setNow(current)
+      if (current >= restEndsAt) {
+        setRestEndsAt(null)
+        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200])
+      }
+    }, 250)
+    return () => window.clearInterval(interval)
+  }, [restEndsAt])
+
+  const restRemaining =
+    pausedRemaining ?? (restEndsAt !== null ? Math.max(0, Math.ceil((restEndsAt - now) / 1000)) : 0)
+  const restRunning = restEndsAt !== null
+
+  const startRest = (seconds = DEFAULT_REST_SECONDS) => {
+    setPausedRemaining(null)
+    setNow(Date.now())
+    setRestEndsAt(Date.now() + seconds * 1000)
+  }
+
+  const adjustRest = (deltaSeconds: number) => {
+    const next = Math.max(0, restRemaining + deltaSeconds)
+    if (pausedRemaining !== null) {
+      setPausedRemaining(next > 0 ? next : null)
+    } else if (next > 0) {
+      startRest(next)
+    } else {
+      setRestEndsAt(null)
+    }
+  }
+
+  const toggleRestPause = () => {
+    if (restRunning) {
+      setPausedRemaining(restRemaining)
+      setRestEndsAt(null)
+    } else if (pausedRemaining !== null) {
+      startRest(pausedRemaining)
+    }
+  }
+
+  const stopRest = () => {
+    setRestEndsAt(null)
+    setPausedRemaining(null)
+  }
+
+  const updateEntry = useCallback((assignedId: string, index: number, patch: Partial<SetEntry>) => {
+    setSets((previous) => ({
+      ...previous,
+      [assignedId]: (previous[assignedId] ?? []).map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, ...patch } : entry,
+      ),
+    }))
   }, [])
 
-  useEffect(() => {
-    if (isTimerRunning && restSeconds > 0) {
-      timerRef.current = setInterval(() => {
-        setRestSeconds((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current)
-            setIsTimerRunning(false)
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-            return 0
-          }
-          return prev - 1
+  const ensureSession = () => {
+    if (sessionIdRef.current) return Promise.resolve(sessionIdRef.current)
+
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = (async () => {
+        const { data, error } = await supabase
+          .from('workout_sessions')
+          .insert({ assigned_workout_id: workoutId, student_id: userId, status: 'in_progress' })
+          .select('id, created_at')
+          .single()
+
+        if (error || !data) {
+          sessionPromiseRef.current = null
+          throw new Error(error?.message ?? 'Não foi possível iniciar a sessão.')
+        }
+        sessionIdRef.current = data.id
+        setSessionStartedAt(data.created_at)
+        return data.id as string
+      })()
+    }
+    return sessionPromiseRef.current
+  }
+
+  const toggleSet = async (row: ExerciseRow, index: number) => {
+    const entry = sets[row.id]?.[index]
+    if (!entry || entry.saving) return
+    setErrorMessage('')
+
+    if (entry.completed) {
+      // Desmarcar remove a série do banco (antes ela continuava salva).
+      updateEntry(row.id, index, { completed: false, saving: true, isPR: false })
+      if (entry.rowId) {
+        const { data, error } = await supabase.from('session_sets').delete().eq('id', entry.rowId).select('id')
+        if (error || !data?.length) {
+          updateEntry(row.id, index, { completed: true, saving: false, isPR: entry.isPR })
+          setErrorMessage('Não foi possível desmarcar a série. Verifique sua conexão.')
+          return
+        }
+      }
+      updateEntry(row.id, index, { saving: false, rowId: null })
+      return
+    }
+
+    // Campos vazios usam o que aparece como sugestão (treino anterior / meta).
+    const weightText = entry.weight.trim() || (entry.previous ? String(entry.previous.weight) : '')
+    const repsText = entry.reps.trim() || (entry.previous ? String(entry.previous.reps) : String(parseInt(entry.targetReps, 10) || ''))
+    const weight = Math.max(0, parseNumber(weightText))
+    const reps = Math.max(0, Math.round(parseNumber(repsText)))
+
+    if (reps <= 0) {
+      setErrorMessage(`Informe as repetições feitas na série ${entry.setNumber} de ${row.exercises?.name ?? 'exercício'}.`)
+      return
+    }
+
+    const sameExerciseBest = exercises
+      .filter((item) => item.exercise_id === row.exercise_id)
+      .flatMap((item) => (sets[item.id] ?? []).filter((other) => other.completed && other !== entry))
+      .reduce((best, other) => Math.max(best, parseNumber(other.weight)), 0)
+    const isPR = weight > 0 && weight > Math.max(records[row.exercise_id]?.weight ?? 0, sameExerciseBest)
+
+    updateEntry(row.id, index, { completed: true, saving: true, weight: weightText, reps: String(reps), isPR })
+    startRest()
+
+    try {
+      const sessionId = await ensureSession()
+      const { data, error } = await supabase
+        .from('session_sets')
+        .insert({
+          session_id: sessionId,
+          exercise_id: row.exercise_id,
+          assigned_exercise_id: row.id,
+          set_number: entry.setNumber,
+          weight_kg: weight,
+          reps,
+          rir: entry.targetRir,
+          set_type: entry.type,
+          completed: true,
         })
-      }, 1000)
-    } else {
-      clearInterval(timerRef.current)
-    }
-    return () => clearInterval(timerRef.current)
-  }, [isTimerRunning, restSeconds])
+        .select('id')
+        .single()
 
-  const startRestTimer = (seconds = 90) => {
-    setRestSeconds(seconds)
-    setIsTimerRunning(true)
-  }
-
-  const initWorkoutSession = async () => {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: w } = await supabase.from('assigned_workouts').select('*').eq('id', id).single()
-    const { data: ex } = await supabase.from('assigned_workout_exercises').select('*, exercises(name, muscle_group, video_url)').eq('assigned_workout_id', id).order('order', { ascending: true })
-
-    setWorkout(w)
-    setAssignedExercises(ex || [])
-
-    const { data: newSession } = await supabase.from('workout_sessions').insert([{ assigned_workout_id: id, student_id: user.id, status: 'in_progress' }]).select().single()
-    setSession(newSession)
-
-    const initialSets: Record<string, any[]> = {}
-    const pastRecords: Record<string, any> = {}
-
-    if (ex) {
-      for (const item of ex) {
-        const planned = item.planned_sets || []
-        const setsCount = planned.length > 0 ? planned.length : item.sets_count
-
-        const setsArray = []
-        for (let i = 0; i < setsCount; i++) {
-          const currentPlan = planned[i] || {}
-          setsArray.push({
-            set_number: i + 1,
-            weight_kg: '',
-            reps: '',
-            target_reps: currentPlan.reps || item.target_reps || '8-12',
-            rir: currentPlan.rir !== undefined ? currentPlan.rir : item.target_rir,
-            type: currentPlan.type || item.set_type || 'working',
-            completed: false,
-          })
-        }
-        initialSets[item.id] = setsArray
-
-        // Recorde só do próprio aluno (antes considerava as séries de todos).
-        const { data: pastSet } = await supabase.from('session_sets').select('weight_kg, reps, workout_sessions!inner(student_id)').eq('workout_sessions.student_id', user.id).eq('exercise_id', item.exercise_id).eq('completed', true).order('weight_kg', { ascending: false }).limit(1).maybeSingle()
-        if (pastSet) pastRecords[item.id] = pastSet
-      }
-    }
-    setSetsData(initialSets)
-    setLastRecords(pastRecords)
-    setLoading(false)
-  }
-
-  const handleUpdateSet = (assignedExId: string, setIdx: number, field: string, value: any) => {
-    setSetsData((prev) => {
-      const updatedExSets = [...(prev[assignedExId] || [])]
-      updatedExSets[setIdx] = { ...updatedExSets[setIdx], [field]: value }
-      return { ...prev, [assignedExId]: updatedExSets }
-    })
-  }
-
-  const toggleCompleteSet = async (assignedExId: string, exerciseId: string, setIdx: number) => {
-    const currentSet = setsData[assignedExId][setIdx]
-    const newCompleted = !currentSet.completed
-    handleUpdateSet(assignedExId, setIdx, 'completed', newCompleted)
-
-    if (newCompleted) {
-      startRestTimer(90)
-
-      const pastMax = lastRecords[assignedExId]?.weight_kg || 0
-      const currentWeight = Number(currentSet.weight_kg) || 0
-      if (currentWeight > pastMax && currentWeight > 0) {
-        setNewPRs((prev) => ({ ...prev, [`${assignedExId}-${setIdx}`]: true }))
-      }
-
-      if (session) {
-        await supabase.from('session_sets').insert([
-          {
-            session_id: session.id,
-            exercise_id: exerciseId,
-            assigned_exercise_id: assignedExId,
-            set_number: currentSet.set_number,
-            weight_kg: currentWeight,
-            reps: Number(currentSet.reps) || 0,
-            rir: currentSet.rir ? Number(currentSet.rir) : null,
-            set_type: currentSet.type,
-            completed: true,
-          },
-        ])
-      }
+      if (error || !data) throw new Error(error?.message)
+      updateEntry(row.id, index, { saving: false, rowId: data.id })
+      if (isPR && 'vibrate' in navigator) navigator.vibrate(80)
+    } catch {
+      updateEntry(row.id, index, { completed: false, saving: false, isPR: false })
+      setErrorMessage('Não foi possível salvar a série. Verifique sua conexão e tente de novo.')
     }
   }
 
-  const calculateTotalVolume = () => {
-    let total = 0
-    Object.values(setsData).forEach((sets) => {
-      sets.forEach((s) => {
-        if (s.completed) {
-          total += (Number(s.weight_kg) || 0) * (Number(s.reps) || 0)
-        }
-      })
-    })
-    return total
-  }
+  const progress = useMemo(() => {
+    const all = Object.values(sets).flat()
+    const done = all.filter((entry) => entry.completed)
+    return {
+      total: all.length,
+      done: done.length,
+      volume: done.reduce((total, entry) => total + parseNumber(entry.weight) * parseNumber(entry.reps), 0),
+      prs: done.filter((entry) => entry.isPR).length,
+      saving: all.some((entry) => entry.saving),
+    }
+  }, [sets])
+
+  const closeFinishModal = useCallback(() => setShowFinishModal(false), [])
 
   const handleFinishWorkout = async () => {
-    if (!session) return
+    setFinishError('')
+    if (progress.saving) {
+      setFinishError('Aguarde as séries terminarem de salvar.')
+      return
+    }
+    const sessionId = sessionIdRef.current
+    if (!sessionId || progress.done === 0) {
+      setFinishError('Marque pelo menos uma série concluída antes de finalizar.')
+      return
+    }
+
     setFinishing(true)
-    await supabase.from('workout_sessions').update({ completed_at: new Date().toISOString(), session_rpe: sessionRpe, status: 'completed' }).eq('id', session.id)
+    const completedAt = new Date()
+    const { data, error } = await supabase
+      .from('workout_sessions')
+      .update({ completed_at: completedAt.toISOString(), session_rpe: sessionRpe, status: 'completed' })
+      .eq('id', sessionId)
+      .select('id')
+      .maybeSingle()
     setFinishing(false)
-    setIsCompleted(true)
+
+    if (error || !data) {
+      setFinishError('Não foi possível finalizar o treino. Tente novamente.')
+      return
+    }
+
+    stopRest()
+    setShowFinishModal(false)
+    setSummary({
+      volume: progress.volume,
+      sets: progress.done,
+      prs: progress.prs,
+      minutes: sessionStartedAt
+        ? Math.max(1, Math.round((completedAt.getTime() - new Date(sessionStartedAt).getTime()) / 60_000))
+        : null,
+    })
   }
 
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60)
-    const s = sec % 60
-    return `${m}:${s < 10 ? '0' : ''}${s}`
-  }
+  const handleShare = async () => {
+    if (!summary) return
+    const text =
+      `Treino "${workout?.name}" concluído! 💪\n` +
+      `Volume: ${formatKg(summary.volume)} kg · ${summary.sets} séries` +
+      (summary.prs > 0 ? ` · ${summary.prs} recorde(s)` : '') +
+      '\n@teamjean'
 
-  const getSetBadge = (type: string) => {
-    switch (type) {
-      case 'warmup': return { label: 'AQUECIMENTO', color: 'text-amber-400 bg-amber-950/40 border-amber-800/40' }
-      case 'feeder': return { label: 'FEEDER SET', color: 'text-sky-400 bg-sky-950/40 border-sky-800/40' }
-      case 'top': return { label: 'TOP SET', color: 'text-rose-400 bg-rose-950/40 border-rose-800/40' }
-      case 'backoff': return { label: 'BACK-OFF SET', color: 'text-purple-400 bg-purple-950/40 border-purple-800/40' }
-      case 'cluster': return { label: 'CLUSTER', color: 'text-indigo-400 bg-indigo-950/40 border-indigo-800/40' }
-      case 'myo_reps': return { label: 'MYO REPS', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40' }
-      default: return { label: 'WORKING SET', color: 'text-zinc-400 bg-zinc-900 border-zinc-800' }
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Team Jean', text })
+        return
+      }
+      await navigator.clipboard.writeText(text)
+      setShareMessage('Resumo copiado! Cole nos stories e marque @teamjean.')
+    } catch {
+      // Compartilhamento cancelado pelo usuário.
     }
   }
 
-  if (loading) return <div className="flex flex-col items-center justify-center py-20 text-zinc-500"><Loader2 className="animate-spin w-8 h-8 text-white" /></div>
+  if (loadState.status === 'loading') return <PageLoader label="Preparando treino" />
+
+  if (loadState.status === 'not-found' || loadState.status === 'error') {
+    return (
+      <div className="space-y-4 py-16 text-center">
+        <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
+        <p className="text-sm font-semibold text-zinc-400">
+          {loadState.status === 'not-found' ? 'Treino não encontrado.' : 'Não foi possível carregar o treino.'}
+        </p>
+        {loadState.status === 'error' && <Alert variant="error">{loadState.message}</Alert>}
+        <div className="flex justify-center gap-2">
+          {loadState.status === 'error' && (
+            <button
+              type="button"
+              onClick={() => {
+                setLoadState({ status: 'loading' })
+                setReloadKey((key) => key + 1)
+              }}
+              className="rounded-xl bg-white px-4 py-2.5 text-xs font-black uppercase text-black"
+            >
+              Tentar de novo
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => router.replace('/student/today')}
+            className="rounded-xl border border-zinc-800 px-4 py-2.5 text-xs font-bold uppercase text-zinc-300"
+          >
+            Voltar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (summary) {
+    return (
+      <div className="flex min-h-[80vh] items-center justify-center py-8">
+        <div className="relative w-full space-y-6 overflow-hidden rounded-3xl border-2 border-zinc-800 bg-black p-6 text-center shadow-2xl">
+          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-500/10 blur-[70px]" aria-hidden="true" />
+          <div className="relative space-y-2">
+            <Logo className="mx-auto h-12 w-12" />
+            <h1 className="text-2xl font-black uppercase tracking-wider text-white">Treino concluído!</h1>
+            <p className="text-xs font-bold uppercase tracking-widest text-emerald-400">{workout?.name}</p>
+          </div>
+
+          <div className="relative grid grid-cols-2 gap-3 border-y border-zinc-900 py-4">
+            {[
+              { label: 'Volume total', value: `${formatKg(summary.volume)} kg` },
+              { label: 'Séries', value: String(summary.sets) },
+              { label: 'Duração', value: summary.minutes ? `${summary.minutes} min` : '—' },
+              { label: 'Esforço (RPE)', value: `${sessionRpe}/10` },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-2xl border border-zinc-900 bg-zinc-950 p-3">
+                <span className="block text-[9px] font-black uppercase text-zinc-500">{stat.label}</span>
+                <span className="text-lg font-black text-white">{stat.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {summary.prs > 0 && (
+            <p className="relative flex items-center justify-center gap-2 text-sm font-black uppercase text-amber-300">
+              <Trophy className="h-4 w-4 text-amber-400" aria-hidden="true" />
+              {summary.prs} {summary.prs === 1 ? 'novo recorde' : 'novos recordes'}!
+            </p>
+          )}
+
+          {shareMessage && <Alert variant="success">{shareMessage}</Alert>}
+
+          <div className="relative space-y-3 pt-2">
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white p-4 text-xs font-black uppercase text-black transition-all active:scale-95"
+            >
+              <Share2 className="h-4 w-4" aria-hidden="true" /> Compartilhar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                router.replace('/student/today')
+                router.refresh()
+              }}
+              className="w-full rounded-2xl bg-zinc-900 p-3 text-xs font-bold uppercase text-zinc-400"
+            >
+              Voltar para o app
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const progressPercent = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
 
   return (
-    <div className="space-y-6 pb-28">
-      {/* Topo do Treino */}
-      <div className="flex items-center justify-between border-b border-zinc-900 pb-4 sticky top-0 bg-black/90 backdrop-blur-md z-30 pt-2">
-        <button onClick={() => router.back()} className="p-2 text-zinc-400 hover:text-white"><ArrowLeft className="w-6 h-6" /></button>
-        <div>
-          <h1 className="font-black text-base uppercase tracking-wide truncate max-w-[180px]">{workout?.name}</h1>
-          <p className="text-[10px] text-emerald-400 font-extrabold uppercase">Volume: {calculateTotalVolume().toLocaleString('pt-BR')} kg</p>
+    <div className={cn('space-y-5', restRemaining > 0 ? 'pb-36' : 'pb-10')}>
+      <div className="sticky top-0 z-30 -mx-4 border-b border-zinc-900 bg-black/90 px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-md">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Voltar (o progresso fica salvo)"
+            className="rounded-xl p-2 text-zinc-400 hover:text-white"
+          >
+            <ArrowLeft className="h-6 w-6" aria-hidden="true" />
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            <h1 className="truncate text-base font-black uppercase tracking-wide">{workout?.name}</h1>
+            <p className="text-[10px] font-extrabold uppercase text-emerald-400">
+              {progress.done}/{progress.total} séries · {formatKg(progress.volume)} kg
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFinishError('')
+              setShowFinishModal(true)
+            }}
+            className="rounded-xl bg-white px-3.5 py-2 text-xs font-extrabold uppercase text-black shadow-lg"
+          >
+            Concluir
+          </button>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-white text-black font-extrabold px-3.5 py-2 rounded-xl text-xs uppercase shadow-lg">Concluir</button>
+        <div
+          className="mt-3 h-1 overflow-hidden rounded-full bg-zinc-900"
+          role="progressbar"
+          aria-label="Séries concluídas"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progressPercent}
+        >
+          <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progressPercent}%` }} />
+        </div>
       </div>
 
-      {/* Lista de Exercícios */}
-      {assignedExercises.map((exItem) => {
-        const last = lastRecords[exItem.id]
-        const sets = setsData[exItem.id] || []
+      {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+
+      {exercises.length === 0 && (
+        <div className="rounded-3xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-sm text-zinc-500">
+          Este treino ainda não tem exercícios. Fale com seu treinador.
+        </div>
+      )}
+
+      {exercises.map((row) => {
+        const record = records[row.exercise_id]
+        const entries = sets[row.id] ?? []
 
         return (
-          <div key={exItem.id} className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 space-y-4 overflow-hidden">
-            {exItem.exercises?.video_url ? (
-              <div className="w-full h-40 bg-zinc-900 rounded-2xl overflow-hidden mb-4 relative">
-                <img src={exItem.exercises.video_url} alt="Execução" className="w-full h-full object-cover opacity-80" />
-              </div>
-            ) : (
-              <div className="w-full h-16 bg-zinc-900/60 rounded-2xl flex items-center justify-center mb-2 border border-zinc-800">
-                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest">Alvo: {exItem.exercises?.muscle_group}</span>
-              </div>
-            )}
+          <section
+            key={row.id}
+            aria-label={row.exercises?.name ?? 'Exercício'}
+            className="space-y-4 overflow-hidden rounded-3xl border border-zinc-900 bg-zinc-950 p-5"
+          >
+            <ExerciseMedia
+              muscleGroup={row.exercises?.muscle_group}
+              videoUrl={row.exercises?.video_url}
+              imageUrl={row.exercises?.image_url}
+              name={row.exercises?.name}
+            />
 
-            <div className="flex items-start justify-between border-b border-zinc-900 pb-3">
-              <div>
-                <h3 className="font-black text-base text-white">{exItem.exercises?.name}</h3>
-                <p className="text-xs font-bold uppercase text-zinc-500 mt-0.5">{exItem.exercises?.muscle_group}</p>
+            <div className="flex items-start justify-between gap-3 border-b border-zinc-900 pb-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-black text-white">{row.exercises?.name ?? 'Exercício'}</h2>
+                <p className="mt-0.5 text-xs font-bold uppercase text-zinc-500">{row.exercises?.muscle_group}</p>
               </div>
-              {last && (
-                <div className="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl text-right">
-                  <span className="text-[9px] font-bold text-zinc-500 uppercase block">Recorde Máx</span>
-                  <span className="text-xs font-extrabold text-emerald-400">{last.weight_kg}kg × {last.reps}</span>
+              {record && record.weight > 0 && (
+                <div className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-right">
+                  <span className="block text-[9px] font-bold uppercase text-zinc-500">Seu recorde</span>
+                  <span className="text-xs font-extrabold text-emerald-400">
+                    {formatKg(record.weight)}kg × {record.reps}
+                  </span>
                 </div>
               )}
             </div>
 
-            {exItem.notes && (
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-zinc-300 font-medium">{exItem.notes}</p>
+            {row.notes && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />
+                <p className="whitespace-pre-line text-xs font-medium text-zinc-300">{row.notes}</p>
               </div>
             )}
 
             <div className="space-y-3">
-              {sets.map((s, idx) => {
-                const isPR = newPRs[`${exItem.id}-${idx}`]
-                const badge = getSetBadge(s.type)
+              {entries.map((entry, index) => {
+                const badge = getSetTypeInfo(entry.type)
+                const weightId = `weight-${row.id}-${index}`
+                const repsId = `reps-${row.id}-${index}`
+                const locked = entry.completed || entry.saving
 
                 return (
-                  <div key={idx} className={`p-3 rounded-2xl border space-y-2 transition-all ${s.completed ? 'bg-emerald-950/20 border-emerald-800/40' : 'bg-zinc-900/80 border-zinc-800/60'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-zinc-400">#{s.set_number}</span>
-                        <span className={`text-[9px] font-black uppercase border px-2 py-0.5 rounded-md ${badge.color}`}>
-                          {badge.label}
+                  <div
+                    key={entry.setNumber}
+                    className={cn(
+                      'space-y-2 rounded-2xl border p-3 transition-all',
+                      entry.completed ? 'border-emerald-800/40 bg-emerald-950/20' : 'border-zinc-800/60 bg-zinc-900/80',
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-black text-zinc-400">#{entry.setNumber}</span>
+                        <span className={cn('rounded-md border px-2 py-0.5 text-[9px] font-black uppercase', badge.className)}>
+                          {badge.badge}
                         </span>
-                        {isPR && (
-                          <span className="text-[9px] font-black uppercase text-amber-300 bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 rounded-md flex items-center gap-1 animate-bounce">
-                            <Trophy className="w-3 h-3 text-amber-400" /> NOVO PR!
+                        {entry.isPR && entry.completed && (
+                          <span className="flex items-center gap-1 rounded-md border border-amber-600/50 bg-amber-950/80 px-2 py-0.5 text-[9px] font-black uppercase text-amber-300">
+                            <Trophy className="h-3 w-3 text-amber-400" aria-hidden="true" /> Novo PR!
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] font-bold text-zinc-400">Meta: {s.target_reps} reps | RIR {s.rir ?? '0'}</span>
+                      <span className="shrink-0 text-[10px] font-bold text-zinc-400">
+                        Meta: {entry.targetReps} reps
+                        {entry.targetRir !== null && ` · RIR ${entry.targetRir}`}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 items-center pt-1">
+                    <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 pt-1">
                       <div>
-                        <span className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">Carga (kg)</span>
-                        <input type="number" value={s.weight_kg} onChange={(e) => handleUpdateSet(exItem.id, idx, 'weight_kg', e.target.value)} placeholder="0" className="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-center text-sm font-extrabold text-white focus:outline-none" />
+                        <label htmlFor={weightId} className="mb-1 block text-[8px] font-bold uppercase text-zinc-500">
+                          Carga (kg)
+                        </label>
+                        <input
+                          id={weightId}
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          value={entry.weight}
+                          disabled={locked}
+                          onChange={(event) => updateEntry(row.id, index, { weight: event.target.value })}
+                          placeholder={entry.previous ? formatKg(entry.previous.weight) : '0'}
+                          className="w-full rounded-xl border border-zinc-800 bg-black p-2.5 text-center text-sm font-extrabold text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none disabled:opacity-70"
+                        />
                       </div>
                       <div>
-                        <span className="text-[8px] font-bold text-zinc-500 uppercase block mb-1">Reps Feitas</span>
-                        <input type="number" value={s.reps} onChange={(e) => handleUpdateSet(exItem.id, idx, 'reps', e.target.value)} placeholder={s.target_reps || '0'} className="w-full bg-black border border-zinc-800 rounded-xl p-2.5 text-center text-sm font-extrabold text-white focus:outline-none" />
+                        <label htmlFor={repsId} className="mb-1 block text-[8px] font-bold uppercase text-zinc-500">
+                          Reps feitas
+                        </label>
+                        <input
+                          id={repsId}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          autoComplete="off"
+                          value={entry.reps}
+                          disabled={locked}
+                          onChange={(event) => updateEntry(row.id, index, { reps: event.target.value })}
+                          placeholder={entry.previous ? String(entry.previous.reps) : entry.targetReps}
+                          className="w-full rounded-xl border border-zinc-800 bg-black p-2.5 text-center text-sm font-extrabold text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none disabled:opacity-70"
+                        />
                       </div>
-                      <button onClick={() => toggleCompleteSet(exItem.id, exItem.exercise_id, idx)} className={`w-full h-10 rounded-xl flex justify-center items-center font-bold mt-3 transition-all ${s.completed ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500'}`}>
-                        <Check className="w-5 h-5 stroke-[3]" />
+                      <button
+                        type="button"
+                        onClick={() => toggleSet(row, index)}
+                        disabled={entry.saving}
+                        aria-pressed={entry.completed}
+                        aria-label={
+                          entry.completed
+                            ? `Desmarcar série ${entry.setNumber}`
+                            : `Marcar série ${entry.setNumber} como concluída`
+                        }
+                        className={cn(
+                          'flex h-[42px] w-14 items-center justify-center rounded-xl font-bold transition-all',
+                          entry.completed ? 'bg-emerald-500 text-black' : 'bg-zinc-800 text-zinc-500',
+                        )}
+                      >
+                        {entry.saving ? (
+                          <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <Check className="h-5 w-5 stroke-[3]" aria-hidden="true" />
+                        )}
                       </button>
                     </div>
+
+                    {entry.previous && !entry.completed && (
+                      <p className="text-[9px] font-semibold text-zinc-600">
+                        Último treino: {formatKg(entry.previous.weight)} kg × {entry.previous.reps}
+                      </p>
+                    )}
                   </div>
                 )
               })}
             </div>
-          </div>
+          </section>
         )
       })}
 
-      {/* TIMER FLUTUANTE */}
-      {restSeconds > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 bg-zinc-900/95 border border-zinc-700/80 rounded-2xl p-4 flex items-center justify-between shadow-2xl z-50 backdrop-blur-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/40 rounded-xl flex items-center justify-center text-emerald-400 font-black">
-              <Timer className="w-5 h-5 animate-spin" />
+      {restRemaining > 0 && (
+        <div
+          role="timer"
+          aria-label="Tempo de descanso"
+          className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-md rounded-2xl border border-zinc-700/80 bg-zinc-900/95 p-4 shadow-2xl backdrop-blur-lg"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-500/20 text-emerald-400">
+                <Timer className={cn('h-5 w-5', restRunning && 'animate-pulse')} aria-hidden="true" />
+              </div>
+              <div>
+                <span className="block text-[9px] font-black uppercase tracking-widest text-zinc-400">Descanso</span>
+                <span className="text-xl font-black tabular-nums text-white">{formatSeconds(restRemaining)}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-400 block">Tempo de Descanso</span>
-              <span className="text-xl font-black text-white">{formatTime(restSeconds)}</span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => adjustRest(-15)}
+                aria-label="Menos 15 segundos"
+                className="rounded-lg bg-zinc-800 p-2 text-zinc-300"
+              >
+                <Minus className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => adjustRest(30)}
+                aria-label="Mais 30 segundos"
+                className="flex items-center rounded-lg bg-zinc-800 px-2 py-2 text-xs font-bold text-zinc-300"
+              >
+                <Plus className="h-3 w-3" aria-hidden="true" />
+                30s
+              </button>
+              <button
+                type="button"
+                onClick={toggleRestPause}
+                aria-label={restRunning ? 'Pausar descanso' : 'Continuar descanso'}
+                className="rounded-lg bg-white p-2 text-black"
+              >
+                {restRunning ? (
+                  <Pause className="h-4 w-4 fill-black" aria-hidden="true" />
+                ) : (
+                  <Play className="h-4 w-4 fill-black" aria-hidden="true" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={stopRest}
+                aria-label="Pular descanso"
+                className="rounded-lg bg-zinc-800 p-2 text-zinc-400"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button onClick={() => setRestSeconds((prev) => prev + 30)} className="px-2.5 py-1.5 bg-zinc-800 rounded-lg text-xs font-bold text-zinc-300 uppercase">+30s</button>
-            <button onClick={() => setIsTimerRunning(!isTimerRunning)} className="p-2 bg-white text-black rounded-lg">{isTimerRunning ? <Pause className="w-4 h-4 fill-black" /> : <Play className="w-4 h-4 fill-black" />}</button>
-            <button onClick={() => setRestSeconds(0)} className="p-2 bg-zinc-800 text-zinc-400 rounded-lg"><RotateCcw className="w-4 h-4" /></button>
+          <div className="mt-3 h-1 overflow-hidden rounded-full bg-zinc-800" aria-hidden="true">
+            <div
+              className="h-full rounded-full bg-emerald-400 transition-[width] duration-300"
+              style={{ width: `${Math.min(100, (restRemaining / DEFAULT_REST_SECONDS) * 100)}%` }}
+            />
           </div>
         </div>
       )}
 
-      {/* MODAL FINALIZAÇÃO & STORIES */}
-      {showFinishModal && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          {!isCompleted ? (
-            <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-sm space-y-6">
-              <div className="text-center space-y-1"><h2 className="text-xl font-black uppercase">Finalizar Treino</h2><p className="text-xs text-zinc-400">Qual foi o Esforço (RPE) da sessão?</p></div>
-              <div className="space-y-3 text-center">
-                <span className="text-4xl font-black text-white">{sessionRpe} / 10</span>
-                <input type="range" min="1" max="10" value={sessionRpe} onChange={(e) => setSessionRpe(Number(e.target.value))} className="w-full accent-white" />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setShowModal(false)} className="w-1/2 bg-zinc-900 text-zinc-400 font-bold p-4 rounded-xl text-xs uppercase">Voltar</button>
-                <button onClick={handleFinishWorkout} disabled={finishing} className="w-1/2 bg-white text-black font-extrabold p-4 rounded-xl text-xs uppercase flex justify-center items-center">{finishing ? <Loader2 className="animate-spin w-5 h-5" /> : 'Concluir'}</button>
-              </div>
+      <Modal
+        open={showFinishModal}
+        onClose={closeFinishModal}
+        title="Finalizar treino"
+        description="Qual foi o esforço (RPE) da sessão?"
+      >
+        <div className="space-y-6">
+          <div className="space-y-3 text-center">
+            <span className="text-4xl font-black text-white">{sessionRpe} / 10</span>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              value={sessionRpe}
+              onChange={(event) => setSessionRpe(Number(event.target.value))}
+              aria-label="RPE da sessão"
+              className="w-full accent-white"
+            />
+            <div className="flex justify-between text-[9px] font-bold uppercase text-zinc-600">
+              <span>Leve</span>
+              <span>Máximo</span>
             </div>
-          ) : (
-            <div className="bg-black border-2 border-zinc-800 rounded-3xl p-6 w-full max-w-sm space-y-6 text-center relative overflow-hidden shadow-2xl">
-              <div className="space-y-2">
-                <div className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center font-black mx-auto">TJ</div>
-                <h2 className="text-2xl font-black uppercase tracking-wider text-white">TREINO CONCLUÍDO!</h2>
-                <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest">CONSULTORIA TEAM JEAN</p>
-              </div>
+          </div>
 
-              <div className="grid grid-cols-2 gap-3 py-4 border-y border-zinc-900">
-                <div className="bg-zinc-950 p-3 rounded-2xl border border-zinc-900">
-                  <span className="text-[9px] font-black uppercase text-zinc-500 block">Volume Total</span>
-                  <span className="text-lg font-black text-white">{calculateTotalVolume().toLocaleString('pt-BR')} kg</span>
-                </div>
-                <div className="bg-zinc-950 p-3 rounded-2xl border border-zinc-900">
-                  <span className="text-[9px] font-black uppercase text-zinc-500 block">Esforço RPE</span>
-                  <span className="text-lg font-black text-white">{sessionRpe} / 10</span>
-                </div>
-              </div>
+          <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-500">
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+            {progress.done} de {progress.total} séries concluídas
+          </p>
 
-              <div className="space-y-3 pt-2">
-                <button onClick={() => alert('Tire um print da tela e poste no Instagram marcando @teamjean !')} className="w-full bg-white text-black font-black p-4 rounded-2xl text-xs uppercase flex items-center justify-center gap-2 active:scale-95 transition-all">
-                  <Share2 className="w-4 h-4" /> COMPARTILHAR NOS STORIES
-                </button>
-                <button onClick={() => router.push('/student/today')} className="w-full bg-zinc-900 text-zinc-400 font-bold p-3 rounded-2xl text-xs uppercase">
-                  Voltar para o App
-                </button>
-              </div>
-            </div>
-          )}
+          {finishError && <Alert variant="error">{finishError}</Alert>}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={closeFinishModal}
+              className="w-1/2 rounded-xl bg-zinc-900 p-4 text-xs font-bold uppercase text-zinc-400"
+            >
+              Voltar
+            </button>
+            <button
+              type="button"
+              onClick={handleFinishWorkout}
+              disabled={finishing}
+              className="flex w-1/2 items-center justify-center rounded-xl bg-white p-4 text-xs font-extrabold uppercase text-black disabled:opacity-60"
+            >
+              {finishing ? <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Finalizando" /> : 'Concluir'}
+            </button>
+          </div>
         </div>
-      )}
+      </Modal>
     </div>
   )
-                  }
+}

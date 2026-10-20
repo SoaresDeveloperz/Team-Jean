@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -14,24 +14,34 @@ type ModalProps = {
   variant?: 'dialog' | 'sheet'
 }
 
+// Pilha de modais abertos: o Esc fecha só o que está por cima.
+const openModalStack: string[] = []
+
 export function Modal({ open, onClose, title, description, children, variant = 'dialog' }: ModalProps) {
   const titleId = useId()
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!open) return
 
+    openModalStack.push(titleId)
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && openModalStack[openModalStack.length - 1] === titleId) onCloseRef.current()
     }
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', handleKeyDown)
 
     return () => {
+      openModalStack.splice(openModalStack.lastIndexOf(titleId), 1)
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open, onClose])
+  }, [open, titleId])
 
   if (!open) return null
 

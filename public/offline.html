@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <title>Sem conexão · Team Jean</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: #000;
+        color: #fff;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+      }
+      main { max-width: 320px; }
+      svg { width: 64px; height: 64px; }
+      h1 { margin: 24px 0 8px; font-size: 18px; font-weight: 900; letter-spacing: 0.15em; text-transform: uppercase; }
+      p { margin: 0 0 24px; color: #a1a1aa; font-size: 14px; line-height: 1.5; }
+      button {
+        width: 100%;
+        padding: 16px;
+        border: 0;
+        border-radius: 16px;
+        background: #fff;
+        color: #000;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg viewBox="0 0 400 400" fill="none" aria-hidden="true">
+        <path d="M60 120 L340 120 L300 150 L225 150 L225 280 L200 310 L150 250 L175 220 L200 250 L200 150 L100 150 Z" fill="white" />
+        <path d="M245 170 L290 170 L290 280 L200 350 L160 300 L180 275 L200 295 L265 245 L265 170 Z" fill="white" />
+      </svg>
+      <h1>Sem conexão</h1>
+      <p>Verifique sua internet. As séries que você já marcou ficam salvas e o treino pode ser retomado.</p>
+      <button type="button" onclick="location.reload()">Tentar novamente</button>
+    </main>
+  </body>
+</html>

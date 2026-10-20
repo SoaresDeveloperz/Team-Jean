@@ -1,527 +1,720 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '../../../lib/supabase/client'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ClipboardList,
-  Plus,
-  Trash2,
-  Pencil,
-  Dumbbell,
-  Loader2,
-  Search,
-  X,
-  CheckCircle2,
-  AlertCircle,
+  Archive,
+  ArchiveRestore,
+  ArrowDown,
+  ArrowUp,
+  Calendar,
   ChevronDown,
   ChevronUp,
-  FolderKanban,
-  Send,
-  Users,
-  Sparkles,
+  Dumbbell,
   Eye,
-  Calendar,
-  Award,
+  FolderKanban,
   History,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  Trash2,
+  Users,
+  X,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { AssignedWorkout, Exercise, PlannedSet, PrescribedExercise, Profile, WorkoutSession } from '@/lib/types'
+import {
+  REP_PRESETS,
+  SET_TYPES,
+  createDefaultPlannedSets,
+  formatKg,
+  getPlannedSets,
+  normalizeRir,
+} from '@/lib/workouts'
+import { cn } from '@/lib/cn'
+import { Alert, FeedbackAlert, type Feedback } from '@/components/ui/alert'
+import { Modal } from '@/components/ui/modal'
+import { PageLoader } from '@/components/ui/page-loader'
+
+type WorkoutWithMeta = AssignedWorkout & { assigned_workout_exercises?: { count: number }[] }
+type TemplateWithMeta = { id: string; name: string; workout_template_exercises?: { count: number }[] }
+
+type BuilderExercise = {
+  key: string
+  rowId: string | null
+  exercise_id: string
+  name: string
+  muscle_group: string
+  notes: string
+  planned_sets: PlannedSet[]
+}
+
+type HistorySet = {
+  id: string
+  session_id: string
+  set_number: number
+  weight_kg: number | null
+  reps: number | null
+  rir: number | null
+  exercises: { name: string | null } | null
+}
+
+type HistorySession = WorkoutSession & { groups: { name: string; sets: HistorySet[] }[] }
+
+type BuilderMode = { kind: 'workout' | 'template'; editingId: string | null }
+
+const inputClassName =
+  'w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white placeholder:text-zinc-600 focus:border-white focus:outline-none'
+
+function countOf(meta: { count: number }[] | undefined) {
+  return meta?.[0]?.count ?? 0
+}
 
 export default function AdminWorkoutsPage() {
+  const [supabase] = useState(() => createClient())
   const [activeTab, setActiveTab] = useState<'students' | 'templates'>('students')
 
-  const [workouts, setWorkouts] = useState<any[]>([])
-  const [templates, setTemplates] = useState<any[]>([])
-  const [students, setStudents] = useState<any[]>([])
-  const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([])
+  const [workouts, setWorkouts] = useState<WorkoutWithMeta[]>([])
+  const [templates, setTemplates] = useState<TemplateWithMeta[]>([])
+  const [students, setStudents] = useState<Profile[]>([])
+  const [exerciseLibrary, setExerciseLibrary] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+  const [feedback, setFeedback] = useState<Feedback>(null)
 
-  // Controle de Sanfona dos Alunos
   const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({})
 
-  // Modal e Estado do Visualizador de Cargas do Treino (NOVO!)
-  const [showWorkoutHistoryModal, setShowWorkoutHistoryModal] = useState(false)
-  const [selectedWorkoutForHistory, setSelectedWorkoutForHistory] = useState<any>(null)
-  const [workoutSessionsHistory, setWorkoutSessionsHistory] = useState<any[]>([])
+  const [historyWorkout, setHistoryWorkout] = useState<WorkoutWithMeta | null>(null)
+  const [historySessions, setHistorySessions] = useState<HistorySession[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyError, setHistoryError] = useState('')
 
-  // Modais de Construtor
-  const [showBuilder, setShowBuilder] = useState(false)
-  const [isTemplateMode, setIsTemplateModal] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [builder, setBuilder] = useState<BuilderMode | null>(null)
   const [selectedStudent, setSelectedStudent] = useState('')
   const [workoutName, setWorkoutName] = useState('')
-  const [selectedExercises, setSelectedExercises] = useState<any[]>([])
+  const [selectedExercises, setSelectedExercises] = useState<BuilderExercise[]>([])
+  const [originalRowIds, setOriginalRowIds] = useState<string[]>([])
+  const [builderError, setBuilderError] = useState('')
+  const [openingBuilder, setOpeningBuilder] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const [showAssignModal, setShowAssignModal] = useState(false)
-  const [templateToAssign, setTemplateToAssign] = useState<any>(null)
+  const [templateToAssign, setTemplateToAssign] = useState<TemplateWithMeta | null>(null)
   const [assignStudentId, setAssignStudentId] = useState('')
+  const [assignError, setAssignError] = useState('')
 
   const [showExPicker, setShowExPicker] = useState(false)
   const [exSearch, setExSearch] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
+  const keyCounter = useRef(0)
 
-  const supabase = createClient()
-  const REP_PRESETS = ['6-8', '8-10', '8-12', '10-12', '12-15', '15-20', 'Até a Falha']
+  const reload = () => setReloadKey((key) => key + 1)
 
   useEffect(() => {
-    loadData()
-  }, [])
+    let active = true
 
-  const loadData = async () => {
-    setLoading(true)
-    const { data: w } = await supabase
-      .from('assigned_workouts')
-      .select('*, profiles(full_name, email)')
-      .order('created_at', { ascending: false })
+    const load = async () => {
+      const [workoutsResult, templatesResult, studentsResult, exercisesResult] = await Promise.all([
+        supabase
+          .from('assigned_workouts')
+          .select('*, profiles(full_name, email), assigned_workout_exercises(count)')
+          .order('created_at', { ascending: false }),
+        supabase.from('workout_templates').select('id, name, workout_template_exercises(count)').order('name'),
+        supabase.from('profiles').select('id, role, full_name, email').eq('role', 'student').order('full_name'),
+        supabase.from('exercises').select('*').order('name'),
+      ])
+      if (!active) return
 
-    const { data: t } = await supabase
-      .from('workout_templates')
-      .select('*')
-      .order('name', { ascending: true })
+      const error = workoutsResult.error ?? templatesResult.error ?? studentsResult.error ?? exercisesResult.error
+      if (error) {
+        setLoadError(`Não foi possível carregar os dados: ${error.message}`)
+      } else {
+        setLoadError('')
+        setWorkouts((workoutsResult.data ?? []) as WorkoutWithMeta[])
+        setTemplates((templatesResult.data ?? []) as TemplateWithMeta[])
+        setStudents((studentsResult.data ?? []) as Profile[])
+        setExerciseLibrary((exercisesResult.data ?? []) as Exercise[])
+      }
+      setLoading(false)
+    }
 
-    const { data: s } = await supabase.from('profiles').select('*').eq('role', 'student')
-    const { data: ex } = await supabase.from('exercises').select('*').order('name')
+    void load()
+    return () => {
+      active = false
+    }
+  }, [supabase, reloadKey])
 
-    if (w) setWorkouts(w)
-    if (t) setTemplates(t)
-    if (s) setStudents(s)
-    if (ex) setExerciseLibrary(ex)
-    setLoading(false)
-  }
+  const nextKey = () => `new-${keyCounter.current++}`
 
-  const toggleStudentAccordion = (studentId: string) => {
-    setExpandedStudents((prev) => ({ ...prev, [studentId]: !prev[studentId] }))
-  }
-
-  // CARREGAR CARGAS REGISTRADAS DO TREINO ESPECÍFICO
-  const handleOpenWorkoutHistory = async (workout: any) => {
-    setSelectedWorkoutForHistory(workout)
-    setShowWorkoutHistoryModal(true)
+  // ---------------------------------------------------------------------------
+  // Histórico de cargas do treino
+  // ---------------------------------------------------------------------------
+  const handleOpenWorkoutHistory = async (workout: WorkoutWithMeta) => {
+    setHistoryWorkout(workout)
+    setHistorySessions([])
+    setHistoryError('')
     setLoadingHistory(true)
 
-    // Busca as sessões concluídas deste treino específico
-    const { data: sessions } = await supabase
+    const { data: sessions, error } = await supabase
       .from('workout_sessions')
       .select('*')
       .eq('assigned_workout_id', workout.id)
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
+      .limit(20)
 
-    if (sessions && sessions.length > 0) {
-      const detailedSessions = await Promise.all(
-        sessions.map(async (sess) => {
-          const { data: sets } = await supabase
-            .from('session_sets')
-            .select('*, exercises(name, muscle_group)')
-            .eq('session_id', sess.id)
-            .order('set_number', { ascending: true })
-
-          return {
-            ...sess,
-            sets: sets || [],
-          }
-        })
-      )
-      setWorkoutSessionsHistory(detailedSessions)
-    } else {
-      setWorkoutSessionsHistory([])
+    if (error) {
+      setHistoryError(error.message)
+      setLoadingHistory(false)
+      return
     }
 
+    const sessionRows = (sessions ?? []) as WorkoutSession[]
+    let setRows: HistorySet[] = []
+    if (sessionRows.length > 0) {
+      // Uma consulta só para todas as sessões (antes era uma por sessão).
+      const { data: setsData, error: setsError } = await supabase
+        .from('session_sets')
+        .select('id, session_id, set_number, weight_kg, reps, rir, exercises(name)')
+        .in(
+          'session_id',
+          sessionRows.map((session) => session.id),
+        )
+        .order('set_number', { ascending: true })
+
+      if (setsError) setHistoryError(setsError.message)
+      setRows = (setsData ?? []) as unknown as HistorySet[]
+    }
+
+    setHistorySessions(
+      sessionRows.map((session) => {
+        const groups: HistorySession['groups'] = []
+        for (const set of setRows.filter((row) => row.session_id === session.id)) {
+          const name = set.exercises?.name || 'Exercício'
+          const group = groups.find((item) => item.name === name)
+          if (group) group.sets.push(set)
+          else groups.push({ name, sets: [set] })
+        }
+        return { ...session, groups }
+      }),
+    )
     setLoadingHistory(false)
   }
 
-  const handleEditWorkout = async (workout: any) => {
-    setErrorMessage('')
-    setIsTemplateModal(false)
-    setEditingId(workout.id)
-    setSelectedStudent(workout.student_id)
-    setWorkoutName(workout.name)
+  const closeHistory = useCallback(() => setHistoryWorkout(null), [])
 
-    const { data: ex } = await supabase
-      .from('assigned_workout_exercises')
-      .select('*, exercises(name, muscle_group, secondary_muscle)')
-      .eq('assigned_workout_id', workout.id)
-      .order('order', { ascending: true })
-
-    if (ex && ex.length > 0) {
-      setSelectedExercises(
-        ex.map((item) => ({
-          exercise_id: item.exercise_id,
-          name: item.exercises?.name || 'Exercício',
-          muscle_group: item.exercises?.muscle_group || 'Geral',
-          notes: item.notes || '',
-          planned_sets: item.planned_sets || [
-            { type: 'warmup', reps: '15-20', rir: 4 },
-            { type: 'working', reps: '6-8', rir: 0 },
-          ],
-        }))
-      )
-    } else {
-      setSelectedExercises([])
-    }
-    setShowBuilder(true)
-  }
-
-  const handleEditTemplate = async (template: any) => {
-    setErrorMessage('')
-    setIsTemplateModal(true)
-    setEditingId(template.id)
-    setSelectedStudent('')
-    setWorkoutName(template.name)
-
-    const { data: ex } = await supabase
-      .from('workout_template_exercises')
-      .select('*, exercises(name, muscle_group, secondary_muscle)')
-      .eq('template_id', template.id)
-      .order('order', { ascending: true })
-
-    if (ex && ex.length > 0) {
-      setSelectedExercises(
-        ex.map((item) => ({
-          exercise_id: item.exercise_id,
-          name: item.exercises?.name || 'Exercício',
-          muscle_group: item.exercises?.muscle_group || 'Geral',
-          notes: item.notes || '',
-          planned_sets: item.planned_sets || [
-            { type: 'warmup', reps: '15-20', rir: 4 },
-            { type: 'working', reps: '6-8', rir: 0 },
-          ],
-        }))
-      )
-    } else {
-      setSelectedExercises([])
-    }
-    setShowBuilder(true)
-  }
-
-  const handleCreateNewWorkout = (studentId?: string) => {
-    setErrorMessage('')
-    setIsTemplateModal(false)
-    setEditingId(null)
-    setSelectedStudent(studentId || '')
-    setWorkoutName('')
+  // ---------------------------------------------------------------------------
+  // Construtor de treino / modelo
+  // ---------------------------------------------------------------------------
+  const openBuilder = async (mode: BuilderMode, options: { studentId?: string; name?: string } = {}) => {
+    setBuilderError('')
+    setSelectedStudent(options.studentId ?? '')
+    setWorkoutName(options.name ?? '')
     setSelectedExercises([])
-    setShowBuilder(true)
+    setOriginalRowIds([])
+
+    if (!mode.editingId) {
+      setBuilder(mode)
+      return
+    }
+
+    setOpeningBuilder(true)
+    const table = mode.kind === 'workout' ? 'assigned_workout_exercises' : 'workout_template_exercises'
+    const parentColumn = mode.kind === 'workout' ? 'assigned_workout_id' : 'template_id'
+    const { data, error } = await supabase
+      .from(table)
+      .select('*, exercises(name, muscle_group)')
+      .eq(parentColumn, mode.editingId)
+      .order('order', { ascending: true })
+    setOpeningBuilder(false)
+
+    if (error) {
+      setFeedback({ type: 'error', message: `Não foi possível abrir para edição: ${error.message}` })
+      return
+    }
+
+    const rows = (data ?? []) as PrescribedExercise[]
+    setOriginalRowIds(rows.map((row) => row.id))
+    setSelectedExercises(
+      rows.map((row) => {
+        const plannedSets = getPlannedSets(row)
+        return {
+          key: row.id,
+          rowId: row.id,
+          exercise_id: row.exercise_id,
+          name: row.exercises?.name || 'Exercício',
+          muscle_group: row.exercises?.muscle_group || 'Geral',
+          notes: row.notes || '',
+          planned_sets: plannedSets.length > 0 ? plannedSets.map((set) => ({ ...set })) : createDefaultPlannedSets(),
+        }
+      }),
+    )
+    setBuilder(mode)
   }
 
-  const handleCreateNewTemplate = () => {
-    setErrorMessage('')
-    setIsTemplateModal(true)
-    setEditingId(null)
-    setSelectedStudent('')
-    setWorkoutName('')
-    setSelectedExercises([])
-    setShowBuilder(true)
+  const closeBuilder = useCallback(() => setBuilder(null), [])
+  const closePicker = useCallback(() => setShowExPicker(false), [])
+
+  const updateExerciseAt = (index: number, update: (item: BuilderExercise) => BuilderExercise) => {
+    setSelectedExercises((items) => items.map((item, itemIndex) => (itemIndex === index ? update(item) : item)))
   }
 
-  const handleAddExerciseToWorkout = (ex: any) => {
-    setSelectedExercises([
-      ...selectedExercises,
+  const updateSetAt = (exIndex: number, setIndex: number, patch: Partial<PlannedSet>) => {
+    updateExerciseAt(exIndex, (item) => ({
+      ...item,
+      planned_sets: item.planned_sets.map((set, index) => (index === setIndex ? { ...set, ...patch } : set)),
+    }))
+  }
+
+  const handleAddExercise = (exercise: Exercise) => {
+    setSelectedExercises((items) => [
+      ...items,
       {
-        exercise_id: ex.id,
-        name: ex.name,
-        muscle_group: ex.muscle_group,
+        key: nextKey(),
+        rowId: null,
+        exercise_id: exercise.id,
+        name: exercise.name,
+        muscle_group: exercise.muscle_group || 'Geral',
         notes: '',
-        planned_sets: [
-          { type: 'warmup', reps: '15-20', rir: 4 },
-          { type: 'feeder', reps: '10-12', rir: 2 },
-          { type: 'working', reps: '8-10', rir: 0 },
-        ],
+        planned_sets: createDefaultPlannedSets(),
       },
     ])
     setShowExPicker(false)
+    setExSearch('')
   }
 
-  const handleMoveExercise = (index: number, direction: 'up' | 'down') => {
-    if (
-      (direction === 'up' && index === 0) ||
-      (direction === 'down' && index === selectedExercises.length - 1)
-    ) return
-    const updated = [...selectedExercises]
-    const targetIndex = direction === 'up' ? index - 1 : index + 1
-    const temp = updated[index]
-    updated[index] = updated[targetIndex]
-    updated[targetIndex] = temp
-    setSelectedExercises(updated)
+  const handleMoveExercise = (index: number, direction: -1 | 1) => {
+    setSelectedExercises((items) => {
+      const target = index + direction
+      if (target < 0 || target >= items.length) return items
+      const updated = [...items]
+      ;[updated[index], updated[target]] = [updated[target], updated[index]]
+      return updated
+    })
   }
 
-  const handleAddSetToExercise = (exIdx: number) => {
-    const updated = [...selectedExercises]
-    const currentSets = updated[exIdx].planned_sets || []
-    updated[exIdx].planned_sets = [...currentSets, { type: 'working', reps: '8-12', rir: 1 }]
-    setSelectedExercises(updated)
-  }
-
-  const handleRemoveSetFromExercise = (exIdx: number, setIdx: number) => {
-    const updated = [...selectedExercises]
-    updated[exIdx].planned_sets = updated[exIdx].planned_sets.filter((_: any, i: number) => i !== setIdx)
-    setSelectedExercises(updated)
-  }
-
-  const handleUpdateIndividualSet = (exIdx: number, setIdx: number, field: string, value: any) => {
-    const updated = [...selectedExercises]
-    updated[exIdx].planned_sets[setIdx][field] = value
-    setSelectedExercises(updated)
-  }
-
-  const handleApplyPresetToAllSets = (exIdx: number, presetReps: string) => {
-    const updated = [...selectedExercises]
-    updated[exIdx].planned_sets = updated[exIdx].planned_sets.map((s: any) => ({ ...s, reps: presetReps }))
-    setSelectedExercises(updated)
-  }
-
-  const handleRemoveExercise = (index: number) => {
-    setSelectedExercises(selectedExercises.filter((_, i) => i !== index))
-  }
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorMessage('')
-
-    if (!isTemplateMode && !selectedStudent) {
-      setErrorMessage('Selecione um aluno.')
-      return
+  const buildRow = (item: BuilderExercise, index: number) => {
+    const plannedSets = item.planned_sets.map((set) => ({
+      type: set.type,
+      reps: String(set.reps ?? '').trim() || '8-12',
+      rir: normalizeRir(set.rir),
+    }))
+    return {
+      exercise_id: item.exercise_id,
+      order: index + 1,
+      sets_count: plannedSets.length,
+      target_reps: plannedSets[0]?.reps || '8-12',
+      planned_sets: plannedSets,
+      notes: item.notes.trim() || null,
     }
-    if (!workoutName) {
-      setErrorMessage('Informe o nome.')
-      return
+  }
+
+  // Atualiza linhas existentes, insere as novas e só então remove as que
+  // saíram. Antes tudo era apagado e reinserido: se o insert falhasse, o
+  // treino ficava vazio, e as séries já registradas perdiam a referência.
+  const syncExercises = async (kind: BuilderMode['kind'], parentId: string) => {
+    const table = kind === 'workout' ? 'assigned_workout_exercises' : 'workout_template_exercises'
+    const parentColumn = kind === 'workout' ? 'assigned_workout_id' : 'template_id'
+
+    const updates = selectedExercises
+      .map((item, index) => ({ item, row: buildRow(item, index) }))
+      .filter(({ item }) => item.rowId)
+    const inserts = selectedExercises
+      .map((item, index) => ({ item, row: buildRow(item, index) }))
+      .filter(({ item }) => !item.rowId)
+      .map(({ row }) => ({ ...row, [parentColumn]: parentId }))
+
+    const updateResults = await Promise.all(
+      updates.map(({ item, row }) => supabase.from(table).update(row).eq('id', item.rowId as string)),
+    )
+    const updateError = updateResults.find((result) => result.error)?.error
+    if (updateError) throw new Error(`Erro ao atualizar exercícios: ${updateError.message}`)
+
+    if (inserts.length > 0) {
+      const { error } = await supabase.from(table).insert(inserts)
+      if (error) throw new Error(`Erro ao adicionar exercícios: ${error.message}`)
     }
-    if (selectedExercises.length === 0) {
-      setErrorMessage('Adicione pelo menos 1 exercício.')
-      return
+
+    const keptIds = new Set(selectedExercises.map((item) => item.rowId).filter(Boolean))
+    const removedIds = originalRowIds.filter((id) => !keptIds.has(id))
+    if (removedIds.length > 0) {
+      const { error } = await supabase.from(table).delete().in('id', removedIds)
+      if (error) {
+        throw new Error(
+          `Os exercícios foram salvos, mas não foi possível remover os que saíram do treino (${error.message}).`,
+        )
+      }
     }
+  }
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!builder) return
+    setBuilderError('')
+
+    const name = workoutName.trim()
+    if (builder.kind === 'workout' && !selectedStudent) return setBuilderError('Selecione um aluno.')
+    if (!name) return setBuilderError('Informe o nome.')
+    if (selectedExercises.length === 0) return setBuilderError('Adicione pelo menos 1 exercício.')
+    const emptyExercise = selectedExercises.find((item) => item.planned_sets.length === 0)
+    if (emptyExercise) return setBuilderError(`"${emptyExercise.name}" precisa de pelo menos 1 série.`)
 
     setSaving(true)
+    let parentId = builder.editingId
 
     try {
-      if (isTemplateMode) {
-        let templateId = editingId
-        if (templateId) {
-          await supabase.from('workout_templates').update({ name: workoutName }).eq('id', templateId)
-          await supabase.from('workout_template_exercises').delete().eq('template_id', templateId)
+      if (builder.kind === 'template') {
+        if (parentId) {
+          const { error } = await supabase.from('workout_templates').update({ name }).eq('id', parentId)
+          if (error) throw new Error(`Erro ao salvar o modelo: ${error.message}`)
         } else {
-          const { data: newT } = await supabase.from('workout_templates').insert([{ name: workoutName }]).select().single()
-          if (newT) templateId = newT.id
+          const { data, error } = await supabase.from('workout_templates').insert({ name }).select('id').single()
+          if (error || !data) throw new Error(`Erro ao criar o modelo: ${error?.message}`)
+          parentId = data.id as string
         }
-
-        const rows = selectedExercises.map((item, idx) => ({
-          template_id: templateId,
-          exercise_id: item.exercise_id,
-          order: idx + 1,
-          sets_count: item.planned_sets.length,
-          target_reps: item.planned_sets[0]?.reps || '8-12',
-          planned_sets: item.planned_sets,
-          notes: item.notes || null,
-        }))
-
-        await supabase.from('workout_template_exercises').insert(rows)
+      } else if (parentId) {
+        const { error } = await supabase
+          .from('assigned_workouts')
+          .update({ name, student_id: selectedStudent })
+          .eq('id', parentId)
+        if (error) throw new Error(`Erro ao salvar o treino: ${error.message}`)
       } else {
-        let currentWorkoutId = editingId
-        if (currentWorkoutId) {
-          await supabase.from('assigned_workouts').update({ name: workoutName, student_id: selectedStudent }).eq('id', currentWorkoutId)
-          await supabase.from('assigned_workout_exercises').delete().eq('assigned_workout_id', currentWorkoutId)
-        } else {
-          const { data: newW } = await supabase.from('assigned_workouts').insert([{ student_id: selectedStudent, name: workoutName, is_current: true }]).select().single()
-          if (newW) currentWorkoutId = newW.id
-        }
-
-        const rows = selectedExercises.map((item, idx) => ({
-          assigned_workout_id: currentWorkoutId,
-          exercise_id: item.exercise_id,
-          order: idx + 1,
-          sets_count: item.planned_sets.length,
-          target_reps: item.planned_sets[0]?.reps || '8-12',
-          planned_sets: item.planned_sets,
-          notes: item.notes || null,
-        }))
-
-        await supabase.from('assigned_workout_exercises').insert(rows)
+        const { data, error } = await supabase
+          .from('assigned_workouts')
+          .insert({ student_id: selectedStudent, name, is_current: true })
+          .select('id')
+          .single()
+        if (error || !data) throw new Error(`Erro ao criar o treino: ${error?.message}`)
+        parentId = data.id as string
       }
 
-      setShowBuilder(false)
-      loadData()
-    } catch (err: any) {
-      setErrorMessage(err.message)
+      // Se algo falhar daqui em diante, um novo "Salvar" edita o registro já
+      // criado em vez de duplicá-lo.
+      setBuilder({ kind: builder.kind, editingId: parentId })
+      await syncExercises(builder.kind, parentId as string)
+
+      setBuilder(null)
+      setFeedback({ type: 'success', message: builder.kind === 'template' ? 'Modelo salvo.' : 'Treino salvo.' })
+      if (builder.kind === 'workout') setExpandedStudents((previous) => ({ ...previous, [selectedStudent]: true }))
+      reload()
+    } catch (error) {
+      setBuilderError(error instanceof Error ? error.message : 'Erro ao salvar.')
+      // Recarrega para o próximo salvamento comparar com o estado real do banco.
+      if (parentId) void reopenAfterPartialSave(builder.kind, parentId)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleAssignTemplateToStudent = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const reopenAfterPartialSave = async (kind: BuilderMode['kind'], parentId: string) => {
+    const table = kind === 'workout' ? 'assigned_workout_exercises' : 'workout_template_exercises'
+    const parentColumn = kind === 'workout' ? 'assigned_workout_id' : 'template_id'
+    const { data } = await supabase.from(table).select('id, exercise_id, order').eq(parentColumn, parentId)
+    const rows = (data ?? []) as { id: string; exercise_id: string; order: number | null }[]
+    setOriginalRowIds(rows.map((row) => row.id))
+    // Liga itens novos às linhas que chegaram a ser inseridas (mesmo exercício e posição).
+    setSelectedExercises((items) =>
+      items.map((item, index) => {
+        if (item.rowId) return item
+        const inserted = rows.find((row) => row.exercise_id === item.exercise_id && row.order === index + 1)
+        return inserted ? { ...item, rowId: inserted.id } : item
+      }),
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ações nos cartões
+  // ---------------------------------------------------------------------------
+  const handleToggleActive = async (workout: WorkoutWithMeta) => {
+    const { error } = await supabase
+      .from('assigned_workouts')
+      .update({ is_current: !workout.is_current })
+      .eq('id', workout.id)
+    if (error) {
+      setFeedback({ type: 'error', message: `Não foi possível alterar o status: ${error.message}` })
+      return
+    }
+    setFeedback({
+      type: 'success',
+      message: workout.is_current ? `"${workout.name}" foi arquivado.` : `"${workout.name}" está ativo de novo.`,
+    })
+    reload()
+  }
+
+  const handleDeleteWorkout = async (workout: WorkoutWithMeta) => {
+    if (!window.confirm(`Apagar o treino "${workout.name}"? O histórico de cargas dele pode ser perdido.`)) return
+    const { error } = await supabase.from('assigned_workouts').delete().eq('id', workout.id)
+    if (error) {
+      setFeedback({
+        type: 'error',
+        message: `Não foi possível apagar (${error.message}). Se o treino já tem histórico, prefira arquivá-lo.`,
+      })
+      return
+    }
+    setFeedback({ type: 'success', message: 'Treino apagado.' })
+    reload()
+  }
+
+  const handleDeleteTemplate = async (template: TemplateWithMeta) => {
+    if (!window.confirm(`Apagar o modelo "${template.name}"?`)) return
+    const { error } = await supabase.from('workout_templates').delete().eq('id', template.id)
+    if (error) {
+      setFeedback({ type: 'error', message: `Não foi possível apagar o modelo: ${error.message}` })
+      return
+    }
+    setFeedback({ type: 'success', message: 'Modelo apagado.' })
+    reload()
+  }
+
+  const closeAssign = useCallback(() => setTemplateToAssign(null), [])
+
+  const handleAssignTemplateToStudent = async (event: React.FormEvent) => {
+    event.preventDefault()
     if (!templateToAssign || !assignStudentId) return
     setSaving(true)
+    setAssignError('')
 
     try {
-      const { data: tExercises } = await supabase
+      const { data: templateRows, error: templateError } = await supabase
         .from('workout_template_exercises')
         .select('*')
         .eq('template_id', templateToAssign.id)
+        .order('order', { ascending: true })
+      if (templateError) throw new Error(`Erro ao ler o modelo: ${templateError.message}`)
 
-      const { data: newWorkout, error: wErr } = await supabase
+      const { data: newWorkout, error: workoutError } = await supabase
         .from('assigned_workouts')
-        .insert([{ student_id: assignStudentId, name: templateToAssign.name, is_current: true }])
-        .select()
+        .insert({ student_id: assignStudentId, name: templateToAssign.name, is_current: true })
+        .select('id')
         .single()
+      if (workoutError || !newWorkout) throw new Error(`Erro ao atribuir: ${workoutError?.message ?? 'sem resposta'}`)
 
-      if (wErr || !newWorkout) throw new Error('Erro ao atribuir: ' + wErr?.message)
-
-      if (tExercises && tExercises.length > 0) {
-        const rows = tExercises.map((item) => ({
-          assigned_workout_id: newWorkout.id,
-          exercise_id: item.exercise_id,
-          order: item.order,
-          sets_count: item.sets_count,
-          target_reps: item.target_reps,
-          planned_sets: item.planned_sets,
-          notes: item.notes,
-        }))
-
-        await supabase.from('assigned_workout_exercises').insert(rows)
+      const rows = (templateRows ?? []) as PrescribedExercise[]
+      if (rows.length > 0) {
+        const { error } = await supabase.from('assigned_workout_exercises').insert(
+          rows.map((row) => ({
+            assigned_workout_id: newWorkout.id,
+            exercise_id: row.exercise_id,
+            order: row.order,
+            sets_count: row.sets_count,
+            target_reps: row.target_reps,
+            planned_sets: row.planned_sets,
+            notes: row.notes,
+          })),
+        )
+        if (error) {
+          await supabase.from('assigned_workouts').delete().eq('id', newWorkout.id)
+          throw new Error(`Erro ao copiar os exercícios: ${error.message}`)
+        }
       }
 
-      await supabase.from('notifications').insert([{ recipient_id: assignStudentId, type: 'workout_updated', title: 'Treino Lançado! 💪', message: `O treinador Jean atribuiu o treino: ${templateToAssign.name}.` }])
+      const { error: notificationError } = await supabase.from('notifications').insert({
+        recipient_id: assignStudentId,
+        type: 'workout_updated',
+        title: 'Treino lançado! 💪',
+        message: `Seu treinador atribuiu o treino: ${templateToAssign.name}.`,
+      })
 
-      setShowAssignModal(false)
+      setTemplateToAssign(null)
       setActiveTab('students')
-      setExpandedStudents((prev) => ({ ...prev, [assignStudentId]: true }))
-      loadData()
-    } catch (err: any) {
-      alert(err.message)
+      setExpandedStudents((previous) => ({ ...previous, [assignStudentId]: true }))
+      setFeedback(
+        notificationError
+          ? { type: 'success', message: 'Treino atribuído (o aviso ao aluno não pôde ser enviado).' }
+          : { type: 'success', message: 'Treino atribuído e aluno avisado.' },
+      )
+      reload()
+    } catch (error) {
+      setAssignError(error instanceof Error ? error.message : 'Erro ao atribuir.')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDeleteWorkout = async (id: string) => {
-    if (!confirm('Deseja apagar este treino?')) return
-    await supabase.from('assigned_workouts').delete().eq('id', id)
-    loadData()
-  }
-
-  const handleDeleteTemplate = async (id: string) => {
-    if (!confirm('Deseja apagar este modelo pré-definido?')) return
-    await supabase.from('workout_templates').delete().eq('id', id)
-    loadData()
-  }
-
+  const searchTerm = exSearch.trim().toLowerCase()
   const filteredLibrary = exerciseLibrary.filter(
-    (ex) => ex.name.toLowerCase().includes(exSearch.toLowerCase()) || ex.muscle_group.toLowerCase().includes(exSearch.toLowerCase())
+    (exercise) =>
+      (exercise.name ?? '').toLowerCase().includes(searchTerm) ||
+      (exercise.muscle_group ?? '').toLowerCase().includes(searchTerm),
   )
 
   const studentGroups = students.map((student) => ({
     student,
-    workouts: workouts.filter((w) => w.student_id === student.id),
+    workouts: workouts.filter((workout) => workout.student_id === student.id),
   }))
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* SELETOR DE ABAS DO TOPO */}
-      <div className="flex bg-zinc-950 p-1.5 rounded-2xl border border-zinc-900 shadow-xl">
-        <button
-          onClick={() => setActiveTab('students')}
-          className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
-            activeTab === 'students' ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" /> Alunos ({students.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
-            activeTab === 'templates' ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-white'
-          }`}
-        >
-          <FolderKanban className="w-4 h-4" /> Pastinha ({templates.length})
-        </button>
+    <div className="space-y-6">
+      <div className="flex rounded-2xl border border-zinc-900 bg-zinc-950 p-1.5 shadow-xl" role="tablist">
+        {(
+          [
+            { id: 'students', label: `Alunos (${students.length})`, icon: Users },
+            { id: 'templates', label: `Pastinha (${templates.length})`, icon: FolderKanban },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-xs font-black uppercase tracking-wider transition-all',
+              activeTab === tab.id ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-white',
+            )}
+          >
+            <tab.icon className="h-4 w-4" aria-hidden="true" /> {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* ABA 1: TREINOS DOS ALUNOS */}
+      <FeedbackAlert feedback={feedback} />
+      {loadError && <Alert variant="error">{loadError}</Alert>}
+
       {activeTab === 'students' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-black uppercase tracking-wide">Treinos Atribuídos</h1>
-              <p className="text-xs text-zinc-500 font-medium">Veja as cargas e prescreva treinos</p>
+              <h1 className="text-xl font-black uppercase tracking-wide">Treinos atribuídos</h1>
+              <p className="text-xs font-medium text-zinc-500">Prescreva treinos e veja as cargas</p>
             </div>
             <button
-              onClick={() => handleCreateNewWorkout()}
-              className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
+              type="button"
+              onClick={() => openBuilder({ kind: 'workout', editingId: null })}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold uppercase text-black shadow-lg active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Criar Treino
+              <Plus className="h-4 w-4" aria-hidden="true" /> Criar treino
             </button>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-12 text-zinc-500"><Loader2 className="animate-spin w-8 h-8" /></div>
+            <PageLoader label="Carregando treinos" />
+          ) : studentGroups.length === 0 ? (
+            <div className="rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center text-sm font-semibold text-zinc-400">
+              Cadastre um aluno na aba Alunos para prescrever treinos.
+            </div>
           ) : (
             <div className="space-y-4">
-              {studentGroups.map(({ student, workouts: sWorkouts }) => {
-                const isExpanded = !!expandedStudents[student.id]
+              {studentGroups.map(({ student, workouts: studentWorkouts }) => {
+                const isExpanded = Boolean(expandedStudents[student.id])
+                const activeCount = studentWorkouts.filter((workout) => workout.is_current).length
+
                 return (
-                  <div key={student.id} className="bg-zinc-950 border border-zinc-900 rounded-3xl overflow-hidden shadow-xl">
-                    <div
-                      onClick={() => toggleStudentAccordion(student.id)}
-                      className="p-5 flex items-center justify-between cursor-pointer hover:bg-zinc-900/50 transition-colors select-none"
+                  <div key={student.id} className="overflow-hidden rounded-3xl border border-zinc-900 bg-zinc-950 shadow-xl">
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      onClick={() => setExpandedStudents((previous) => ({ ...previous, [student.id]: !isExpanded }))}
+                      className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-zinc-900/50"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 bg-zinc-900 rounded-2xl flex items-center justify-center font-black text-white text-sm border border-zinc-800">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900 text-sm font-black text-white">
                           {student.full_name ? student.full_name.substring(0, 2).toUpperCase() : 'AL'}
                         </div>
-                        <div>
-                          <h3 className="font-extrabold text-base text-white">{student.full_name || 'Aluno sem nome'}</h3>
-                          <p className="text-[11px] text-zinc-500 font-medium">{sWorkouts.length} {sWorkouts.length === 1 ? 'Treino Prescrito' : 'Treinos Prescritos'}</p>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-extrabold text-white">
+                            {student.full_name || student.email || 'Aluno sem nome'}
+                          </h3>
+                          <p className="text-[11px] font-medium text-zinc-500">
+                            {activeCount} {activeCount === 1 ? 'treino ativo' : 'treinos ativos'}
+                            {studentWorkouts.length > activeCount && ` · ${studentWorkouts.length - activeCount} arquivado(s)`}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-1 rounded-lg">{sWorkouts.length}</span>
-                        {isExpanded ? <ChevronUp className="w-5 h-5 text-white" /> : <ChevronDown className="w-5 h-5 text-zinc-500" />}
-                      </div>
-                    </div>
+                      {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 shrink-0 text-white" aria-hidden="true" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 shrink-0 text-zinc-500" aria-hidden="true" />
+                      )}
+                    </button>
 
-                    {/* TREINOS DO ALUNO EXPANDIDOS */}
                     {isExpanded && (
-                      <div className="border-t border-zinc-900 bg-black/60 p-4 space-y-3">
-                        {sWorkouts.length === 0 ? (
-                          <div className="p-4 text-center text-xs text-zinc-600 font-medium space-y-2">
-                            <p>Nenhum treino prescrito para este aluno.</p>
-                            <button onClick={() => handleCreateNewWorkout(student.id)} className="text-emerald-400 font-bold hover:underline">+ Prescrever Treino</button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {sWorkouts.map((w) => (
-                              <div key={w.id} className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h4 className="font-extrabold text-base text-white">{w.name}</h4>
-                                    <span className="text-[9px] font-bold text-zinc-500 block mt-0.5">
-                                      Criado em {new Date(w.created_at).toLocaleDateString('pt-BR')}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5">
-                                    <button onClick={() => handleEditWorkout(w)} className="p-2 bg-zinc-950 border border-zinc-800 rounded-xl text-emerald-400 hover:text-white" title="Editar Treino"><Pencil className="w-4 h-4" /></button>
-                                    <button onClick={() => handleDeleteWorkout(w.id)} className="p-2 bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-500 hover:text-red-400" title="Excluir"><Trash2 className="w-4 h-4" /></button>
-                                  </div>
-                                </div>
-
-                                {/* BOTÃO NOVO PARA O JEAN VER AS CARGAS REGISTRADAS DESTE TREINO! */}
-                                <button
-                                  onClick={() => handleOpenWorkoutHistory(w)}
-                                  className="w-full bg-zinc-950 hover:bg-emerald-500 hover:text-black border border-zinc-800 text-emerald-400 font-bold text-xs uppercase py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95"
-                                >
-                                                                    <Eye className="w-4 h-4" /> Ver Cargas Registradas do Aluno
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+                      <div className="space-y-3 border-t border-zinc-900 bg-black/60 p-4">
+                        {studentWorkouts.length === 0 && (
+                          <p className="p-4 text-center text-xs font-medium text-zinc-600">
+                            Nenhum treino prescrito para este aluno.
+                          </p>
                         )}
 
+                        {studentWorkouts.map((workout) => (
+                          <div
+                            key={workout.id}
+                            className={cn(
+                              'space-y-3 rounded-2xl border p-4',
+                              workout.is_current ? 'border-zinc-800 bg-zinc-900/90' : 'border-zinc-900 bg-zinc-950 opacity-70',
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="truncate text-base font-extrabold text-white">{workout.name}</h4>
+                                  {!workout.is_current && (
+                                    <span className="rounded-md border border-zinc-800 px-1.5 py-0.5 text-[8px] font-black uppercase text-zinc-500">
+                                      Arquivado
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="mt-0.5 block text-[10px] font-bold text-zinc-500">
+                                  {countOf(workout.assigned_workout_exercises)} exercícios · criado em{' '}
+                                  {new Date(workout.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openBuilder(
+                                      { kind: 'workout', editingId: workout.id },
+                                      { studentId: workout.student_id, name: workout.name },
+                                    )
+                                  }
+                                  disabled={openingBuilder}
+                                  aria-label={`Editar ${workout.name}`}
+                                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-emerald-400 hover:text-white"
+                                >
+                                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleActive(workout)}
+                                  aria-label={workout.is_current ? `Arquivar ${workout.name}` : `Reativar ${workout.name}`}
+                                  title={workout.is_current ? 'Arquivar' : 'Reativar'}
+                                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-zinc-400 hover:text-white"
+                                >
+                                  {workout.is_current ? (
+                                    <Archive className="h-4 w-4" aria-hidden="true" />
+                                  ) : (
+                                    <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteWorkout(workout)}
+                                  aria-label={`Apagar ${workout.name}`}
+                                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-2 text-zinc-500 hover:text-red-400"
+                                >
+                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenWorkoutHistory(workout)}
+                              className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 py-2.5 text-xs font-bold uppercase text-emerald-400 transition-all hover:bg-emerald-500 hover:text-black active:scale-95"
+                            >
+                              <Eye className="h-4 w-4" aria-hidden="true" /> Ver cargas registradas
+                            </button>
+                          </div>
+                        ))}
+
                         <button
-                          onClick={() => handleCreateNewWorkout(student.id)}
-                          className="w-full py-3 bg-zinc-900 border border-dashed border-zinc-800 rounded-2xl text-xs font-bold text-zinc-400 hover:text-white uppercase flex items-center justify-center gap-1.5 transition-all mt-2"
+                          type="button"
+                          onClick={() => openBuilder({ kind: 'workout', editingId: null }, { studentId: student.id })}
+                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-zinc-800 bg-zinc-900 py-3 text-xs font-bold uppercase text-zinc-400 transition-all hover:text-white"
                         >
-                          <Plus className="w-4 h-4" /> Adicionar Mais um Treino
+                          <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar treino
                         </button>
                       </div>
                     )}
@@ -533,53 +726,71 @@ export default function AdminWorkoutsPage() {
         </div>
       )}
 
-      {/* ABA 2: PASTINHA DE MODELOS PRONTOS */}
       {activeTab === 'templates' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-black uppercase tracking-wide">Modelos Prontos</h1>
-              <p className="text-xs text-zinc-500 font-medium">Treinos pré-definidos para reusar</p>
+              <h1 className="text-xl font-black uppercase tracking-wide">Modelos prontos</h1>
+              <p className="text-xs font-medium text-zinc-500">Treinos pré-definidos para reusar</p>
             </div>
             <button
-              onClick={() => handleCreateNewTemplate()}
-              className="bg-white text-black font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase flex items-center gap-1.5 shadow-lg active:scale-95"
+              type="button"
+              onClick={() => openBuilder({ kind: 'template', editingId: null })}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold uppercase text-black shadow-lg active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Criar Modelo
+              <Plus className="h-4 w-4" aria-hidden="true" /> Criar modelo
             </button>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-12 text-zinc-500"><Loader2 className="animate-spin w-8 h-8" /></div>
+            <PageLoader label="Carregando modelos" />
           ) : templates.length === 0 ? (
-            <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-3">
-              <FolderKanban className="w-10 h-10 text-zinc-700 mx-auto" />
+            <div className="space-y-3 rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center">
+              <FolderKanban className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
               <p className="text-sm font-semibold text-zinc-400">Pastinha de modelos vazia.</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {templates.map((t) => (
-                <div key={t.id} className="bg-zinc-950 border border-zinc-900 rounded-3xl p-5 space-y-4 shadow-xl">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[9px] font-black uppercase text-amber-400 bg-amber-950/60 border border-amber-800/40 px-2 py-0.5 rounded-md">MODELO PRÉ-DEFINIDO</span>
-                      <h3 className="font-extrabold text-base text-white mt-1">{t.name}</h3>
+              {templates.map((template) => (
+                <div key={template.id} className="space-y-4 rounded-3xl border border-zinc-900 bg-zinc-950 p-5 shadow-xl">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="rounded-md border border-amber-800/40 bg-amber-950/60 px-2 py-0.5 text-[9px] font-black uppercase text-amber-400">
+                        Modelo · {countOf(template.workout_template_exercises)} exercícios
+                      </span>
+                      <h3 className="mt-1 truncate text-base font-extrabold text-white">{template.name}</h3>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => handleEditTemplate(t)} className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-emerald-400"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => handleDeleteTemplate(t.id)} className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openBuilder({ kind: 'template', editingId: template.id }, { name: template.name })}
+                        disabled={openingBuilder}
+                        aria-label={`Editar modelo ${template.name}`}
+                        className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-emerald-400"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTemplate(template)}
+                        aria-label={`Apagar modelo ${template.name}`}
+                        className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-zinc-500 hover:text-red-400"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
                     </div>
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => {
-                      setTemplateToAssign(t)
+                      setTemplateToAssign(template)
                       setAssignStudentId('')
-                      setShowAssignModal(true)
+                      setAssignError('')
                     }}
-                    className="w-full bg-zinc-900 hover:bg-white hover:text-black border border-zinc-800 text-white font-black text-xs uppercase py-3 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 py-3 text-xs font-black uppercase text-white transition-all hover:bg-white hover:text-black active:scale-95"
                   >
-                    <Send className="w-4 h-4" /> Atribuir a um Aluno
+                    <Send className="h-4 w-4" aria-hidden="true" /> Atribuir a um aluno
                   </button>
                 </div>
               ))}
@@ -588,210 +799,393 @@ export default function AdminWorkoutsPage() {
         </div>
       )}
 
-      {/* MODAL 👁️ VISUALIZADOR DE CARGAS REGISTRADAS DESTE TREINO */}
-      {showWorkoutHistoryModal && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-4 overflow-y-auto">
-          <div className="max-w-md mx-auto w-full space-y-6 pb-20">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-              <div>
-                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">
-                  CARGAS REGISTRADAS PELO ALUNO
-                </span>
-                <h2 className="text-lg font-black uppercase text-white">
-                  {selectedWorkoutForHistory?.name}
-                </h2>
-                <p className="text-xs text-zinc-500">
-                  Atleta: {selectedWorkoutForHistory?.profiles?.full_name || selectedWorkoutForHistory?.profiles?.email}
+      {/* Histórico de cargas do treino */}
+      <Modal
+        open={historyWorkout !== null}
+        onClose={closeHistory}
+        variant="sheet"
+        title={historyWorkout?.name}
+        description={`Cargas registradas por ${historyWorkout?.profiles?.full_name || historyWorkout?.profiles?.email || 'aluno'}`}
+      >
+        {loadingHistory ? (
+          <PageLoader label="Buscando histórico de cargas" />
+        ) : (
+          <div className="space-y-6">
+            {historyError && <Alert variant="error">{historyError}</Alert>}
+            {historySessions.length === 0 && !historyError ? (
+              <div className="space-y-3 rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center">
+                <History className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
+                <p className="text-sm font-semibold text-zinc-400">Nenhum treino concluído ainda.</p>
+                <p className="text-xs text-zinc-600">
+                  Quando o aluno marcar as séries e finalizar o treino, as cargas aparecem aqui.
                 </p>
               </div>
-              <button onClick={() => setShowWorkoutHistoryModal(false)} className="p-2 text-zinc-400 hover:text-white">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {loadingHistory ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 text-zinc-500">
-                <Loader2 className="animate-spin w-8 h-8 text-white" />
-                <p className="text-xs uppercase font-bold tracking-widest">Buscando histórico de cargas...</p>
-              </div>
-            ) : workoutSessionsHistory.length === 0 ? (
-              <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-3">
-                <History className="w-10 h-10 text-zinc-700 mx-auto" />
-                <p className="text-sm font-semibold text-zinc-400">Nenhum registro de execução ainda.</p>
-                <p className="text-xs text-zinc-600">Assim que o aluno treinar na academia e marcar as séries, os pesos (kg) e repetições aparecem aqui!</p>
-              </div>
             ) : (
-              <div className="space-y-6">
-                {workoutSessionsHistory.map((session) => (
-                  <div key={session.id} className="bg-zinc-950 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-                      <div>
-                        <span className="text-[9px] font-black uppercase text-zinc-500 block">SESSÃO CONCLUÍDA</span>
-                        <p className="text-xs font-extrabold text-white flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-                          {new Date(session.completed_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-
-                      <div className="bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl text-right">
-                        <span className="text-[8px] font-bold text-zinc-500 uppercase block">Esforço</span>
-                        <span className="text-xs font-black text-amber-400">RPE {session.session_rpe || '-'}/10</span>
-                      </div>
+              historySessions.map((session) => (
+                <div key={session.id} className="space-y-4 rounded-3xl border border-zinc-800 bg-zinc-950 p-5 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
+                    <div>
+                      <span className="block text-[9px] font-black uppercase text-zinc-500">Sessão concluída</span>
+                      <p className="mt-0.5 flex items-center gap-1 text-xs font-extrabold text-white">
+                        <Calendar className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" />
+                        {session.completed_at
+                          ? new Date(session.completed_at).toLocaleString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </p>
                     </div>
-
-                    <div className="space-y-4">
-                      {session.sets && session.sets.length > 0 ? (
-                        session.sets.reduce((acc: any[], setItem: any) => {
-                          const exName = setItem.exercises?.name || 'Exercício'
-                          const existing = acc.find((e) => e.name === exName)
-                          if (existing) { existing.sets.push(setItem) } else { acc.push({ name: exName, sets: [setItem] }) }
-                          return acc
-                        }, []).map((group: any, gIdx: number) => (
-                          <div key={gIdx} className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-3.5 space-y-2">
-                            <h4 className="font-bold text-xs text-emerald-400 flex items-center gap-1.5">
-                              <Dumbbell className="w-3.5 h-3.5" /> {group.name}
-                            </h4>
-
-                            <div className="space-y-1.5 pt-1">
-                              {group.sets.map((s: any, sIdx: number) => (
-                                <div key={sIdx} className="flex items-center justify-between bg-black/60 px-3 py-2 rounded-xl text-xs">
-                                  <span className="font-bold text-zinc-400 text-[11px]">Série #{s.set_number}</span>
-                                  <div className="flex items-center gap-3 font-extrabold text-white">
-                                    <span className="text-emerald-400">{s.weight_kg} kg</span>
-                                    <span className="text-zinc-500">×</span>
-                                    <span>{s.reps} reps</span>
-                                    {s.rir !== null && <span className="text-[10px] font-medium text-zinc-500 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded">RIR {s.rir}</span>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-zinc-600 text-center py-2">Nenhuma série registrada.</p>
-                      )}
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-right">
+                      <span className="block text-[8px] font-bold uppercase text-zinc-500">Esforço</span>
+                      <span className="text-xs font-black text-amber-400">RPE {session.session_rpe ?? '-'}/10</span>
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  {session.groups.length === 0 ? (
+                    <p className="py-2 text-center text-xs text-zinc-600">Nenhuma série registrada.</p>
+                  ) : (
+                    session.groups.map((group) => (
+                      <div key={group.name} className="space-y-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-3.5">
+                        <h4 className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                          <Dumbbell className="h-3.5 w-3.5" aria-hidden="true" /> {group.name}
+                        </h4>
+                        <div className="space-y-1.5 pt-1">
+                          {group.sets.map((set) => (
+                            <div key={set.id} className="flex items-center justify-between rounded-xl bg-black/60 px-3 py-2 text-xs">
+                              <span className="text-[11px] font-bold text-zinc-400">Série #{set.set_number}</span>
+                              <div className="flex items-center gap-3 font-extrabold text-white">
+                                <span className="text-emerald-400">{formatKg(Number(set.weight_kg) || 0)} kg</span>
+                                <span className="text-zinc-500">×</span>
+                                <span>{set.reps} reps</span>
+                                {set.rir !== null && (
+                                  <span className="rounded border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
+                                    RIR {set.rir}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ))
             )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* MODAL CONSTRUTOR / EDITOR */}
-      {showBuilder && (
-        <div className="fixed inset-0 bg-black/95 z-50 p-4 overflow-y-auto">
-          <div className="max-w-md mx-auto space-y-6 pb-20">
-            <div className="flex justify-between border-b border-zinc-800 pb-4">
-              <h2 className="text-lg font-black uppercase">{isTemplateMode ? '📁 Modelo' : '⚡ Treino'}</h2>
-              <button onClick={() => setShowBuilder(false)} className="text-zinc-400"><X className="w-6 h-6" /></button>
-            </div>
-
-            {errorMessage && <p className="text-xs text-red-400 font-bold">{errorMessage}</p>}
-
-            <form onSubmit={handleSave} className="space-y-4">
-              {!isTemplateMode && (
-                <select required value={selectedStudent} onChange={(e) => setSelectedStudent(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white">
-                  <option value="">Selecione um aluno...</option>
-                  {students.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}
-                </select>
-              )}
-
-              <input type="text" required value={workoutName} onChange={(e) => setWorkoutName(e.target.value)} placeholder="Nome" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white" />
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase text-zinc-400">Exercícios ({selectedExercises.length})</span>
-                  <button type="button" onClick={() => setShowExPicker(true)} className="bg-white text-black font-bold text-xs p-2 rounded-lg">+ Adicionar</button>
-                </div>
-
-                {selectedExercises.map((item, exIdx) => (
-                  <div key={exIdx} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-3">
-                    <div className="flex justify-between border-b border-zinc-800 pb-2">
-                      <h4 className="font-extrabold text-sm text-white">#{exIdx + 1} {item.name}</h4>
-                      <button type="button" onClick={() => handleRemoveExercise(exIdx)} className="text-zinc-500"><X className="w-4 h-4" /></button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {item.planned_sets.map((s: any, setIdx: number) => (
-                        <div key={setIdx} className="bg-zinc-900 border border-zinc-800 rounded-xl p-2 flex gap-2 items-center">
-                          <span className="text-xs text-zinc-500 font-bold">#{setIdx + 1}</span>
-                          <select value={s.type} onChange={(e) => handleUpdateIndividualSet(exIdx, setIdx, 'type', e.target.value)} className="bg-black text-[10px] p-1 rounded text-white border border-zinc-800">
-                            <option value="warmup">Aquecimento</option>
-                            <option value="feeder">Feeder</option>
-                            <option value="working">Working</option>
-                            <option value="top">Top Set</option>
-                          </select>
-                          <input type="text" value={s.reps} onChange={(e) => handleUpdateIndividualSet(exIdx, setIdx, 'reps', e.target.value)} placeholder="Reps" className="bg-black text-xs text-center p-1 rounded w-16 text-white border border-zinc-800" />
-                          <input type="number" value={s.rir} onChange={(e) => handleUpdateIndividualSet(exIdx, setIdx, 'rir', e.target.value)} placeholder="RIR" className="bg-black text-xs text-center p-1 rounded w-12 text-white border border-zinc-800" />
-                        </div>
-                      ))}
-                      <button type="button" onClick={() => handleAddSetToExercise(exIdx)} className="w-full text-[10px] text-zinc-400 border border-dashed border-zinc-800 py-1.5 rounded-lg">+ Série</button>
-                    </div>
-                  </div>
+      {/* Construtor / editor */}
+      <Modal
+        open={builder !== null}
+        onClose={closeBuilder}
+        variant="sheet"
+        title={
+          builder?.kind === 'template'
+            ? builder.editingId
+              ? 'Editar modelo'
+              : 'Novo modelo'
+            : builder?.editingId
+              ? 'Editar treino'
+              : 'Novo treino'
+        }
+      >
+        <form onSubmit={handleSave} className="space-y-4">
+          {builder?.kind === 'workout' && (
+            <div>
+              <label htmlFor="builder-student" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+                Aluno
+              </label>
+              <select
+                id="builder-student"
+                required
+                value={selectedStudent}
+                onChange={(event) => setSelectedStudent(event.target.value)}
+                className={inputClassName}
+              >
+                <option value="">Selecione um aluno...</option>
+                {students.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.full_name || student.email}
+                  </option>
                 ))}
-              </div>
+              </select>
+            </div>
+          )}
 
-              <button type="submit" disabled={saving} className="w-full bg-white text-black font-black py-4 rounded-xl text-xs uppercase mt-4">
-                {saving ? <Loader2 className="animate-spin w-4 h-4 mx-auto" /> : 'Salvar'}
-              </button>
-            </form>
+          <div>
+            <label htmlFor="builder-name" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+              Nome
+            </label>
+            <input
+              id="builder-name"
+              type="text"
+              required
+              value={workoutName}
+              onChange={(event) => setWorkoutName(event.target.value)}
+              placeholder="Ex: Treino A - Peito e tríceps"
+              className={inputClassName}
+            />
           </div>
-        </div>
-      )}
 
-      {/* MODAL ATRIBUIR MODELO */}
-      {showAssignModal && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-sm space-y-5">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black uppercase">Lançar Treino</h2>
-              <button onClick={() => setShowAssignModal(false)} className="text-zinc-400"><X className="w-5 h-5" /></button>
+              <span className="text-xs font-bold uppercase text-zinc-400">Exercícios ({selectedExercises.length})</span>
+              <button
+                type="button"
+                onClick={() => setShowExPicker(true)}
+                className="flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-xs font-bold text-black"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Adicionar
+              </button>
             </div>
 
-            <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase text-amber-400">Modelo Selecionado:</span>
-              <p className="font-extrabold text-base text-white">{templateToAssign?.name}</p>
-            </div>
+            {selectedExercises.length === 0 && (
+              <p className="rounded-2xl border border-dashed border-zinc-800 p-6 text-center text-xs text-zinc-500">
+                Nenhum exercício ainda. Toque em &quot;Adicionar&quot;.
+              </p>
+            )}
 
-            <form onSubmit={handleAssignTemplateToStudent} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">Escolha o Aluno</label>
-                <select required value={assignStudentId} onChange={(e) => setAssignStudentId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 text-sm text-white">
-                  <option value="">Selecione um aluno...</option>
-                  {students.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.email}</option>)}
-                </select>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setShowAssignModal(false)} className="w-1/2 bg-zinc-900 text-zinc-400 font-bold p-3.5 rounded-xl text-xs uppercase">Cancelar</button>
-                <button type="submit" disabled={saving} className="w-1/2 bg-white text-black font-extrabold p-3.5 rounded-xl text-xs uppercase flex items-center justify-center">
-                  {saving ? <Loader2 className="animate-spin w-4 h-4" /> : 'Lançar Treino'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* BUSCA EXERCÍCIO */}
-      {showExPicker && (
-        <div className="fixed inset-0 bg-black/95 z-50 p-4">
-          <div className="max-w-md mx-auto space-y-4">
-            <div className="flex justify-between"><h3 className="font-bold uppercase text-sm">Adicionar Exercício</h3><button onClick={() => setShowExPicker(false)}><X className="w-5 h-5" /></button></div>
-            <input type="text" value={exSearch} onChange={(e) => setExSearch(e.target.value)} placeholder="Buscar..." className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-white" />
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-              {filteredLibrary.map((ex) => (
-                <div key={ex.id} onClick={() => handleAddExerciseToWorkout(ex)} className="bg-zinc-900 p-3 rounded-xl flex justify-between cursor-pointer">
-                  <span className="text-xs font-bold text-white">{ex.name}</span>
-                  <Plus className="w-4 h-4 text-zinc-400" />
+            {selectedExercises.map((item, exIndex) => (
+              <div key={item.key} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                <div className="flex items-start justify-between gap-2 border-b border-zinc-800 pb-2">
+                  <div className="min-w-0">
+                    <h4 className="truncate text-sm font-extrabold text-white">
+                      #{exIndex + 1} {item.name}
+                    </h4>
+                    <p className="text-[10px] font-bold uppercase text-zinc-500">{item.muscle_group}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveExercise(exIndex, -1)}
+                      disabled={exIndex === 0}
+                      aria-label={`Mover ${item.name} para cima`}
+                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-white disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveExercise(exIndex, 1)}
+                      disabled={exIndex === selectedExercises.length - 1}
+                      aria-label={`Mover ${item.name} para baixo`}
+                      className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-white disabled:opacity-30"
+                    >
+                      <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExercises((items) => items.filter((_, index) => index !== exIndex))}
+                      aria-label={`Remover ${item.name}`}
+                      className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-900 hover:text-red-400"
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="flex flex-wrap gap-1.5" aria-label="Aplicar repetições a todas as séries">
+                  {REP_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() =>
+                        updateExerciseAt(exIndex, (current) => ({
+                          ...current,
+                          planned_sets: current.planned_sets.map((set) => ({ ...set, reps: preset })),
+                        }))
+                      }
+                      className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-[10px] font-bold text-zinc-400 hover:border-zinc-600 hover:text-white"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  {item.planned_sets.map((set, setIndex) => (
+                    <div key={setIndex} className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-2">
+                      <span className="w-5 text-xs font-bold text-zinc-500">#{setIndex + 1}</span>
+                      <select
+                        value={set.type}
+                        onChange={(event) => updateSetAt(exIndex, setIndex, { type: event.target.value })}
+                        aria-label={`Tipo da série ${setIndex + 1}`}
+                        className="min-w-0 flex-1 rounded border border-zinc-800 bg-black p-1 text-[11px] text-white"
+                      >
+                        {SET_TYPES.map((setType) => (
+                          <option key={setType.value} value={setType.value}>
+                            {setType.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={set.reps ?? ''}
+                        onChange={(event) => updateSetAt(exIndex, setIndex, { reps: event.target.value })}
+                        placeholder="Reps"
+                        aria-label={`Repetições da série ${setIndex + 1}`}
+                        className="w-16 rounded border border-zinc-800 bg-black p-1 text-center text-xs text-white"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={set.rir ?? ''}
+                        onChange={(event) => updateSetAt(exIndex, setIndex, { rir: event.target.value })}
+                        placeholder="RIR"
+                        aria-label={`RIR da série ${setIndex + 1}`}
+                        className="w-12 rounded border border-zinc-800 bg-black p-1 text-center text-xs text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateExerciseAt(exIndex, (current) => ({
+                            ...current,
+                            planned_sets: current.planned_sets.filter((_, index) => index !== setIndex),
+                          }))
+                        }
+                        aria-label={`Remover série ${setIndex + 1}`}
+                        className="rounded p-1 text-zinc-600 hover:text-red-400"
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateExerciseAt(exIndex, (current) => ({
+                        ...current,
+                        planned_sets: [...current.planned_sets, { type: 'working', reps: '8-12', rir: 1 }],
+                      }))
+                    }
+                    className="w-full rounded-lg border border-dashed border-zinc-800 py-1.5 text-[10px] text-zinc-400 hover:text-white"
+                  >
+                    + Série
+                  </button>
+                </div>
+
+                <textarea
+                  value={item.notes}
+                  onChange={(event) => updateExerciseAt(exIndex, (current) => ({ ...current, notes: event.target.value }))}
+                  placeholder="Observações para o aluno (opcional)"
+                  aria-label={`Observações de ${item.name}`}
+                  rows={2}
+                  className="w-full rounded-xl border border-zinc-800 bg-black p-2.5 text-xs text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
+                />
+              </div>
+            ))}
           </div>
+
+          {builderError && <Alert variant="error">{builderError}</Alert>}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="mt-4 flex w-full items-center justify-center rounded-xl bg-white py-4 text-xs font-black uppercase text-black disabled:opacity-60"
+          >
+            {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Salvando" /> : 'Salvar'}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Escolher exercício da biblioteca */}
+      <Modal
+        open={showExPicker}
+        onClose={closePicker}
+        variant="sheet"
+        title="Adicionar exercício"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-zinc-500" aria-hidden="true" />
+            <input
+              type="search"
+              value={exSearch}
+              onChange={(event) => setExSearch(event.target.value)}
+              placeholder="Buscar por nome ou músculo..."
+              aria-label="Buscar exercício"
+              className={cn(inputClassName, 'pl-10')}
+            />
+          </div>
+          <ul className="space-y-2">
+            {filteredLibrary.map((exercise) => (
+              <li key={exercise.id}>
+                <button
+                  type="button"
+                  onClick={() => handleAddExercise(exercise)}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl bg-zinc-900 p-3 text-left hover:bg-zinc-800"
+                >
+                  <span>
+                    <span className="block text-xs font-bold text-white">{exercise.name}</span>
+                    <span className="block text-[10px] font-semibold uppercase text-zinc-500">
+                      {exercise.muscle_group || 'Geral'}
+                    </span>
+                  </span>
+                  <Plus className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+            {filteredLibrary.length === 0 && (
+              <li className="py-6 text-center text-xs text-zinc-500">Nenhum exercício encontrado.</li>
+            )}
+          </ul>
         </div>
-      )}
+      </Modal>
+
+      {/* Atribuir modelo */}
+      <Modal open={templateToAssign !== null} onClose={closeAssign} title="Lançar treino">
+        <div className="mb-4 space-y-1">
+          <span className="text-[10px] font-black uppercase text-amber-400">Modelo selecionado</span>
+          <p className="text-base font-extrabold text-white">{templateToAssign?.name}</p>
+        </div>
+
+        <form onSubmit={handleAssignTemplateToStudent} className="space-y-4">
+          <div>
+            <label htmlFor="assign-student" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+              Escolha o aluno
+            </label>
+            <select
+              id="assign-student"
+              required
+              value={assignStudentId}
+              onChange={(event) => setAssignStudentId(event.target.value)}
+              className={inputClassName}
+            >
+              <option value="">Selecione um aluno...</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {student.full_name || student.email}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {assignError && <Alert variant="error">{assignError}</Alert>}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={closeAssign}
+              className="w-1/2 rounded-xl bg-zinc-900 p-3.5 text-xs font-bold uppercase text-zinc-400"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex w-1/2 items-center justify-center rounded-xl bg-white p-3.5 text-xs font-extrabold uppercase text-black disabled:opacity-60"
+            >
+              {saving ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Lançando" /> : 'Lançar treino'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
-                          }
+}

@@ -1,50 +1,76 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '../../../lib/supabase/client'
-import { Send, Bell, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { LoaderCircle, Send } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { Profile } from '@/lib/types'
+import { Alert, FeedbackAlert, type Feedback } from '@/components/ui/alert'
+
+const ALL_STUDENTS = 'all'
+const inputClassName =
+  'w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white placeholder:text-zinc-600 focus:border-white focus:outline-none'
 
 export default function AdminAnnouncementsPage() {
-  const [students, setStudents] = useState<any[]>([])
+  const [supabase] = useState(() => createClient())
+  const [students, setStudents] = useState<Profile[]>([])
+  const [loadError, setLoadError] = useState('')
   const [selectedStudent, setSelectedStudent] = useState('')
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
-  const [feedback, setFeedback] = useState('')
-
-  const supabase = createClient()
+  const [feedback, setFeedback] = useState<Feedback>(null)
 
   useEffect(() => {
-    loadStudents()
-  }, [])
+    let active = true
 
-  const loadStudents = async () => {
-    const { data } = await supabase.from('profiles').select('*').eq('role', 'student')
-    if (data) setStudents(data)
-  }
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, role, full_name, email')
+        .eq('role', 'student')
+        .order('full_name')
+      if (!active) return
+      if (error) setLoadError(`Não foi possível carregar os alunos: ${error.message}`)
+      else setStudents((data ?? []) as Profile[])
+    }
 
-  const handleSendAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault()
+    void load()
+    return () => {
+      active = false
+    }
+  }, [supabase])
+
+  const handleSendAnnouncement = async (event: React.FormEvent) => {
+    event.preventDefault()
     if (!selectedStudent) return
 
+    const recipients = selectedStudent === ALL_STUDENTS ? students.map((student) => student.id) : [selectedStudent]
+    if (recipients.length === 0) {
+      setFeedback({ type: 'error', message: 'Nenhum aluno para receber o aviso.' })
+      return
+    }
+
     setSending(true)
-    setFeedback('')
+    setFeedback(null)
 
-    const { error } = await supabase.from('notifications').insert([
-      {
-        recipient_id: selectedStudent,
+    const { error } = await supabase.from('notifications').insert(
+      recipients.map((recipientId) => ({
+        recipient_id: recipientId,
         type: 'announcement',
-        title,
-        message,
-      },
-    ])
+        title: title.trim(),
+        message: message.trim(),
+      })),
+    )
 
-    if (!error) {
-      setFeedback('Aviso enviado com sucesso!')
+    if (error) {
+      setFeedback({ type: 'error', message: `Erro ao enviar aviso: ${error.message}` })
+    } else {
+      setFeedback({
+        type: 'success',
+        message: recipients.length > 1 ? `Aviso enviado para ${recipients.length} alunos!` : 'Aviso enviado com sucesso!',
+      })
       setTitle('')
       setMessage('')
-    } else {
-      setFeedback('Erro ao enviar aviso.')
     }
     setSending(false)
   }
@@ -52,60 +78,79 @@ export default function AdminAnnouncementsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-black uppercase tracking-wide">Enviar Aviso</h1>
-        <p className="text-xs text-zinc-500 font-medium">Envie mensagens individuais aos alunos</p>
+        <h1 className="text-xl font-black uppercase tracking-wide">Enviar aviso</h1>
+        <p className="text-xs font-medium text-zinc-500">O aviso aparece no perfil do aluno</p>
       </div>
 
-      <form onSubmit={handleSendAnnouncement} className="bg-zinc-950 border border-zinc-900 rounded-2xl p-5 space-y-4">
+      {loadError && <Alert variant="error">{loadError}</Alert>}
+
+      <form onSubmit={handleSendAnnouncement} className="space-y-4 rounded-2xl border border-zinc-900 bg-zinc-950 p-5">
         <div>
-          <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">Selecione o Aluno</label>
+          <label htmlFor="announcement-student" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+            Para
+          </label>
           <select
+            id="announcement-student"
             required
             value={selectedStudent}
-            onChange={(e) => setSelectedStudent(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white"
+            onChange={(event) => setSelectedStudent(event.target.value)}
+            className={inputClassName}
           >
             <option value="">Selecione um aluno...</option>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name || s.email}
+            {students.length > 1 && <option value={ALL_STUDENTS}>Todos os alunos ({students.length})</option>}
+            {students.map((student) => (
+              <option key={student.id} value={student.id}>
+                {student.full_name || student.email}
               </option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">Título do Aviso</label>
+          <label htmlFor="announcement-title" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+            Título do aviso
+          </label>
           <input
+            id="announcement-title"
             type="text"
             required
+            maxLength={120}
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(event) => setTitle(event.target.value)}
             placeholder="Ex: Atualização da carga de treino"
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white"
+            className={inputClassName}
           />
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-zinc-400 uppercase block mb-1">Mensagem</label>
+          <label htmlFor="announcement-message" className="mb-1 block text-xs font-semibold uppercase text-zinc-400">
+            Mensagem
+          </label>
           <textarea
+            id="announcement-message"
             required
             rows={4}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(event) => setMessage(event.target.value)}
             placeholder="Escreva a mensagem para o aluno..."
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm text-white"
+            className={inputClassName}
           />
         </div>
 
-        {feedback && <p className="text-xs text-emerald-400 font-bold text-center">{feedback}</p>}
+        <FeedbackAlert feedback={feedback} />
 
         <button
           type="submit"
           disabled={sending}
-          className="w-full bg-white text-black font-extrabold p-4 rounded-xl text-xs uppercase flex items-center justify-center gap-2"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white p-4 text-xs font-extrabold uppercase text-black disabled:opacity-60"
         >
-          {sending ? <Loader2 className="animate-spin w-4 h-4" /> : <><Send className="w-4 h-4" /> Enviar Aviso</>}
+          {sending ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Enviando" />
+          ) : (
+            <>
+              <Send className="h-4 w-4" aria-hidden="true" /> Enviar aviso
+            </>
+          )}
         </button>
       </form>
     </div>

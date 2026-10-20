@@ -1,75 +1,162 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '../../../lib/supabase/client'
-import { Dumbbell, Loader2, ArrowRight } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { ArrowRight, Dumbbell } from 'lucide-react'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
+import type { AssignedWorkout } from '@/lib/types'
+import { RESUME_WINDOW_MS, pickNextWorkout } from '@/lib/workouts'
+import { cn } from '@/lib/cn'
+import { Alert } from '@/components/ui/alert'
+import { PageLoader } from '@/components/ui/page-loader'
+import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 
-export default function StudentRoutinePage() {
-  const [workouts, setWorkouts] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const supabase = createClient()
-  const router = useRouter()
+type RoutineWorkout = AssignedWorkout & {
+  assigned_workout_exercises?: { count: number }[]
+  lastDoneAt: string | null
+  inProgress: boolean
+}
+
+export default function StudentWeekPage() {
+  const [supabase] = useState(() => createClient())
+  const [workouts, setWorkouts] = useState<RoutineWorkout[] | null>(null)
+  const [nextWorkoutId, setNextWorkoutId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    loadWorkouts()
-  }, [])
+    let active = true
 
-  const loadWorkouts = async () => {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      // Busca TODOS os treinos ativos do aluno
-      const { data } = await supabase
-        .from('assigned_workouts')
-        .select('*')
-        .eq('student_id', user.id)
-        .eq('is_current', true)
-        .order('name', { ascending: true })
+    const load = async () => {
+      const user = await getCurrentUser(supabase)
+      if (!active || !user) return
 
-      if (data) setWorkouts(data)
+      const [workoutsResult, sessionsResult] = await Promise.all([
+        supabase
+          .from('assigned_workouts')
+          .select('*, assigned_workout_exercises(count)')
+          .eq('student_id', user.id)
+          .eq('is_current', true)
+          .order('name', { ascending: true }),
+        supabase
+          .from('workout_sessions')
+          .select('assigned_workout_id, status, created_at, completed_at')
+          .eq('student_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(60),
+      ])
+      if (!active) return
+
+      const error = workoutsResult.error ?? sessionsResult.error
+      if (error) {
+        setLoadError(`Não foi possível carregar sua rotina: ${error.message}`)
+        setWorkouts([])
+        return
+      }
+
+      const sessions = (sessionsResult.data ?? []) as {
+        assigned_workout_id: string
+        status: string
+        created_at: string
+        completed_at: string | null
+      }[]
+      const lastDone = new Map<string, string>()
+      for (const session of sessions) {
+        if (session.status === 'completed' && session.completed_at && !lastDone.has(session.assigned_workout_id)) {
+          lastDone.set(session.assigned_workout_id, session.completed_at)
+        }
+      }
+      const inProgressId =
+        sessions.find(
+          (session) => session.status === 'in_progress' && Date.now() - new Date(session.created_at).getTime() < RESUME_WINDOW_MS,
+        )?.assigned_workout_id ?? null
+
+      const rows = ((workoutsResult.data ?? []) as RoutineWorkout[]).map((workout) => ({
+        ...workout,
+        lastDoneAt: lastDone.get(workout.id) ?? null,
+        inProgress: workout.id === inProgressId,
+      }))
+      setWorkouts(rows)
+      setNextWorkoutId(pickNextWorkout(rows, lastDone, inProgressId)?.id ?? null)
     }
-    setLoading(false)
-  }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [supabase])
 
   return (
-    <div className="space-y-6 pb-20">
-      <div>
-        <h1 className="text-3xl font-black uppercase tracking-wide text-white">Rotina</h1>
-        <p className="text-xs text-zinc-500 font-bold tracking-widest uppercase mt-1">Seu cronograma atual</p>
-      </div>
+    <div className="space-y-8">
+      <section className="space-y-4">
+        <div>
+          <h1 className="text-3xl font-black uppercase tracking-wide text-white">Rotina</h1>
+          <p className="mt-1 text-xs font-bold uppercase tracking-widest text-zinc-500">Seus treinos ativos</p>
+        </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin w-8 h-8 text-zinc-500" /></div>
-      ) : workouts.length === 0 ? (
-        <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-8 text-center space-y-4">
-          <Dumbbell className="w-10 h-10 text-zinc-700 mx-auto" />
-          <h3 className="font-black text-sm text-zinc-400 uppercase">Sem treinos ativos</h3>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {workouts.map((w, idx) => (
-            <div
-              key={w.id}
-              onClick={() => router.push(`/student/workout/${w.id}`)}
-              className="bg-zinc-950 border border-zinc-900 hover:border-zinc-700 rounded-3xl p-5 flex items-center justify-between cursor-pointer active:scale-[0.98] transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center font-black text-zinc-500 text-lg border border-zinc-800 group-hover:border-emerald-500/50 group-hover:text-emerald-400 transition-colors">
-                  {String.fromCharCode(65 + idx)} {/* Transforma 0,1,2 em A, B, C */}
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-white">{w.name}</h3>
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
-                    Toque para iniciar
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-zinc-600 group-hover:text-white transition-colors" />
-            </div>
-          ))}
-        </div>
-      )}
+        {loadError && <Alert variant="error">{loadError}</Alert>}
+
+        {workouts === null ? (
+          <PageLoader label="Carregando rotina" />
+        ) : workouts.length === 0 ? (
+          <div className="space-y-4 rounded-3xl border border-zinc-900 bg-zinc-950 p-8 text-center">
+            <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
+            <h2 className="text-sm font-black uppercase text-zinc-400">Sem treinos ativos</h2>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {workouts.map((workout, index) => {
+              const isNext = workout.id === nextWorkoutId
+              const exerciseCount = workout.assigned_workout_exercises?.[0]?.count ?? 0
+              return (
+                <li key={workout.id}>
+                  <Link
+                    href={`/student/workout/${workout.id}`}
+                    className={cn(
+                      'group flex items-center justify-between gap-3 rounded-3xl border bg-zinc-950 p-5 transition-all active:scale-[0.98]',
+                      isNext ? 'border-emerald-800/60' : 'border-zinc-900 hover:border-zinc-700',
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div
+                        className={cn(
+                          'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-lg font-black transition-colors',
+                          isNext
+                            ? 'border-emerald-500/50 bg-emerald-950/40 text-emerald-400'
+                            : 'border-zinc-800 bg-zinc-900 text-zinc-500 group-hover:text-white',
+                        )}
+                        aria-hidden="true"
+                      >
+                        {index < 26 ? String.fromCharCode(65 + index) : index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h2 className="truncate text-base font-black text-white">{workout.name}</h2>
+                          {isNext && (
+                            <span className="shrink-0 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-black">
+                              {workout.inProgress ? 'Em andamento' : 'Próximo'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                          {exerciseCount} exercícios ·{' '}
+                          {workout.lastDoneAt
+                            ? `feito em ${new Date(workout.lastDoneAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+                            : 'ainda não feito'}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 shrink-0 text-zinc-600 transition-colors group-hover:text-white" aria-hidden="true" />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <div className="rounded-3xl border border-zinc-900 bg-zinc-950/60 p-5">
+        <WeeklyTrainingInsights mode="student" />
+      </div>
     </div>
   )
 }

@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { cn } from '@/lib/cn'
 
 // Gradientes discretos dentro da paleta (esmeralda, âmbar, grafite) para
@@ -26,6 +29,8 @@ export function initialsOf(name: string | null | undefined) {
 type AvatarProps = {
   name: string | null | undefined
   seed?: string
+  // Foto de perfil (URL pública); sem ela, ou se falhar, mostra as iniciais.
+  src?: string | null
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
@@ -38,19 +43,35 @@ const SIZES = {
   xl: 'h-20 w-20 text-2xl',
 }
 
-export function Avatar({ name, seed, size = 'md', className }: AvatarProps) {
+export function Avatar({ name, seed, src, size = 'md', className }: AvatarProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const gradient = GRADIENTS[hash(seed ?? name ?? '') % GRADIENTS.length]
+  const showPhoto = Boolean(src) && failedSrc !== src
+
   return (
     <span
       aria-hidden="true"
       className={cn(
-        'grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br font-display font-bold text-black',
+        'grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br font-display font-bold text-black',
         gradient,
         SIZES[size],
         className,
       )}
     >
-      {initialsOf(name)}
+      {showPhoto ? (
+        // eslint-disable-next-line @next/next/no-img-element -- foto do bucket público do Supabase, já reduzida para 512 px
+        <img
+          src={src as string}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onError={() => setFailedSrc(src ?? null)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        initialsOf(name)
+      )}
     </span>
   )
 }

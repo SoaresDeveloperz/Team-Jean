@@ -9,7 +9,6 @@ import {
   CommunityError,
   MAX_PHOTOS,
   POST_MAX,
-  compressImage,
   createPost,
   isAchievementMeta,
   isWorkoutMeta,
@@ -18,6 +17,8 @@ import {
   type FeedPost,
   type PostDraft,
 } from '@/lib/community'
+import { compressImage } from '@/lib/images'
+import { publicImageUrl } from '@/lib/profile'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
@@ -56,7 +57,7 @@ type ComposerProps = {
 export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin = false }: ComposerProps) {
   const [supabase] = useState(() => createClient())
   const bodyId = useId()
-  const [author, setAuthor] = useState<{ id: string; name: string } | null>(null)
+  const [author, setAuthor] = useState<{ id: string; name: string; avatar: string | null } | null>(null)
   const [body, setBody] = useState('')
   const [photos, setPhotos] = useState<SelectedPhoto[]>([])
   const [pinned, setPinned] = useState(false)
@@ -82,10 +83,15 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
     const load = async () => {
       const user = await getCurrentUser(supabase)
       if (!active || !user) return
-      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
+      // select('*'): avatar_path só existe depois do profile.sql.
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
       if (!active) return
-      const name = (data as { full_name?: string | null } | null)?.full_name?.trim()
-      setAuthor({ id: user.id, name: name || 'Você' })
+      const profile = data as { full_name?: string | null; avatar_path?: string | null } | null
+      setAuthor({
+        id: user.id,
+        name: profile?.full_name?.trim() || 'Você',
+        avatar: publicImageUrl(profile?.avatar_path, user.id),
+      })
     }
     void load()
     return () => {
@@ -181,7 +187,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
     <Modal open={open} onClose={close} variant="sheet" title={TITLES[draft.kind]} description="Visível para toda a equipe Team Jean.">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Avatar name={author?.name} seed={author?.id} size="md" />
+          <Avatar name={author?.name} seed={author?.id} src={author?.avatar} size="md" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-white">{author?.name ?? 'Carregando...'}</p>
             <p className="text-[11px] text-zinc-500">Publicando na Comunidade</p>

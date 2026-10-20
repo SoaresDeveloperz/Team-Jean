@@ -9,6 +9,12 @@ export type Profile = {
   email: string | null
   readiness_score?: number | null
   created_at?: string | null
+  // supabase/profile.sql
+  avatar_path?: string | null
+  cover_path?: string | null
+  bio?: string | null
+  goal?: string | null
+  instagram?: string | null
 }
 
 export type Exercise = {

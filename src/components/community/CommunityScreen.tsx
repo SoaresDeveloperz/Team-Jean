@@ -18,6 +18,7 @@ import {
   type FeedPost,
   type PostDraft,
 } from '@/lib/community'
+import { avatarUrlOf } from '@/lib/profile'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
@@ -107,6 +108,7 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
   }, [supabase, reloadKey])
 
   const workoutsById = useMemo(() => new Map(members.map((member) => [member.id, member.total_workouts])), [members])
+  const avatarUrls = useMemo(() => new Map(members.map((member) => [member.id, avatarUrlOf(member)])), [members])
   const viewerName = members.find((member) => member.id === viewerId)?.full_name ?? null
 
   const refresh = () => {
@@ -326,7 +328,7 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
             onClick={() => setComposerOpen(true)}
             className="flex w-full items-center gap-3 rounded-3xl border border-line bg-surface p-3 text-left transition hover:border-line-strong"
           >
-            <Avatar name={viewerName ?? (viewerIsAdmin ? 'Treinador' : 'Você')} seed={viewerId} size="md" />
+            <Avatar name={viewerName ?? (viewerIsAdmin ? 'Treinador' : 'Você')} seed={viewerId} src={avatarUrls.get(viewerId)} size="md" />
             <span className="min-w-0 flex-1 text-sm text-zinc-400">
               {viewerIsAdmin ? 'Escreva um recado ou poste uma foto para a equipe...' : 'Compartilhe um treino, uma foto ou uma conquista...'}
             </span>
@@ -356,6 +358,7 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
                     <PostCard
                       post={post}
                       authorWorkouts={workoutsById.get(post.author_id) ?? null}
+                      avatarUrls={avatarUrls}
                       viewerId={viewerId}
                       viewerIsAdmin={viewerIsAdmin}
                       onToggleLike={toggleLike}

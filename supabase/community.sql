@@ -216,14 +216,18 @@ create policy "community: dono ou treinador apaga foto" on storage.objects
   );
 
 -- -----------------------------------------------------------------------------
--- Membros para o ranking e os níveis: só nome, papel e contagem de treinos
+-- Membros para o ranking e os níveis: só nome, papel, foto e contagem de treinos
+-- (mesma definição do profile.sql, para os dois rodarem em qualquer ordem)
 -- -----------------------------------------------------------------------------
+alter table public.profiles add column if not exists avatar_path text;
+
 drop function if exists public.community_members();
 create function public.community_members()
 returns table (
   id uuid,
   full_name text,
   role text,
+  avatar_path text,
   total_workouts bigint,
   week_workouts bigint
 )
@@ -236,6 +240,7 @@ as $$
     p.id,
     coalesce(nullif(trim(p.full_name), ''), 'Atleta'),
     lower(trim(p.role::text)),
+    p.avatar_path,
     count(s.id) filter (where s.status = 'completed'),
     count(s.id) filter (
       where s.status = 'completed'
@@ -244,7 +249,7 @@ as $$
   from public.profiles p
   left join public.workout_sessions s on s.student_id = p.id
   where auth.uid() is not null
-  group by p.id, p.full_name, p.role;
+  group by p.id, p.full_name, p.role, p.avatar_path;
 $$;
 
 revoke all on function public.community_members() from public, anon;

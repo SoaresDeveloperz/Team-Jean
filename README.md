@@ -41,7 +41,24 @@ rodado mais de uma vez. Enquanto não for rodado, o app mostra como ativar.
   celular para no máximo 1600 px) e aparecem por links temporários.
 - O treinador fixa e apaga qualquer post ou comentário; cada aluno apaga só o
   que é dele.
-- O ranking mostra apenas nome e quantidade de treinos da semana.
+- O ranking mostra apenas nome, foto de perfil e quantidade de treinos da semana.
+
+## Perfil e medidas
+
+O **Perfil** do aluno tem foto e capa (com recorte: arrastar, pinça e zoom),
+bio, objetivo, Instagram e o registro de medidas (peso, % de gordura, cintura e
+fotos de evolução com comparação antes e depois). Depois do `policies.sql`, rode
+[`supabase/profile.sql`](supabase/profile.sql) no SQL Editor. Ele pode ser rodado
+mais de uma vez, antes ou depois do `community.sql`. Enquanto não for rodado, o
+app avisa que o recurso ainda não foi ativado.
+
+- Foto e capa ficam no bucket público `avatars` (quem tem o link vê); cada pessoa
+  só envia na própria pasta. O recorte e a redução acontecem no celular (foto
+  512 × 512, capa 1500 × 500).
+- Fotos de evolução ficam no bucket privado `progress`: só o aluno e o treinador
+  veem, por links temporários.
+- O treinador vê e registra as medidas na ficha do aluno e troca a própria foto
+  no painel.
 
 ## Scripts
 

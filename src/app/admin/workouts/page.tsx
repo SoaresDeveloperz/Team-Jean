@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PlannedSet, PrescribedExercise, Profile, WorkoutSession } from '@/lib/types'
+import { avatarUrlOf } from '@/lib/profile'
 import { createDefaultPlannedSets, getPlannedSets, normalizeRir } from '@/lib/workouts'
 import { plural } from '@/lib/text'
 import { summarizePrescription, summarizeWork, summaryLine, type WorkoutSummary } from '@/lib/workout-summary'
@@ -194,7 +195,8 @@ export default function AdminWorkoutsPage() {
           .select('*, profiles(full_name, email)')
           .order('created_at', { ascending: false }),
         supabase.from('workout_templates').select('id, name').order('name'),
-        supabase.from('profiles').select('id, role, full_name, email').eq('role', 'student').order('full_name'),
+        // select('*'): a foto (avatar_path) só existe depois do profile.sql.
+        supabase.from('profiles').select('*').eq('role', 'student').order('full_name'),
         supabase.from('exercises').select('*').order('name'),
         supabase.from('workout_template_exercises').select(TEMPLATE_SUMMARY_COLUMNS).limit(1000),
       ])
@@ -880,7 +882,7 @@ export default function AdminWorkoutsPage() {
                       onClick={() => toggleStudent(student.id)}
                       className="flex w-full items-center gap-3.5 p-4 text-left transition-colors hover:bg-white/[0.02]"
                     >
-                      <Avatar name={student.full_name ?? student.email} seed={student.id} size="md" />
+                      <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold text-white">
                           {student.full_name || student.email || 'Aluno sem nome'}
@@ -1382,7 +1384,7 @@ export default function AdminWorkoutsPage() {
                       onChange={() => setAssignStudentId(student.id)}
                       className="sr-only"
                     />
-                    <Avatar name={student.full_name ?? student.email} seed={student.id} size="sm" />
+                    <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
                       {student.full_name || student.email}
                     </span>

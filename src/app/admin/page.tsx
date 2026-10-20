@@ -1,11 +1,24 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { m } from 'framer-motion'
-import { BatteryLow, ChevronRight, ClipboardList, Megaphone, TimerOff, TrendingUp, UserPlus, Users, Zap } from 'lucide-react'
+import {
+  BatteryLow,
+  Camera,
+  ChevronRight,
+  ClipboardList,
+  LoaderCircle,
+  Megaphone,
+  TimerOff,
+  TrendingUp,
+  UserPlus,
+  Users,
+  Zap,
+} from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
+import { avatarUrlOf } from '@/lib/profile'
 import { formatKg } from '@/lib/workouts'
 import { relativeDay, relativeDayPhrase, startOfDay, startOfWeek } from '@/lib/stats'
 import { cn } from '@/lib/cn'
@@ -16,6 +29,7 @@ import { ProgressRing } from '@/components/ui/progress-ring'
 import { PageSkeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
+import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
 
 type SessionRow = {
   id: string
@@ -26,7 +40,7 @@ type SessionRow = {
 }
 
 type DashboardData = {
-  coachName: string
+  coach: Profile
   students: Profile[]
   sessions: SessionRow[]
   volumeBySession: Map<string, number>
@@ -45,6 +59,10 @@ export default function AdminDashboardPage() {
   const [supabase] = useState(() => createClient())
   const [data, setData] = useState<DashboardData | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const closePhotoMenu = useCallback(() => setPhotoMenuOpen(false), [])
+  const handlePhotoUploading = useCallback((kind: string | null) => setUploadingPhoto(kind !== null), [])
 
   useEffect(() => {
     let active = true
@@ -55,7 +73,8 @@ export default function AdminDashboardPage() {
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000)
 
       const [coachResult, studentsResult, sessionsResult] = await Promise.all([
-        supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
+        // select('*'): a foto (avatar_path) só existe depois do profile.sql.
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         supabase.from('profiles').select('*').eq('role', 'student').order('full_name'),
         supabase
           .from('workout_sessions')
@@ -93,7 +112,7 @@ export default function AdminDashboardPage() {
       }
 
       setData({
-        coachName: (coachResult.data as { full_name?: string | null } | null)?.full_name?.split(' ')[0] || 'treinador',
+        coach: { id: user.id, role: 'admin', full_name: null, email: user.email ?? null, ...(coachResult.data as Partial<Profile> | null) },
         students: (studentsResult.data ?? []) as Profile[],
         sessions,
         volumeBySession,
@@ -156,6 +175,7 @@ export default function AdminDashboardPage() {
 
   const now = new Date()
   const maxDay = Math.max(1, ...derived.lastSevenDays)
+  const coachName = data.coach.full_name?.trim().split(' ')[0] || 'treinador'
   const readinessColor =
     derived.averageReadiness === null
       ? 'text-zinc-400'
@@ -168,16 +188,43 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <Stagger className="space-y-4">
-        <m.header variants={tileVariants} className="px-1">
-          <Eyebrow>{now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Eyebrow>
-          <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">
-            {greeting(now)}, {data.coachName}!
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            {derived.trainedThisWeek === 0
-              ? 'Nenhum aluno treinou ainda nesta semana.'
-              : `${derived.trainedThisWeek} de ${data.students.length} alunos já treinaram nesta semana.`}
-          </p>
+        <m.header variants={tileVariants} className="flex items-start justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <Eyebrow>{now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Eyebrow>
+            <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">
+              {greeting(now)}, {coachName}!
+            </h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              {derived.trainedThisWeek === 0
+                ? 'Nenhum aluno treinou ainda nesta semana.'
+                : `${derived.trainedThisWeek} de ${data.students.length} alunos já treinaram nesta semana.`}
+            </p>
+          </div>
+          {/* Sua foto aparece nos posts e comentários da comunidade. */}
+          <m.button
+            type="button"
+            whileTap={{ scale: 0.92 }}
+            onClick={() => setPhotoMenuOpen(true)}
+            disabled={uploadingPhoto}
+            className="relative mt-1 shrink-0 rounded-full"
+          >
+            <Avatar
+              name={data.coach.full_name ?? data.coach.email}
+              seed={data.coach.id}
+              src={avatarUrlOf(data.coach)}
+              size="lg"
+              className="rounded-full ring-2 ring-brand/60 ring-offset-2 ring-offset-black"
+            />
+            <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full border-2 border-black bg-brand text-black">
+              <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+            {uploadingPhoto && (
+              <span className="absolute inset-0 grid place-items-center rounded-full bg-black/60">
+                <LoaderCircle className="h-5 w-5 animate-spin text-white" aria-hidden="true" />
+              </span>
+            )}
+            <span className="sr-only">{data.coach.avatar_path ? 'Trocar sua foto de perfil' : 'Adicionar sua foto de perfil'}</span>
+          </m.button>
         </m.header>
 
         {/* Indicadores */}
@@ -269,7 +316,7 @@ export default function AdminDashboardPage() {
                       href={`/admin/students?aluno=${session.student_id}`}
                       className="flex items-center gap-3 px-5 py-3 transition hover:bg-white/[0.02]"
                     >
-                      <Avatar name={student?.full_name ?? student?.email} seed={session.student_id} size="sm" />
+                      <Avatar name={student?.full_name ?? student?.email} seed={session.student_id} src={avatarUrlOf(student)} size="sm" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm text-zinc-300">
                           <span className="font-bold text-white">{student?.full_name?.split(' ')[0] ?? 'Aluno'}</span> concluiu{' '}
@@ -302,7 +349,7 @@ export default function AdminDashboardPage() {
                 <ul className="space-y-1.5">
                   {derived.inactive.slice(0, 5).map(({ student, last }) => (
                     <li key={student.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2">
-                      <Avatar name={student.full_name ?? student.email} seed={student.id} size="sm" />
+                      <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-white">{student.full_name || student.email}</span>
                         <span className="block text-[11px] text-zinc-500">
@@ -332,7 +379,7 @@ export default function AdminDashboardPage() {
                         href={`/admin/students?aluno=${student.id}`}
                         className="flex items-center gap-2 rounded-full border border-danger/30 bg-danger-soft py-1 pl-1 pr-3 text-xs font-semibold text-white"
                       >
-                        <Avatar name={student.full_name ?? student.email} seed={student.id} size="sm" className="h-7 w-7 rounded-full text-[10px]" />
+                        <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" className="h-7 w-7 rounded-full text-[10px]" />
                         {student.full_name?.split(' ')[0] ?? 'Aluno'}
                         <span className="font-bold text-danger">{student.readiness_score}%</span>
                       </Link>
@@ -346,6 +393,16 @@ export default function AdminDashboardPage() {
       </Stagger>
 
       <WeeklyTrainingInsights mode="admin" />
+
+      <ProfileImageEditor
+        userId={data.coach.id}
+        kind="avatar"
+        open={photoMenuOpen}
+        currentPath={data.coach.avatar_path}
+        onClose={closePhotoMenu}
+        onChange={(_, path) => setData((current) => (current ? { ...current, coach: { ...current.coach, avatar_path: path } } : current))}
+        onUploadingChange={handlePhotoUploading}
+      />
     </div>
   )
 }

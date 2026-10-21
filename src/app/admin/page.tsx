@@ -30,6 +30,7 @@ import { PageSkeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
+import { CoachRadar } from '@/components/coach/CoachRadar'
 
 type SessionRow = {
   id: string
@@ -188,7 +189,8 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8">
       <Stagger className="space-y-4">
-        <m.header variants={tileVariants} className="flex items-start justify-between gap-3 px-1">
+        <m.header variants={tileVariants} className="relative isolate flex items-start justify-between gap-3 px-1">
+          <div aria-hidden="true" className="aurora" />
           <div className="min-w-0">
             <Eyebrow>{now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Eyebrow>
             <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">
@@ -296,6 +298,9 @@ export default function AdminDashboardPage() {
             </Link>
           ))}
         </m.div>
+
+        {/* Radar: recordes, progressões e cansaço */}
+        <CoachRadar students={data.students} />
 
         {/* Atividade recente */}
         <Tile className="p-0">

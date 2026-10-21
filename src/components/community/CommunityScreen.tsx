@@ -9,6 +9,7 @@ import {
   addComment,
   deleteComment,
   deletePost,
+  isAdminRole,
   loadFeedPage,
   loadMembers,
   setLike,
@@ -28,6 +29,7 @@ import { Modal } from '@/components/ui/modal'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow } from '@/components/ui/tile'
+import { ChallengesSection } from './ChallengesSection'
 import { Composer } from './Composer'
 import { LeaderboardCard } from './LeaderboardCard'
 import { PhotoViewer } from './PhotoViewer'
@@ -109,6 +111,7 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
 
   const workoutsById = useMemo(() => new Map(members.map((member) => [member.id, member.total_workouts])), [members])
   const avatarUrls = useMemo(() => new Map(members.map((member) => [member.id, avatarUrlOf(member)])), [members])
+  const studentIds = useMemo(() => members.filter((member) => !isAdminRole(member.role)).map((member) => member.id), [members])
   const viewerName = members.find((member) => member.id === viewerId)?.full_name ?? null
 
   const refresh = () => {
@@ -320,6 +323,8 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
 
       {status === 'ready' && viewerId && (
         <>
+          <ChallengesSection viewerId={viewerId} viewerIsAdmin={viewerIsAdmin} studentIds={studentIds} refreshKey={reloadKey} />
+
           <LeaderboardCard members={members} viewerId={viewerId} viewerIsAdmin={viewerIsAdmin} />
 
           <m.button

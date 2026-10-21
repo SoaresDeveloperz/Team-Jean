@@ -26,12 +26,24 @@ export function Stagger({ className, children }: { className?: string; children:
 
 type TileProps = ComponentProps<typeof m.section>
 
+// Luz que segue o mouse (variáveis CSS; o efeito só existe com mouse).
+function followPointer(event: React.PointerEvent<HTMLElement>) {
+  if (event.pointerType !== 'mouse') return
+  const rect = event.currentTarget.getBoundingClientRect()
+  event.currentTarget.style.setProperty('--spot-x', `${event.clientX - rect.left}px`)
+  event.currentTarget.style.setProperty('--spot-y', `${event.clientY - rect.top}px`)
+}
+
 // Bloco do bento grid: superfície grafite com borda fina.
-export function Tile({ className, children, ...props }: TileProps) {
+export function Tile({ className, children, onPointerMove, ...props }: TileProps) {
   return (
     <m.section
       variants={tileVariants}
-      className={cn('relative overflow-hidden rounded-3xl border border-line bg-surface p-5', className)}
+      onPointerMove={(event) => {
+        followPointer(event)
+        onPointerMove?.(event)
+      }}
+      className={cn('tile-spotlight relative overflow-hidden rounded-3xl border border-line bg-surface p-5', className)}
       {...props}
     >
       {children}

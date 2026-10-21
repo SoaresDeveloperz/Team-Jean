@@ -60,6 +60,38 @@ app avisa que o recurso ainda não foi ativado.
 - O treinador vê e registra as medidas na ficha do aluno e troca a própria foto
   no painel.
 
+## Ferramentas do treinador
+
+Depois do `policies.sql`, rode [`supabase/coach.sql`](supabase/coach.sql) no SQL
+Editor. Ele pode ser rodado mais de uma vez, em qualquer ordem com os outros
+arquivos. Ele ativa:
+
+- **Desafios da equipe** (aba Equipe): meta de treinos, dias ativos ou volume
+  (kg) num período. O placar sai sozinho dos treinos concluídos, no horário de
+  Brasília. O treinador cria e apaga; os alunos recebem um aviso e acompanham o
+  progresso.
+- **Notas do treinador** na ficha do aluno (lesões, preferências, combinados).
+  Só o treinador vê.
+
+Sem SQL novo, o painel também traz:
+
+- **Radar do treinador**: recordes da semana (com "Parabenizar"), cargas prontas
+  para subir (todas as séries no topo da faixa com a mesma carga) e alerta de
+  cansaço (RPE 9+ nos últimos 3 treinos). Cada ação manda um aviso ao aluno.
+- **Ficha do aluno em abas**: resumo, corpo 3D da semana (séries por músculo e
+  grupos sem estímulo há 10 dias ou mais), medidas e notas.
+- **Atalhos**: botão flutuante para novo aluno, treino, aviso, desafio e
+  exercício.
+
+## Corpo 3D
+
+O modelo de cada exercício, a prévia do editor, o construtor de treinos e a
+ficha do aluno mostram um corpo 3D (three.js) com as mesmas 13 regiões do mapa
+muscular: arrastar para girar, pinça ou roda para aproximar, vistas de frente,
+lado e costas, e toque num músculo para focar. A malha é esculpida no próprio
+aparelho (num Web Worker, uma vez por sessão), e o three.js só é baixado quando
+o 3D aparece. Sem WebGL, o app mostra o mapa 2D.
+
 ## Scripts
 
 - `pnpm dev`: servidor de desenvolvimento

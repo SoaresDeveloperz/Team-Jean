@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Lint, tipos, build e testes de ponta a ponta
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      # Build apontando para o Supabase falso dos testes (tests/mock-supabase.mjs).
+      - run: pnpm test:build
+
+      - run: pnpm typecheck
+
+      - name: Navegador do Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Testes de ponta a ponta e acessibilidade (axe, WCAG 2.1 AA)
+        run: pnpm test:e2e
+
+      - name: Capturas de tela dos testes
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: tests/.output
+          if-no-files-found: ignore
+          # A pasta começa com ponto: sem isto o upload ignora as capturas.
+          include-hidden-files: true
+
+  sql:
+    name: Banco (RLS, restrições e funções)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: node tests/sql/run.mjs

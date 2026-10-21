@@ -11,12 +11,14 @@ export type SetEntry = {
   type: string
   targetReps: string
   targetRir: number | null
+  // Carga-alvo do treinador (kg), quando definida na prescrição.
+  targetWeight: number | null
   weight: string
   reps: string
   previous: PreviousSet | null
   completed: boolean
+  // Id da série em session_sets (gerado no aparelho ao marcar).
   rowId: string | null
-  saving: boolean
   isPR: boolean
   // Série adicionada pelo aluno além do que o treinador prescreveu.
   extra: boolean

@@ -40,7 +40,37 @@ export function saveActiveSession(session: ActiveSession) {
 export function clearActiveSession() {
   try {
     window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(JOURNAL_KEY)
   } catch {
     // Ignora: nada a limpar.
+  }
+}
+
+// Diário das séries marcadas neste aparelho: retoma o treino mesmo sem
+// internet (o servidor continua sendo a fonte quando há conexão).
+const JOURNAL_KEY = 'team-jean:active-session-sets'
+
+export type JournalSet = {
+  id: string
+  assigned_exercise_id: string | null
+  set_number: number
+  weight_kg: number | null
+  reps: number | null
+}
+
+export function readSessionJournal(sessionId: string): JournalSet[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(JOURNAL_KEY) ?? 'null') as { sessionId?: string; sets?: JournalSet[] } | null
+    return parsed?.sessionId === sessionId && Array.isArray(parsed.sets) ? parsed.sets : []
+  } catch {
+    return []
+  }
+}
+
+export function saveSessionJournal(sessionId: string, sets: JournalSet[]) {
+  try {
+    window.localStorage.setItem(JOURNAL_KEY, JSON.stringify({ sessionId, sets }))
+  } catch {
+    // Sem armazenamento: sem internet não dá para retomar, só isso.
   }
 }

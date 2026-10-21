@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { Camera, Columns2, Plus, Scale, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
+import { Camera, ChevronDown, Columns2, Plus, Ruler, Scale, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { dateFromISO, deleteMeasurement, loadMeasurements, type Measurement } from '@/lib/measurements'
 import { ProfileError } from '@/lib/profile'
@@ -16,7 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Tile } from '@/components/ui/tile'
 import { CompareSlider } from './CompareSlider'
-import { MeasurementForm } from './MeasurementForm'
+import { MeasurementForm, type PhysicalProfile } from './MeasurementForm'
+import { PERIMETERS, SKINFOLDS, bmi, bmiLabel, composition, type SkinfoldSite } from '@/lib/health'
 
 type MeasurementsCardProps = {
   userId: string
@@ -26,6 +27,9 @@ type MeasurementsCardProps = {
   studentName?: string | null
   // Dentro de um modal (ficha do aluno) não usa o Tile animado.
   bare?: boolean
+  // Sexo, nascimento e altura (IMC e % de gordura pelas dobras).
+  profile?: PhysicalProfile | null
+  onProfileChange?: (patch: PhysicalProfile) => void
 }
 
 type Status = 'loading' | 'ready' | 'missing' | 'error'
@@ -49,7 +53,7 @@ function Container({ bare, children }: { bare: boolean; children: ReactNode }) {
   return <Tile className="p-4">{children}</Tile>
 }
 
-export function MeasurementsCard({ userId, goal, studentName, bare = false }: MeasurementsCardProps) {
+export function MeasurementsCard({ userId, goal, studentName, bare = false, profile, onProfileChange }: MeasurementsCardProps) {
   const [supabase] = useState(() => createClient())
   const toast = useToast()
   const [items, setItems] = useState<Measurement[]>([])
@@ -63,6 +67,9 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false }: Me
   const [confirmItem, setConfirmItem] = useState<Measurement | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  // Perfil físico atualizado pelo formulário (sem esperar o pai recarregar).
+  const [physical, setPhysical] = useState<PhysicalProfile | null>(profile ?? null)
 
   useEffect(() => {
     let active = true
@@ -126,6 +133,10 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false }: Me
   const delta = latestWeight && firstWeight && latestWeight !== firstWeight ? (latestWeight.weight_kg as number) - (firstWeight.weight_kg as number) : null
   const latestFat = items.find((item) => item.body_fat !== null) ?? null
   const latestWaist = items.find((item) => item.waist_cm !== null) ?? null
+  const latestBmi = bmi(latestWeight?.weight_kg, physical?.height_cm)
+  // Composição do registro mais recente com peso e % de gordura.
+  const latestComplete = items.find((item) => item.weight_kg !== null && item.body_fat !== null) ?? null
+  const latestComposition = latestComplete ? composition(latestComplete.weight_kg, latestComplete.body_fat) : null
   const chartPoints = [...weights]
     .slice(0, 12)
     .reverse()
@@ -221,6 +232,26 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false }: Me
             </div>
           </dl>
 
+          {(latestBmi !== null || latestComposition) && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Composição corporal">
+              {latestBmi !== null && (
+                <li className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-200">
+                  IMC <span className="font-bold text-white">{formatOne(latestBmi)}</span> · {bmiLabel(latestBmi)}
+                </li>
+              )}
+              {latestComposition && (
+                <>
+                  <li className="rounded-full bg-brand-soft px-3 py-1 text-[11px] font-semibold text-brand">
+                    Massa magra <span className="font-bold">{formatOne(latestComposition.leanMass)} kg</span>
+                  </li>
+                  <li className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-200">
+                    Massa gorda <span className="font-bold text-white">{formatOne(latestComposition.fatMass)} kg</span>
+                  </li>
+                </>
+              )}
+            </ul>
+          )}
+
           {chartPoints.length >= 2 && (
             <div className="mt-3">
               <LineChart
@@ -282,35 +313,110 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false }: Me
                     item.body_fat !== null ? `${formatOne(item.body_fat)}%` : null,
                     item.waist_cm !== null ? `${formatOne(item.waist_cm)} cm` : null,
                   ].filter(Boolean)
+                  const rounds = PERIMETERS.filter((point) => typeof item.perimeters?.[point.key] === 'number')
+                  const folds = (Object.keys(SKINFOLDS) as SkinfoldSite[]).filter((site) => typeof item.skinfolds?.[site] === 'number')
+                  const hasDetails = rounds.length > 0 || folds.length > 0
+                  const expanded = expandedId === item.id
+                  // Registro anterior com o mesmo perímetro (para a variação).
+                  const older = items.slice(items.indexOf(item) + 1)
+                  const previousRound = (key: string) => older.find((entry) => typeof entry.perimeters?.[key] === 'number')?.perimeters?.[key]
                   return (
-                    <m.li
-                      key={item.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-3 py-2.5"
-                    >
-                      <span className="w-16 shrink-0 text-[11px] font-bold tabular-nums text-zinc-400">{shortDate(item.measured_on)}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-white">
-                          {parts.length > 0 ? parts.join(' · ') : 'Só fotos'}
-                          {item.photos.length > 0 && (
-                            <>
-                              <Camera className="ml-1.5 inline h-3.5 w-3.5 text-brand" aria-hidden="true" />
-                              <span className="sr-only">, {plural(item.photos.length, 'foto', 'fotos')}</span>
-                            </>
-                          )}
+                    <m.li key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} className="py-2.5">
+                      <div className="flex items-center gap-3">
+                        <span className="w-16 shrink-0 text-[11px] font-bold tabular-nums text-zinc-400">{shortDate(item.measured_on)}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {parts.length > 0 ? parts.join(' · ') : 'Só fotos'}
+                            {item.photos.length > 0 && (
+                              <>
+                                <Camera className="ml-1.5 inline h-3.5 w-3.5 text-brand" aria-hidden="true" />
+                                <span className="sr-only">, {plural(item.photos.length, 'foto', 'fotos')}</span>
+                              </>
+                            )}
+                          </span>
+                          {item.note && <span className="block truncate text-[11px] text-zinc-500">{item.note}</span>}
                         </span>
-                        {item.note && <span className="block truncate text-[11px] text-zinc-500">{item.note}</span>}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmItem(item)}
-                        aria-label={`Apagar registro de ${shortDate(item.measured_on)}`}
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-zinc-500 transition hover:bg-danger-soft hover:text-danger"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </button>
+                        {hasDetails && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(expanded ? null : item.id)}
+                            aria-expanded={expanded}
+                            aria-label={`${expanded ? 'Esconder' : 'Ver'} avaliação completa de ${shortDate(item.measured_on)}`}
+                            className={cn(
+                              'flex h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[11px] font-bold transition',
+                              expanded ? 'bg-white text-black' : 'bg-white/[0.06] text-zinc-300 hover:text-white',
+                            )}
+                          >
+                            <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
+                            <m.span animate={{ rotate: expanded ? 180 : 0 }}>
+                              <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                            </m.span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setConfirmItem(item)}
+                          aria-label={`Apagar registro de ${shortDate(item.measured_on)}`}
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-zinc-500 transition hover:bg-danger-soft hover:text-danger"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
+                      <AnimatePresence initial={false}>
+                        {expanded && (
+                          <m.div
+                            key="details"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-2.5 space-y-3 rounded-2xl bg-black/25 p-3">
+                              {rounds.length > 0 && (
+                                <div>
+                                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Perímetros (cm)</p>
+                                  <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                                    {rounds.map((point) => {
+                                      const value = item.perimeters?.[point.key] as number
+                                      const before = previousRound(point.key)
+                                      const diff = typeof before === 'number' ? Math.round((value - before) * 10) / 10 : null
+                                      return (
+                                        <div key={point.key} className="flex items-baseline justify-between gap-2 text-xs">
+                                          <dt className="truncate text-zinc-400">{point.label}</dt>
+                                          <dd className="shrink-0 font-bold tabular-nums text-white">
+                                            {formatOne(value)}
+                                            {diff !== null && diff !== 0 && (
+                                              <span className={cn('ml-1 text-[10px]', diff > 0 ? 'text-brand' : 'text-gold')}>
+                                                {diff > 0 ? '+' : '−'}
+                                                {formatOne(Math.abs(diff))}
+                                              </span>
+                                            )}
+                                          </dd>
+                                        </div>
+                                      )
+                                    })}
+                                  </dl>
+                                </div>
+                              )}
+                              {folds.length > 0 && (
+                                <div>
+                                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">
+                                    Dobras (mm){item.protocol ? ` · ${item.protocol === 'pollock7' ? 'Pollock 7' : 'Pollock 3'}` : ''}
+                                  </p>
+                                  <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                                    {folds.map((site) => (
+                                      <div key={site} className="flex items-baseline justify-between gap-2 text-xs">
+                                        <dt className="truncate text-zinc-400">{SKINFOLDS[site]}</dt>
+                                        <dd className="shrink-0 font-bold tabular-nums text-white">{formatOne(item.skinfolds?.[site] as number)}</dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                </div>
+                              )}
+                            </div>
+                          </m.div>
+                        )}
+                      </AnimatePresence>
                     </m.li>
                   )
                 })}
@@ -334,6 +440,11 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false }: Me
         open={formOpen}
         userId={userId}
         forStudent={studentName}
+        profile={physical}
+        onProfileChange={(patch) => {
+          setPhysical(patch)
+          onProfileChange?.(patch)
+        }}
         onClose={closeForm}
         onSaved={handleSaved}
       />

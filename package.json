@@ -9,7 +9,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:build": "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-mock next build",
+    "test:e2e": "node tests/run.mjs",
+    "test:sql": "node tests/sql/run.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -22,7 +26,8 @@
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
-    "three": "0.186.1"
+    "three": "0.186.1",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.8",
@@ -30,8 +35,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "0.186.0",
+    "@types/web-push": "3.6.4",
+    "axe-core": "4.14.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "playwright": "1.56.1",
     "tailwindcss": "^4.0.8",
     "typescript": "^5"
   }

@@ -15,6 +15,8 @@ export function LogoutButton({ className, showLabel = false }: { className?: str
     setLoading(true)
     await createClient().auth.signOut()
     resetNotifications()
+    // As telas guardadas para uso offline eram desta conta.
+    navigator.serviceWorker?.controller?.postMessage({ type: 'clear-pages' })
     router.replace('/login')
     router.refresh()
   }

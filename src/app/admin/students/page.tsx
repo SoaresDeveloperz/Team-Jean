@@ -10,6 +10,7 @@ import {
   Check,
   ChevronRight,
   ClipboardList,
+  HeartPulse,
   KeyRound,
   LayoutList,
   LoaderCircle,
@@ -19,6 +20,7 @@ import {
   Scale,
   Search,
   Send,
+  ShieldAlert,
   User,
   UserPlus,
 } from 'lucide-react'
@@ -34,16 +36,23 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Stagger, tileVariants } from '@/components/ui/tile'
 import { MeasurementsCard } from '@/components/profile/MeasurementsCard'
+import { AnamneseCard } from '@/components/health/AnamneseCard'
+import { loadParqAlerts } from '@/lib/health'
 import { CoachNotes } from '@/components/coach/CoachNotes'
 import { MuscleWeek } from '@/components/coach/MuscleWeek'
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/tabs'
+import { FeedbackCard } from '@/components/coach/FeedbackCard'
+import { StudentPasswordReset } from '@/components/admin/StudentPasswordReset'
+import { hasFeedback } from '@/lib/feedback'
+import { toFeedbackItem } from '@/lib/coach-feedback'
 import { createStudent } from './actions'
 
-type DetailTab = 'summary' | 'body' | 'measures' | 'notes'
+type DetailTab = 'summary' | 'body' | 'measures' | 'health' | 'notes'
 const DETAIL_TABS: TabItem<DetailTab>[] = [
   { value: 'summary', label: 'Resumo', icon: LayoutList },
   { value: 'body', label: 'Corpo 3D', icon: Box },
   { value: 'measures', label: 'Medidas', icon: Scale },
+  { value: 'health', label: 'Saúde', icon: HeartPulse },
   { value: 'notes', label: 'Notas', icon: NotebookPen },
 ]
 
@@ -53,6 +62,11 @@ type SessionRow = {
   completed_at: string
   session_rpe: number | null
   assigned_workouts: { name: string | null } | null
+  // supabase/gestao.sql (recado do treino)
+  feedback?: string | null
+  feedback_tags?: string[] | null
+  coach_reply?: string | null
+  coach_reply_at?: string | null
 }
 
 type Filter = 'all' | 'active' | 'inactive' | 'tired'
@@ -86,6 +100,8 @@ export default function AdminStudentsPage() {
   const [students, setStudents] = useState<Profile[] | null>(null)
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [workouts, setWorkouts] = useState<AssignedWorkout[]>([])
+  // Alerta do PAR-Q por aluno (null sem o gestao.sql).
+  const [parqAlerts, setParqAlerts] = useState<Map<string, boolean> | null>(null)
   const [loadError, setLoadError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [search, setSearch] = useState('')
@@ -120,7 +136,8 @@ export default function AdminStudentsPage() {
         supabase.from('profiles').select('*').eq('role', 'student').order('created_at', { ascending: false }),
         supabase
           .from('workout_sessions')
-          .select('id, student_id, completed_at, session_rpe, assigned_workouts(name)')
+          // select('*'): o recado do treino só existe depois do gestao.sql.
+          .select('*, assigned_workouts(name)')
           .eq('status', 'completed')
           .gte('completed_at', since.toISOString())
           .order('completed_at', { ascending: false })
@@ -136,6 +153,9 @@ export default function AdminStudentsPage() {
         return
       }
       setLoadError('')
+      void loadParqAlerts(supabase).then((alerts) => {
+        if (active) setParqAlerts(alerts)
+      })
       setStudents((studentsResult.data ?? []) as Profile[])
       setSessions(((sessionsResult.data ?? []) as unknown as SessionRow[]).filter((session) => session.completed_at))
       setWorkouts((workoutsResult.data ?? []) as AssignedWorkout[])
@@ -338,7 +358,7 @@ export default function AdminStudentsPage() {
       {loadError && <Alert variant="error">{loadError}</Alert>}
 
       {students === null ? (
-        <div className="space-y-2.5" role="status" aria-label="Carregando alunos">
+        <div className="grid gap-2.5 lg:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Carregando alunos">
           {[0, 1, 2].map((item) => (
             <Skeleton key={item} className="h-24 rounded-3xl" />
           ))}
@@ -351,16 +371,16 @@ export default function AdminStudentsPage() {
           </p>
         </div>
       ) : (
-        <Stagger className="space-y-2.5">
+        <Stagger className="grid gap-2.5 lg:grid-cols-2 xl:grid-cols-3">
           {filtered.map((student) => {
             const studentStats = statsOf(student.id)
             const readiness = readinessTone(student.readiness_score)
             return (
-              <m.div key={student.id} variants={tileVariants} layout>
+              <m.div key={student.id} variants={tileVariants} layout className="h-full">
                 <button
                   type="button"
                   onClick={() => setDetailId(student.id)}
-                  className="flex w-full items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
+                  className="flex h-full w-full items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
                 >
                   <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
                   <span className="min-w-0 flex-1">
@@ -378,6 +398,12 @@ export default function AdminStudentsPage() {
                       <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-zinc-400">
                         {studentStats.last ? `Treinou ${relativeDayPhrase(studentStats.last)}` : 'Sem treinos'}
                       </span>
+                      {parqAlerts?.get(student.id) && (
+                        <span className="flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-danger">
+                          <ShieldAlert className="h-3 w-3" aria-hidden="true" /> PAR-Q
+                          <span className="sr-only">com alerta</span>
+                        </span>
+                      )}
                     </span>
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
@@ -393,7 +419,7 @@ export default function AdminStudentsPage() {
       )}
 
       {/* Ficha do aluno */}
-      <Modal open={detail !== null} onClose={closeDetail} title={detail?.full_name || 'Aluno'} description={detail?.email}>
+      <Modal open={detail !== null} onClose={closeDetail} title={detail?.full_name || 'Aluno'} description={detail?.email} size="wide">
         {detail && detailStats && (
           <div className="space-y-5">
             <div className="flex items-center gap-4">
@@ -500,21 +526,40 @@ export default function AdminStudentsPage() {
                         </p>
                       ) : (
                         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
-                          {detailStats.recent.map((session) => (
-                            <li key={session.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                              <span className="min-w-0">
-                                <span className="block truncate text-sm font-semibold text-white">
-                                  {session.assigned_workouts?.name ?? 'Treino'}
+                          {detailStats.recent.map((session) =>
+                            hasFeedback(session) ? (
+                              <li key={session.id} className="p-1.5">
+                                <FeedbackCard
+                                  item={toFeedbackItem({ ...session, assigned_workout_id: '', status: 'completed' })}
+                                  student={detail}
+                                  showStudent={false}
+                                  onReplied={(replied) =>
+                                    setSessions((current) =>
+                                      current.map((row) =>
+                                        row.id === replied.sessionId
+                                          ? { ...row, coach_reply: replied.reply, coach_reply_at: replied.replyAt?.toISOString() ?? null }
+                                          : row,
+                                      ),
+                                    )
+                                  }
+                                />
+                              </li>
+                            ) : (
+                              <li key={session.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-semibold text-white">
+                                    {session.assigned_workouts?.name ?? 'Treino'}
+                                  </span>
+                                  <span className="block text-[11px] text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
                                 </span>
-                                <span className="block text-[11px] text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
-                              </span>
-                              {session.session_rpe != null && (
-                                <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
-                                  RPE {session.session_rpe}
-                                </span>
-                              )}
-                            </li>
-                          ))}
+                                {session.session_rpe != null && (
+                                  <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                                    RPE {session.session_rpe}
+                                  </span>
+                                )}
+                              </li>
+                            ),
+                          )}
                         </ul>
                       )}
                     </section>
@@ -575,12 +620,28 @@ export default function AdminStudentsPage() {
                         </m.form>
                       )}
                     </AnimatePresence>
+                    <StudentPasswordReset
+                      key={detail.id}
+                      studentId={detail.id}
+                      studentName={detail.full_name || detail.email || 'Aluno'}
+                      email={detail.email}
+                    />
                     </>
                   )}
                   {detailTab === 'body' && <MuscleWeek studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />}
                   {detailTab === 'measures' && (
-                    <MeasurementsCard userId={detail.id} goal={detail.goal} studentName={detail.full_name || detail.email} bare />
+                    <MeasurementsCard
+                      userId={detail.id}
+                      goal={detail.goal}
+                      studentName={detail.full_name || detail.email}
+                      profile={detail}
+                      onProfileChange={(patch) =>
+                        setStudents((current) => current?.map((student) => (student.id === detail.id ? { ...student, ...patch } : student)) ?? current)
+                      }
+                      bare
+                    />
                   )}
+                  {detailTab === 'health' && <AnamneseCard studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />}
                   {detailTab === 'notes' && <CoachNotes studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />}
                 </TabPanel>
               </m.div>

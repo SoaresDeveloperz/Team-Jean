@@ -1,8 +1,8 @@
 'use client'
 
-import { memo, useRef } from 'react'
+import { memo, useId, useRef } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { Check, LoaderCircle, Trophy } from 'lucide-react'
+import { Check, CloudUpload, Trophy } from 'lucide-react'
 import { formatKg, getSetTypeInfo } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import type { SetEntry } from './types'
@@ -11,16 +11,21 @@ type SetRowProps = {
   entry: SetEntry
   label: string
   inputIdPrefix: string
+  // Marcada no aparelho, ainda não chegou ao servidor (sem internet).
+  pending: boolean
   onChange: (patch: Partial<SetEntry>) => void
   onToggle: () => void
 }
 
 // Uma linha da tabela estilo Hevy: SÉRIE | ANTERIOR | KG | REPS | ✓
-export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, onChange, onToggle }: SetRowProps) {
+export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pending, onChange, onToggle }: SetRowProps) {
   const repsRef = useRef<HTMLInputElement>(null)
+  const pendingId = useId()
   const typeInfo = getSetTypeInfo(entry.type)
-  const locked = entry.completed || entry.saving
+  const locked = entry.completed
   const isWorking = entry.type === 'working'
+  // Sugestão no campo de carga: a meta do treinador, senão o último treino.
+  const weightHint = entry.targetWeight ?? entry.previous?.weight ?? null
 
   return (
     <m.div
@@ -101,8 +106,8 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, onChan
               repsRef.current?.focus()
             }
           }}
-          placeholder={entry.previous ? formatKg(entry.previous.weight) : 'kg'}
-          aria-label={`Carga da série ${entry.setNumber} em kg`}
+          placeholder={weightHint !== null ? formatKg(weightHint) : 'kg'}
+          aria-label={`Carga da série ${entry.setNumber} em kg${entry.targetWeight !== null ? `, meta ${formatKg(entry.targetWeight)} kg` : ''}`}
           className="h-11 w-full rounded-xl border border-line bg-black/40 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none disabled:border-transparent disabled:bg-transparent disabled:text-zinc-200"
         />
       </div>
@@ -135,37 +140,50 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, onChan
         <m.button
           type="button"
           onClick={onToggle}
-          disabled={entry.saving}
           whileTap={{ scale: 0.86 }}
           aria-pressed={entry.completed}
           aria-label={
             entry.completed ? `Desmarcar série ${entry.setNumber}` : `Marcar série ${entry.setNumber} como concluída`
           }
+          aria-describedby={pending ? pendingId : undefined}
           className={cn(
-            'grid h-11 w-11 place-items-center rounded-xl transition-colors',
+            'relative grid h-11 w-11 place-items-center rounded-xl transition-colors',
             entry.completed
               ? 'bg-brand text-black shadow-[0_0_18px_rgba(52,211,153,0.35)]'
               : 'bg-white/[0.07] text-zinc-500 hover:text-zinc-300',
           )}
         >
           <AnimatePresence mode="wait" initial={false}>
-            {entry.saving ? (
-              <m.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
-              </m.span>
-            ) : (
+            <m.span
+              key={entry.completed ? 'done' : 'todo'}
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.4, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 520, damping: 18 }}
+            >
+              <Check className="h-5 w-5 stroke-[3]" aria-hidden="true" />
+            </m.span>
+          </AnimatePresence>
+          <AnimatePresence>
+            {pending && (
               <m.span
-                key={entry.completed ? 'done' : 'todo'}
-                initial={{ scale: 0.4, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.4, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 520, damping: 18 }}
+                key="pending"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-gold text-black ring-2 ring-surface"
+                aria-hidden="true"
               >
-                <Check className="h-5 w-5 stroke-[3]" aria-hidden="true" />
+                <CloudUpload className="h-2.5 w-2.5" />
               </m.span>
             )}
           </AnimatePresence>
         </m.button>
+        {pending && (
+          <span id={pendingId} className="sr-only">
+            Salva no aparelho, aguardando internet para enviar
+          </span>
+        )}
       </div>
     </m.div>
   )

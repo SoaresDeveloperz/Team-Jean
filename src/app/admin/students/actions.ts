@@ -1,5 +1,6 @@
 'use server'
 
+import { randomInt } from 'node:crypto'
 import { requireAdmin } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -61,4 +62,42 @@ export async function createStudent(input: {
   }
 
   return { ok: true, message: `${fullName} foi cadastrado com sucesso.` }
+}
+
+// Senha provisória fácil de ditar: sem caracteres ambíguos (0/O, 1/l).
+function generatePassword() {
+  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789'
+  return Array.from({ length: 8 }, () => alphabet[randomInt(alphabet.length)]).join('')
+}
+
+// O aluno esqueceu a senha e o e-mail de recuperação não chegou: o treinador
+// gera uma senha nova (a antiga deixa de funcionar) e envia para ele.
+export async function resetStudentPassword(studentId: string): Promise<ActionResult & { password?: string }> {
+  await requireAdmin()
+  if (typeof studentId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(studentId)) {
+    return { ok: false, message: 'Aluno inválido.' }
+  }
+
+  let supabaseAdmin: ReturnType<typeof createAdminClient>
+  try {
+    supabaseAdmin = createAdminClient()
+  } catch {
+    return { ok: false, message: 'Indisponível: configure a variável SUPABASE_SERVICE_ROLE_KEY no servidor (Vercel).' }
+  }
+
+  const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('id, role, full_name').eq('id', studentId).maybeSingle()
+  if (profileError) return { ok: false, message: `Não foi possível achar o aluno: ${profileError.message}` }
+  if (!profile) return { ok: false, message: 'Aluno não encontrado.' }
+  if (String(profile.role ?? '').trim().toLowerCase() === 'admin') {
+    return { ok: false, message: 'A senha de um treinador não é trocada por aqui.' }
+  }
+
+  const password = generatePassword()
+  try {
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(studentId, { password })
+    if (error) return { ok: false, message: `Não foi possível gerar a senha: ${error.message}` }
+  } catch (error) {
+    return { ok: false, message: `Não foi possível gerar a senha: ${error instanceof Error ? error.message : 'erro desconhecido'}` }
+  }
+  return { ok: true, message: `Senha nova de ${profile.full_name || 'aluno'} criada.`, password }
 }

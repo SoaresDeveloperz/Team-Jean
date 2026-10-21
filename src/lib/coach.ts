@@ -3,6 +3,7 @@
 import type { createClient } from './supabase/client'
 import { formatKg } from './workouts'
 import { plural } from './text'
+import { requestPushDelivery } from './push/client'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -159,20 +160,28 @@ export async function deleteChallenge(supabase: Supabase, challengeId: string) {
 // ------------------------------------------------------------------ avisos
 // Recado do treinador no sino do aluno. Se o banco recusar o tipo (restrição
 // antiga em notifications.type), manda como aviso comum.
+export type NoticeType = 'announcement' | 'community' | 'workout_updated' | 'feedback_reply' | 'billing'
+
 export async function notifyStudents(
   supabase: Supabase,
   recipients: string[],
   title: string,
   message: string,
-  type: 'announcement' | 'community' = 'announcement',
+  type: NoticeType = 'announcement',
 ) {
   if (recipients.length === 0) return
   const rows = (kind: string) => recipients.map((recipient_id) => ({ recipient_id, type: kind, title, message }))
   const { error } = await supabase.from('notifications').insert(rows(type))
-  if (!error) return
+  if (!error) {
+    requestPushDelivery()
+    return
+  }
   if (type !== 'announcement' && error.code === '23514') {
     const retry = await supabase.from('notifications').insert(rows('announcement'))
-    if (!retry.error) return
+    if (!retry.error) {
+      requestPushDelivery()
+      return
+    }
     fail('Não foi possível enviar o aviso', retry.error)
   }
   fail('Não foi possível enviar o aviso', error)

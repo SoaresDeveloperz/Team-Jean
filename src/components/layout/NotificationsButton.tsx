@@ -3,17 +3,52 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'framer-motion'
-import { Bell, BellOff, ChevronRight, Dumbbell, Megaphone, MessageCircle } from 'lucide-react'
-import { markNotificationsSeen, onOpenNotifications, useNotifications } from '@/lib/notifications'
+import { Bell, BellOff, ChevronRight, Dumbbell, HeartPulse, Megaphone, MessageCircle, MessageSquareReply, MessageSquareText, Wallet, type LucideIcon } from 'lucide-react'
+import { loadNotifications, markNotificationsSeen, onOpenNotifications, openNotifications, useNotifications } from '@/lib/notifications'
 import { plural } from '@/lib/text'
 import { Modal } from '@/components/ui/modal'
 import { cn } from '@/lib/cn'
 
-export function NotificationsButton() {
+const ICONS: Record<string, LucideIcon> = {
+  workout_updated: Dumbbell,
+  community: MessageCircle,
+  feedback: MessageSquareText,
+  feedback_reply: MessageSquareReply,
+  billing: Wallet,
+  health: HeartPulse,
+}
+
+// Atalho de cada tipo de aviso (aluno e treinador).
+function linkFor(type: string, coach: boolean) {
+  if (coach) {
+    if (type === 'feedback') return { href: '/admin?radar=recados', label: 'Responder no radar' }
+    if (type === 'health') return { href: '/admin/students', label: 'Ver alunos' }
+    if (type === 'community') return { href: '/admin/community', label: 'Ver na comunidade' }
+    return null
+  }
+  if (type === 'community') return { href: '/student/community', label: 'Ver na comunidade' }
+  if (type === 'billing') return { href: '/student/profile?mensalidade=1', label: 'Pagar com PIX' }
+  if (type === 'feedback_reply') return { href: '/student/history', label: 'Ver no histórico' }
+  return null
+}
+
+export function NotificationsButton({ audience = 'student' }: { audience?: 'student' | 'coach' }) {
+  const coach = audience === 'coach'
   const { items, unseen, seen } = useNotifications()
   const [open, setOpen] = useState(false)
 
-  useEffect(() => onOpenNotifications(() => setOpen(true)), [])
+  useEffect(() => {
+    const stop = onOpenNotifications(() => setOpen(true))
+    // Aberto pelo toque na notificação push (?avisos=1): mostra a lista.
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('avisos') === '1') {
+      params.delete('avisos')
+      const query = params.toString()
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      void loadNotifications(true).then(openNotifications)
+    }
+    return stop
+  }, [])
 
   // Marca como lidos ao fechar, para o selo "Novo" aparecer enquanto a lista está aberta.
   const close = useCallback(() => {
@@ -28,7 +63,15 @@ export function NotificationsButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={unseenCount > 0 ? `Avisos do treinador: ${plural(unseenCount, 'novo', 'novos')}` : 'Avisos do treinador'}
+        aria-label={
+          coach
+            ? unseenCount > 0
+              ? `Notificações: ${plural(unseenCount, 'nova', 'novas')}`
+              : 'Notificações'
+            : unseenCount > 0
+              ? `Avisos do treinador: ${plural(unseenCount, 'novo', 'novos')}`
+              : 'Avisos do treinador'
+        }
         className="relative grid h-11 w-11 place-items-center rounded-2xl border border-line bg-surface text-zinc-300 transition hover:text-white"
       >
         <Bell className="h-5 w-5" aria-hidden="true" />
@@ -47,7 +90,12 @@ export function NotificationsButton() {
         </AnimatePresence>
       </button>
 
-      <Modal open={open} onClose={close} title="Avisos" description="Recados do seu treinador">
+      <Modal
+        open={open}
+        onClose={close}
+        title={coach ? 'Notificações' : 'Avisos'}
+        description={coach ? 'Recados dos alunos, fichas de saúde e comentários' : 'Recados do seu treinador'}
+      >
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/5 text-zinc-500">
@@ -59,7 +107,8 @@ export function NotificationsButton() {
           <ul className="space-y-2.5">
             {items.map((item, index) => {
               const isNew = !seen.has(item.id)
-              const Icon = item.type === 'workout_updated' ? Dumbbell : item.type === 'community' ? MessageCircle : Megaphone
+              const Icon = ICONS[item.type] ?? Megaphone
+              const link = linkFor(item.type, coach)
               return (
                 <m.li
                   key={item.id}
@@ -94,13 +143,9 @@ export function NotificationsButton() {
                         {new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                       </p>
                     )}
-                    {item.type === 'community' && (
-                      <Link
-                        href="/student/community"
-                        onClick={close}
-                        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-brand"
-                      >
-                        Ver na comunidade <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    {link && (
+                      <Link href={link.href} onClick={close} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-brand">
+                        {link.label} <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                       </Link>
                     )}
                   </div>

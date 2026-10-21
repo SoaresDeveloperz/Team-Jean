@@ -1,16 +1,23 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { Logo } from '@/components/ui/logo'
+import { cn } from '@/lib/cn'
 
 type AppHeaderProps = {
   badge?: string
   actions?: ReactNode
   homeHref?: string
+  className?: string
 }
 
-export function AppHeader({ badge, actions, homeHref = '/' }: AppHeaderProps) {
+export function AppHeader({ badge, actions, homeHref = '/', className }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-black/85 pt-[env(safe-area-inset-top)] backdrop-blur-2xl backdrop-saturate-150">
+    <header
+      className={cn(
+        'sticky top-0 z-40 border-b border-line bg-black/85 pt-[env(safe-area-inset-top)] backdrop-blur-2xl backdrop-saturate-150',
+        className,
+      )}
+    >
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-5 py-3">
         <Link href={homeHref} className="flex items-center gap-2.5" aria-label="Team Jean, ir para o início">
           <Logo className="h-7 w-7" />

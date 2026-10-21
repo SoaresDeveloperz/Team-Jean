@@ -66,6 +66,16 @@ export function normalizeRir(value: PlannedSet['rir']) {
   return Number.isFinite(number) ? number : null
 }
 
+// Carga-alvo: aceita "42,5"; vazio, zero ou inválido = sem carga definida.
+export function normalizeWeight(value: PlannedSet['weight']) {
+  if (value === null || value === undefined || value === '') return null
+  const number = Number(String(value).replace(',', '.'))
+  return Number.isFinite(number) && number > 0 && number <= 1000 ? Math.round(number * 100) / 100 : null
+}
+
+// Aquecimento e feeder não contam como séries de trabalho.
+export const PREP_SET_TYPES = new Set(['warmup', 'feeder'])
+
 export function formatSeconds(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60

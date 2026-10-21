@@ -281,7 +281,7 @@ export default function AdminExercisesPage() {
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-2.5" role="status" aria-label="Carregando biblioteca">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4" role="status" aria-label="Carregando biblioteca">
           {[0, 1, 2, 3].map((item) => (
             <Skeleton key={item} className="h-52 rounded-3xl" />
           ))}
@@ -296,7 +296,7 @@ export default function AdminExercisesPage() {
           </p>
         </div>
       ) : (
-        <ul className="grid grid-cols-2 gap-2.5">
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
           {filteredExercises.map((exercise, index) => {
             const hasVideo = Boolean(exercise.video_url)
             return (

@@ -15,6 +15,8 @@ type ModalProps = {
   // "dialog": folha que sobe de baixo (cartão central no desktop);
   // "sheet": tela cheia, para formulários longos.
   variant?: 'dialog' | 'sheet'
+  // "wide": cartão mais largo no computador (ex.: ficha do aluno).
+  size?: 'default' | 'wide'
 }
 
 // Rodapé das folhas (variant "sheet"): fica colado na base enquanto o conteúdo
@@ -35,7 +37,7 @@ const openModalStack: string[] = []
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function Modal({ open, onClose, title, description, children, variant = 'dialog' }: ModalProps) {
+export function Modal({ open, onClose, title, description, children, variant = 'dialog', size = 'default' }: ModalProps) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
@@ -141,7 +143,10 @@ export function Modal({ open, onClose, title, description, children, variant = '
               'w-full overflow-y-auto outline-none',
               isSheet
                 ? 'bg-black px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))]'
-                : 'max-h-[92vh] max-w-md rounded-t-[2rem] border border-line-strong bg-surface-2 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl shadow-black sm:rounded-[2rem] sm:pb-6',
+                : cn(
+                    'max-h-[92vh] max-w-md rounded-t-[2rem] border border-line-strong bg-surface-2 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl shadow-black sm:rounded-[2rem] sm:pb-6',
+                    size === 'wide' && 'lg:max-w-3xl',
+                  ),
             )}
           >
             {!isSheet && (
@@ -153,7 +158,7 @@ export function Modal({ open, onClose, title, description, children, variant = '
                 <span className="h-1.5 w-10 rounded-full bg-white/20" />
               </div>
             )}
-            <div className={cn(isSheet && 'mx-auto max-w-md')}>
+            <div className={cn(isSheet && 'mx-auto max-w-md', isSheet && size === 'wide' && 'lg:max-w-3xl')}>
               <div className="mb-5 flex items-start justify-between gap-3 border-b border-line pb-4">
                 <div className="min-w-0">
                   <h2 id={titleId} className="font-display text-2xl font-bold uppercase leading-none tracking-wide">

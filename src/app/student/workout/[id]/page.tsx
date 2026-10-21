@@ -2,12 +2,45 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { m, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, Check, Dumbbell, Flag, Timer } from 'lucide-react'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
+import { ArrowLeft, Check, CloudOff, CloudUpload, Dumbbell, Flag, Timer } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
-import { formatKg, getPlannedSets, normalizeRir } from '@/lib/workouts'
-import { clearActiveSession, readActiveSession, saveActiveSession } from '@/lib/active-session'
+import { formatKg, getPlannedSets, normalizeRir, normalizeWeight } from '@/lib/workouts'
+import {
+  clearActiveSession,
+  readActiveSession,
+  readSessionJournal,
+  saveActiveSession,
+  saveSessionJournal,
+  type JournalSet,
+} from '@/lib/active-session'
+import {
+  clearSyncIssue,
+  enqueueWorkoutOp,
+  getWorkoutSyncState,
+  hasQueuedOps,
+  newId,
+  pendingSetIds,
+  queuedSessionState,
+  sessionPending,
+  startWorkoutSync,
+  useOnlineStatus,
+  useWorkoutSync,
+  type FinishPatch,
+} from '@/lib/workout-sync'
+import {
+  NotFoundError,
+  OfflineError,
+  cacheCurrentPage,
+  fetchResumableSets,
+  fetchWorkoutBundle,
+  readCachedBundle,
+  saveCachedBundle,
+  type StoredSet,
+  type WorkoutBundle,
+} from '@/lib/workout-session'
+import { requestPushDelivery } from '@/lib/push/client'
 import { loadFill, muscleLoad, splitSecondary, type MuscleRegion, type MuscleWork } from '@/lib/muscles'
 import { usePreferences } from '@/lib/preferences'
 import { haptic } from '@/lib/haptics'
@@ -25,19 +58,13 @@ import { parseNumber, type ExerciseRow, type PreviousSet, type RestState, type S
 
 type LoadState = { status: 'loading' } | { status: 'ready' } | { status: 'not-found' } | { status: 'error'; message: string }
 
-type StoredSet = {
-  id?: string
-  assigned_exercise_id: string | null
-  set_number: number
-  weight_kg: number | null
-  reps: number | null
-}
-
 const IDLE_REST: RestState = { endsAt: null, pausedRemaining: null, total: 0 }
 
 function setKey(assignedExerciseId: string | null, setNumber: number) {
   return `${assignedExerciseId}:${setNumber}`
 }
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export default function WorkoutExecutionPage() {
   const { id: workoutId } = useParams<{ id: string }>()
@@ -58,17 +85,24 @@ export default function WorkoutExecutionPage() {
   // Início do treino: quando a tela abriu, ou o horário salvo ao retomar.
   const [startedAt, setStartedAt] = useState<number | null>(null)
 
-  // A sessão no banco só é criada na primeira série concluída.
+  // A sessão só é criada na primeira série concluída (id gerado no aparelho).
   const sessionIdRef = useRef<string | null>(null)
-  const sessionPromiseRef = useRef<Promise<string> | null>(null)
   const setsRef = useRef(sets)
+  const sync = useWorkoutSync()
+  const online = useOnlineStatus()
+  const pendingIds = useMemo(() => pendingSetIds(sync), [sync])
+  const offline = !online || sync.offline
 
   const [rest, setRest] = useState<RestState>(IDLE_REST)
   const [showFinish, setShowFinish] = useState(false)
   const [rpe, setRpe] = useState(8)
+  const [feedback, setFeedback] = useState('')
+  const [feedbackTags, setFeedbackTags] = useState<string[]>([])
   const [finishing, setFinishing] = useState(false)
   const [finishError, setFinishError] = useState('')
   const [summary, setSummary] = useState<WorkoutSummaryData | null>(null)
+  // Sessão finalizada sem internet (ainda na fila ao mostrar o resumo).
+  const [queuedSessionId, setQueuedSessionId] = useState<string | null>(null)
 
   useEffect(() => {
     setsRef.current = sets
@@ -85,89 +119,63 @@ export default function WorkoutExecutionPage() {
         return
       }
       setUserId(user.id)
+      // Envia o que ficou na fila de um treino anterior feito sem internet.
+      void startWorkoutSync(supabase, user.id)
 
       // Retoma só a sessão iniciada neste aparelho nas últimas 12h.
       const activeSession = readActiveSession(user.id)
       const resumeCandidate = activeSession?.workoutId === workoutId ? activeSession : null
 
-      const [workoutResult, exercisesResult, resumableResult, completedSessionsResult] = await Promise.all([
-        supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
-        supabase
-          .from('assigned_workout_exercises')
-          .select('*, exercises(*)')
-          .eq('assigned_workout_id', workoutId)
-          .order('order', { ascending: true }),
-        resumeCandidate
-          ? supabase
-              .from('workout_sessions')
-              .select('id, status')
-              .eq('id', resumeCandidate.sessionId)
-              .eq('student_id', user.id)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        // Últimos treinos concluídos do aluno: base do "anterior" e dos recordes.
-        supabase
-          .from('workout_sessions')
-          .select('id, assigned_workout_id')
-          .eq('student_id', user.id)
-          .eq('status', 'completed')
-          .order('completed_at', { ascending: false })
-          .limit(100),
-      ])
+      let bundle: WorkoutBundle | null = null
+      let serverSets: StoredSet[] | null = null
+      let cached = false
+      try {
+        ;[bundle, serverSets] = await Promise.all([
+          fetchWorkoutBundle(supabase, user.id, workoutId),
+          resumeCandidate ? fetchResumableSets(supabase, user.id, resumeCandidate.sessionId) : Promise.resolve(null),
+        ])
+        saveCachedBundle(user.id, workoutId, bundle)
+        cacheCurrentPage()
+      } catch (error) {
+        if (!active) return
+        if (error instanceof NotFoundError) {
+          setLoadState({ status: 'not-found' })
+          return
+        }
+        if (!(error instanceof OfflineError)) {
+          setLoadState({ status: 'error', message: error instanceof Error ? error.message : 'Erro desconhecido.' })
+          return
+        }
+        bundle = readCachedBundle(user.id, workoutId)
+        if (!bundle) {
+          setLoadState({ status: 'error', message: 'Sem internet, e este treino ainda não foi aberto neste aparelho.' })
+          return
+        }
+        cached = true
+      }
       if (!active) return
 
-      const firstError = workoutResult.error ?? exercisesResult.error
-      if (firstError) {
-        setLoadState({ status: 'error', message: firstError.message })
-        return
+      // Séries já feitas na sessão retomada. Sem internet (ou com a sessão ainda
+      // na fila) vale o diário do aparelho; com internet, o servidor mais o que
+      // ainda não subiu.
+      let resumedSets: StoredSet[] | null = null
+      if (resumeCandidate) {
+        const queued = queuedSessionState(user.id, resumeCandidate.sessionId)
+        if (cached || (serverSets === null && queued.created)) {
+          resumedSets = readSessionJournal(resumeCandidate.sessionId)
+        } else if (serverSets !== null) {
+          const known = new Set(serverSets.map((set) => set.id))
+          resumedSets = [
+            ...serverSets.filter((set) => !set.id || !queued.removed.has(set.id)),
+            ...queued.sets.filter((set) => !known.has(set.id)),
+          ]
+        }
+        if (resumedSets === null) clearActiveSession()
       }
-      if (!workoutResult.data) {
-        setLoadState({ status: 'not-found' })
-        return
-      }
 
-      const rows = (exercisesResult.data ?? []) as ExerciseRow[]
-      const resumableRow = resumableResult.data as { id: string; status: string } | null
-      const resumed = resumableRow?.status === 'in_progress' ? resumableRow : null
-      if (resumeCandidate && !resumed) clearActiveSession()
-      const completedSessions = (completedSessionsResult.data ?? []) as { id: string; assigned_workout_id: string }[]
-      const lastCompleted = completedSessions.find((session) => session.assigned_workout_id === workoutId) ?? null
-      const exerciseIds = [...new Set(rows.map((row) => row.exercise_id))]
-
-      const [resumedSetsResult, previousSetsResult, recordSetsResult] = await Promise.all([
-        resumed
-          ? supabase
-              .from('session_sets')
-              .select('id, assigned_exercise_id, set_number, weight_kg, reps')
-              .eq('session_id', resumed.id)
-              .eq('completed', true)
-          : Promise.resolve({ data: [], error: null }),
-        lastCompleted
-          ? supabase
-              .from('session_sets')
-              .select('assigned_exercise_id, set_number, weight_kg, reps')
-              .eq('session_id', lastCompleted.id)
-              .eq('completed', true)
-          : Promise.resolve({ data: [], error: null }),
-        // Recorde de cada exercício considerando só os treinos deste aluno.
-        completedSessions.length > 0 && exerciseIds.length > 0
-          ? supabase
-              .from('session_sets')
-              .select('exercise_id, weight_kg, reps')
-              .in(
-                'session_id',
-                completedSessions.map((session) => session.id),
-              )
-              .in('exercise_id', exerciseIds)
-              .eq('completed', true)
-              .order('weight_kg', { ascending: false })
-              .limit(1000)
-          : Promise.resolve({ data: [], error: null }),
-      ])
-      if (!active) return
-
+      const rows = bundle.rows as ExerciseRow[]
       const pastRecords: Record<string, PreviousSet> = {}
-      for (const row of (recordSetsResult.data ?? []) as { exercise_id: string; weight_kg: number | null; reps: number | null }[]) {
+      for (const row of bundle.recordSets) {
         const weight = Number(row.weight_kg) || 0
         const reps = Number(row.reps) || 0
         const current = pastRecords[row.exercise_id]
@@ -176,17 +184,14 @@ export default function WorkoutExecutionPage() {
         }
       }
 
-      const resumedSets = (resumedSetsResult.data ?? []) as StoredSet[]
-      const resumedByKey = new Map(resumedSets.map((row) => [setKey(row.assigned_exercise_id, row.set_number), row]))
-      const previousByKey = new Map(
-        ((previousSetsResult.data ?? []) as StoredSet[]).map((row) => [setKey(row.assigned_exercise_id, row.set_number), row]),
-      )
+      const resumedByKey = new Map((resumedSets ?? []).map((row) => [setKey(row.assigned_exercise_id, row.set_number), row]))
+      const previousByKey = new Map(bundle.previousSets.map((row) => [setKey(row.assigned_exercise_id, row.set_number), row]))
 
       const bestInSession: Record<string, number> = {}
       const buildEntry = (
         row: ExerciseRow,
         setNumber: number,
-        plan: { type: string; reps: string; rir: number | null },
+        plan: { type: string; reps: string; rir: number | null; weight: number | null },
         extra: boolean,
       ): SetEntry => {
         const saved = resumedByKey.get(setKey(row.id, setNumber))
@@ -200,12 +205,12 @@ export default function WorkoutExecutionPage() {
           type: plan.type,
           targetReps: plan.reps,
           targetRir: plan.rir,
+          targetWeight: plan.weight,
           weight: saved ? String(saved.weight_kg ?? '') : '',
           reps: saved ? String(saved.reps ?? '') : '',
           previous: previous ? { weight: Number(previous.weight_kg) || 0, reps: Number(previous.reps) || 0 } : null,
           completed: Boolean(saved),
           rowId: saved?.id ?? null,
-          saving: false,
           isPR,
           extra,
         }
@@ -217,27 +222,28 @@ export default function WorkoutExecutionPage() {
           type: plan.type,
           reps: String(plan.reps || '8-12'),
           rir: normalizeRir(plan.rir),
+          weight: normalizeWeight(plan.weight),
         }))
         const entries = planned.map((plan, index) => buildEntry(row, index + 1, plan, false))
         // Séries extras já salvas (além do prescrito) voltam ao retomar.
-        const extraNumbers = resumedSets
+        const extraNumbers = (resumedSets ?? [])
           .filter((set) => set.assigned_exercise_id === row.id && set.set_number > planned.length)
           .map((set) => set.set_number)
           .sort((first, second) => first - second)
-        const lastPlan = planned[planned.length - 1] ?? { type: 'working', reps: '8-12', rir: null }
+        const lastPlan = planned[planned.length - 1] ?? { type: 'working', reps: '8-12', rir: null, weight: null }
         for (const setNumber of extraNumbers) {
           entries.push(buildEntry(row, setNumber, { ...lastPlan, type: 'working' }, true))
         }
         initialSets[row.id] = entries
       }
 
-      if (resumed && resumeCandidate) {
-        sessionIdRef.current = resumed.id
+      if (resumedSets !== null && resumeCandidate) {
+        sessionIdRef.current = resumeCandidate.sessionId
         setStartedAt(resumeCandidate.startedAt)
       } else {
         setStartedAt(Date.now())
       }
-      setWorkout(workoutResult.data as AssignedWorkout)
+      setWorkout(bundle.workout as AssignedWorkout)
       setExercises(rows)
       setRecords(pastRecords)
       setSets(initialSets)
@@ -250,6 +256,26 @@ export default function WorkoutExecutionPage() {
     }
   }, [supabase, router, workoutId, reloadKey])
 
+  // Diário das séries marcadas (retoma o treino neste aparelho mesmo sem internet).
+  useEffect(() => {
+    const sessionId = sessionIdRef.current
+    if (!sessionId || loadState.status !== 'ready' || summary) return
+    const journal: JournalSet[] = []
+    for (const row of exercises) {
+      for (const entry of sets[row.id] ?? []) {
+        if (!entry.completed || !entry.rowId) continue
+        journal.push({
+          id: entry.rowId,
+          assigned_exercise_id: row.id,
+          set_number: entry.setNumber,
+          weight_kg: parseNumber(entry.weight),
+          reps: Math.round(parseNumber(entry.reps)),
+        })
+      }
+    }
+    saveSessionJournal(sessionId, journal)
+  }, [sets, exercises, loadState.status, summary])
+
   const updateEntry = useCallback((rowId: string, index: number, patch: Partial<SetEntry>) => {
     setSets((previous) => ({
       ...previous,
@@ -261,53 +287,41 @@ export default function WorkoutExecutionPage() {
     setRest({ endsAt: Date.now() + seconds * 1000, pausedRemaining: null, total: seconds })
   }, [])
 
+  // Cria a sessão na fila (sem esperar o servidor) na primeira série marcada.
   const ensureSession = useCallback(() => {
-    if (sessionIdRef.current) return Promise.resolve(sessionIdRef.current)
-
-    if (!sessionPromiseRef.current) {
-      sessionPromiseRef.current = (async () => {
-        const { data, error } = await supabase
-          .from('workout_sessions')
-          .insert({ assigned_workout_id: workoutId, student_id: userId, status: 'in_progress' })
-          .select('id')
-          .single()
-
-        if (error || !data || !userId) {
-          sessionPromiseRef.current = null
-          throw new Error(error?.message ?? 'Não foi possível iniciar a sessão.')
-        }
-        sessionIdRef.current = data.id
-        saveActiveSession({ userId, workoutId, sessionId: data.id, startedAt: startedAt ?? Date.now() })
-        return data.id as string
-      })()
-    }
-    return sessionPromiseRef.current
+    if (sessionIdRef.current) return sessionIdRef.current
+    if (!userId) return null
+    const id = newId()
+    sessionIdRef.current = id
+    saveActiveSession({ userId, workoutId, sessionId: id, startedAt: startedAt ?? Date.now() })
+    void enqueueWorkoutOp(supabase, userId, {
+      kind: 'session',
+      row: { id, assigned_workout_id: workoutId, student_id: userId, status: 'in_progress' },
+    })
+    return id
   }, [supabase, workoutId, userId, startedAt])
 
   const toggleSet = useCallback(
-    async (rowId: string, index: number) => {
+    (rowId: string, index: number) => {
       const row = exercises.find((item) => item.id === rowId)
       const entry = setsRef.current[rowId]?.[index]
-      if (!row || !entry || entry.saving) return
+      if (!row || !entry || !userId) return
       setErrorMessage('')
+      clearSyncIssue()
 
       if (entry.completed) {
-        // Desmarcar remove a série do banco.
-        updateEntry(rowId, index, { completed: false, saving: true, isPR: false })
-        if (entry.rowId) {
-          const { data, error } = await supabase.from('session_sets').delete().eq('id', entry.rowId).select('id')
-          if (error || !data?.length) {
-            updateEntry(rowId, index, { completed: true, saving: false, isPR: entry.isPR })
-            setErrorMessage('Não foi possível desmarcar a série. Verifique sua conexão.')
-            return
-          }
+        // Desmarcar remove a série (ou só a tira da fila, se ainda não subiu).
+        updateEntry(rowId, index, { completed: false, isPR: false, rowId: null })
+        if (entry.rowId && sessionIdRef.current) {
+          void enqueueWorkoutOp(supabase, userId, { kind: 'unset', id: entry.rowId, sessionId: sessionIdRef.current })
         }
-        updateEntry(rowId, index, { saving: false, rowId: null })
         return
       }
 
-      // Campos vazios usam o que aparece como sugestão (treino anterior / meta).
-      const weightText = entry.weight.trim() || (entry.previous ? String(entry.previous.weight) : '')
+      // Campos vazios usam o que aparece como sugestão (meta do treinador,
+      // treino anterior ou repetições da meta).
+      const suggestedWeight = entry.targetWeight ?? entry.previous?.weight ?? null
+      const weightText = entry.weight.trim() || (suggestedWeight !== null ? String(suggestedWeight) : '')
       const repsText =
         entry.reps.trim() || (entry.previous ? String(entry.previous.reps) : String(parseInt(entry.targetReps, 10) || ''))
       const weight = Math.max(0, parseNumber(weightText))
@@ -325,45 +339,37 @@ export default function WorkoutExecutionPage() {
         .reduce((best, other) => Math.max(best, parseNumber(other.weight)), 0)
       const isPR = weight > 0 && weight > Math.max(records[row.exercise_id]?.weight ?? 0, sameExerciseBest)
 
-      updateEntry(rowId, index, { completed: true, saving: true, weight: weightText, reps: String(reps), isPR })
+      const sessionId = ensureSession()
+      if (!sessionId) return
+      const setId = newId()
+      updateEntry(rowId, index, { completed: true, weight: weightText, reps: String(reps), isPR, rowId: setId })
       haptic(15)
       startRest(restSeconds)
-
-      try {
-        const sessionId = await ensureSession()
-        const { data, error } = await supabase
-          .from('session_sets')
-          .insert({
-            session_id: sessionId,
-            exercise_id: row.exercise_id,
-            assigned_exercise_id: row.id,
-            set_number: entry.setNumber,
-            weight_kg: weight,
-            reps,
-            rir: entry.targetRir,
-            set_type: entry.type,
-            completed: true,
-          })
-          .select('id')
-          .single()
-
-        if (error || !data) throw new Error(error?.message)
-        updateEntry(rowId, index, { saving: false, rowId: data.id })
-        if (isPR) {
-          haptic([30, 40, 90])
-          toast({
-            tone: 'gold',
-            title: 'Novo recorde pessoal!',
-            description: `${row.exercises?.name ?? 'Exercício'} · ${formatKg(weight)} kg × ${reps}`,
-          })
-        }
-      } catch {
-        updateEntry(rowId, index, { completed: false, saving: false, isPR: false })
-        setRest(IDLE_REST)
-        setErrorMessage('Não foi possível salvar a série. Verifique sua conexão e tente de novo.')
+      void enqueueWorkoutOp(supabase, userId, {
+        kind: 'set',
+        row: {
+          id: setId,
+          session_id: sessionId,
+          exercise_id: row.exercise_id,
+          assigned_exercise_id: row.id,
+          set_number: entry.setNumber,
+          weight_kg: weight,
+          reps,
+          rir: entry.targetRir,
+          set_type: entry.type,
+          completed: true,
+        },
+      })
+      if (isPR) {
+        haptic([30, 40, 90])
+        toast({
+          tone: 'gold',
+          title: 'Novo recorde pessoal!',
+          description: `${row.exercises?.name ?? 'Exercício'} · ${formatKg(weight)} kg × ${reps}`,
+        })
       }
     },
-    [exercises, records, supabase, updateEntry, startRest, restSeconds, ensureSession, toast],
+    [exercises, records, supabase, userId, updateEntry, startRest, restSeconds, ensureSession, toast],
   )
 
   const addSet = useCallback((rowId: string) => {
@@ -380,12 +386,12 @@ export default function WorkoutExecutionPage() {
             type: 'working',
             targetReps: last?.targetReps ?? '8-12',
             targetRir: last?.targetRir ?? null,
+            targetWeight: last?.targetWeight ?? null,
             weight: '',
             reps: '',
             previous: null,
             completed: false,
             rowId: null,
-            saving: false,
             isPR: false,
             extra: true,
           },
@@ -398,7 +404,7 @@ export default function WorkoutExecutionPage() {
     setSets((previous) => {
       const entries = previous[rowId] ?? []
       const last = entries[entries.length - 1]
-      if (!last?.extra || last.completed || last.saving) return previous
+      if (!last?.extra || last.completed) return previous
       return { ...previous, [rowId]: entries.slice(0, -1) }
     })
   }, [])
@@ -436,7 +442,6 @@ export default function WorkoutExecutionPage() {
     let done = 0
     let total = 0
     let volume = 0
-    let saving = false
     let nextHint: string | null = null
     const perExercise: { id: string; name: string; done: number; total: number }[] = []
 
@@ -448,7 +453,6 @@ export default function WorkoutExecutionPage() {
           exerciseDone += 1
           volume += parseNumber(entry.weight) * parseNumber(entry.reps)
         }
-        if (entry.saving) saving = true
       }
       done += exerciseDone
       total += entries.length
@@ -460,7 +464,7 @@ export default function WorkoutExecutionPage() {
     }
 
     const currentId = perExercise.find((item) => item.done < item.total)?.id ?? null
-    return { done, total, volume, saving, nextHint, perExercise, currentId }
+    return { done, total, volume, nextHint, perExercise, currentId }
   }, [exercises, sets])
 
   const scrollToExercise = (rowId: string) => {
@@ -469,30 +473,36 @@ export default function WorkoutExecutionPage() {
 
   const handleFinishWorkout = async () => {
     setFinishError('')
-    if (progress.saving) {
-      setFinishError('Aguarde as séries terminarem de salvar.')
-      return
-    }
     const sessionId = sessionIdRef.current
-    if (!sessionId || progress.done === 0) {
+    if (!sessionId || progress.done === 0 || !userId) {
       setFinishError('Marque pelo menos uma série concluída antes de finalizar.')
       return
     }
 
     setFinishing(true)
     const completedAt = new Date()
-    const { data, error } = await supabase
-      .from('workout_sessions')
-      .update({ completed_at: completedAt.toISOString(), session_rpe: rpe, status: 'completed' })
-      .eq('id', sessionId)
-      .select('id')
-      .maybeSingle()
+    const note = feedback.trim()
+    const withFeedback = note.length > 0 || feedbackTags.length > 0
+    const patch: FinishPatch = {
+      completed_at: completedAt.toISOString(),
+      session_rpe: rpe,
+      status: 'completed',
+      ...(withFeedback ? { feedback: note || null, feedback_tags: feedbackTags } : {}),
+    }
+    const sending = enqueueWorkoutOp(supabase, userId, { kind: 'finish', sessionId, patch })
+    // Com internet, espera o envio (até 8 s) para confirmar. Sem internet, o
+    // treino fica na fila e sobe sozinho depois.
+    await Promise.race([sending, wait(8000)])
     setFinishing(false)
-
-    if (error || !data) {
-      setFinishError('Não foi possível finalizar o treino. Tente novamente.')
+    const issue = getWorkoutSyncState().issue
+    if (issue) {
+      clearSyncIssue()
+      setFinishError(issue)
       return
     }
+    const queued = hasQueuedOps(sessionId)
+    // Recado novo: o treinador recebe o aviso (e o push, se ativado).
+    if (!queued && withFeedback) requestPushDelivery()
 
     clearActiveSession()
     setRest(IDLE_REST)
@@ -519,6 +529,7 @@ export default function WorkoutExecutionPage() {
       fills[region] = loadFill(intensity)
     }
 
+    setQueuedSessionId(queued ? sessionId : null)
     setSummary({
       workoutName: workout?.name ?? 'Treino',
       volume: progress.volume,
@@ -576,14 +587,41 @@ export default function WorkoutExecutionPage() {
   }
 
   if (summary) {
+    const stillQueued = queuedSessionId !== null && sessionPending(sync, queuedSessionId)
     return (
-      <WorkoutSummary
-        data={summary}
-        onDone={() => {
-          router.replace('/student/today')
-          router.refresh()
-        }}
-      />
+      <div className="space-y-4">
+        <AnimatePresence initial={false}>
+          {queuedSessionId !== null && (
+            <m.div
+              key="sync-state"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              role="status"
+              className={cn(
+                'flex items-start gap-3 rounded-2xl border px-4 py-3 text-xs leading-relaxed',
+                stillQueued ? 'border-gold/25 bg-gold-soft text-gold' : 'border-brand/25 bg-brand-soft text-brand',
+              )}
+            >
+              {stillQueued ? (
+                <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              {stillQueued
+                ? 'Treino salvo no aparelho. Ele vai para o seu histórico assim que a internet voltar (pode fechar o app).'
+                : 'Conexão de volta: treino enviado para o seu histórico.'}
+            </m.div>
+          )}
+        </AnimatePresence>
+        <WorkoutSummary
+          data={summary}
+          onDone={() => {
+            router.replace('/student/today')
+            router.refresh()
+          }}
+        />
+      </div>
     )
   }
 
@@ -610,6 +648,20 @@ export default function WorkoutExecutionPage() {
               </span>
               <span aria-hidden="true">·</span>
               <span className="tabular-nums">{formatKg(progress.volume)} kg</span>
+              {(offline || pendingIds.size > 0) && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className={cn('flex items-center gap-1', offline ? 'text-gold' : 'text-zinc-400')} role="status">
+                    {offline ? (
+                      <CloudOff className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <CloudUpload className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {offline ? 'Offline' : 'Enviando'}
+                    {pendingIds.size > 0 && <span className="sr-only">: {pendingIds.size} série(s) aguardando envio</span>}
+                  </span>
+                </>
+              )}
             </p>
           </div>
           <m.button
@@ -674,7 +726,14 @@ export default function WorkoutExecutionPage() {
       </div>
 
       <div className="mt-4 space-y-4">
-        {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+        {offline && (
+          <p className="flex items-start gap-2.5 rounded-2xl border border-gold/25 bg-gold-soft px-4 py-3 text-xs leading-relaxed text-gold">
+            <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            Sem internet: pode treinar normalmente. As séries ficam salvas no aparelho e sobem sozinhas quando a conexão voltar.
+          </p>
+        )}
+        {/* Erro da tela ou algo que o servidor recusou ao sincronizar. */}
+        {(errorMessage || sync.issue) && <Alert variant="error">{errorMessage || sync.issue}</Alert>}
 
         {exercises.length === 0 && (
           <div className="rounded-3xl border border-dashed border-line-strong p-8 text-center text-sm text-zinc-500">
@@ -689,6 +748,7 @@ export default function WorkoutExecutionPage() {
             index={index}
             entries={sets[row.id] ?? []}
             record={records[row.exercise_id]}
+            pendingIds={pendingIds}
             onChangeSet={updateEntry}
             onToggleSet={toggleSet}
             onAddSet={addSet}
@@ -735,6 +795,11 @@ export default function WorkoutExecutionPage() {
           volume={progress.volume}
           rpe={rpe}
           onRpeChange={setRpe}
+          feedback={feedback}
+          onFeedbackChange={setFeedback}
+          tags={feedbackTags}
+          onTagsChange={setFeedbackTags}
+          offline={offline}
           finishing={finishing}
           error={finishError}
           onConfirm={handleFinishWorkout}

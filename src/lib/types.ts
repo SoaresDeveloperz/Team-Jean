@@ -15,6 +15,10 @@ export type Profile = {
   bio?: string | null
   goal?: string | null
   instagram?: string | null
+  // supabase/gestao.sql (avaliação física)
+  sex?: 'M' | 'F' | null
+  birth_date?: string | null
+  height_cm?: number | null
 }
 
 export type Exercise = {
@@ -30,6 +34,8 @@ export type PlannedSet = {
   type: string
   reps: string
   rir: number | string | null
+  // Carga-alvo em kg definida pelo treinador (opcional).
+  weight?: number | string | null
 }
 
 export type AssignedWorkout = {
@@ -67,6 +73,11 @@ export type WorkoutSession = {
   status: string
   completed_at: string | null
   session_rpe: number | null
+  // supabase/gestao.sql: recado do aluno e resposta do treinador.
+  feedback?: string | null
+  feedback_tags?: string[] | null
+  coach_reply?: string | null
+  coach_reply_at?: string | null
   // Não existe na tabela atual; lidos só se um dia forem adicionados.
   created_at?: string | null
   started_at?: string | null
@@ -93,4 +104,5 @@ export type AppNotification = {
   title: string
   message: string
   created_at?: string | null
+  pushed_at?: string | null
 }

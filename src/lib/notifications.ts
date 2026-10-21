@@ -79,6 +79,16 @@ export function resetNotifications() {
   listeners.forEach((listener) => listener())
 }
 
+// Push recebido com o app aberto: o sino busca os avisos de novo.
+let listeningPush = false
+function listenForPush() {
+  if (listeningPush || !('serviceWorker' in navigator)) return
+  listeningPush = true
+  navigator.serviceWorker.addEventListener('message', (event: MessageEvent<{ type?: string }>) => {
+    if (event.data?.type === 'push-received') void loadNotifications(true)
+  })
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => {
@@ -95,6 +105,7 @@ export function useNotifications() {
 
   useEffect(() => {
     void loadNotifications()
+    listenForPush()
   }, [])
 
   const unseen = state.items.filter((item) => !state.seen.has(item.id))

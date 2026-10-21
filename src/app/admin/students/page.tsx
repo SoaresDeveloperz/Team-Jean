@@ -1,18 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, m } from 'framer-motion'
 import {
   AtSign,
+  Box,
   Check,
   ChevronRight,
   ClipboardList,
   KeyRound,
+  LayoutList,
   LoaderCircle,
   Megaphone,
+  NotebookPen,
   Pencil,
+  Scale,
   Search,
   Send,
   User,
@@ -30,7 +34,18 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Stagger, tileVariants } from '@/components/ui/tile'
 import { MeasurementsCard } from '@/components/profile/MeasurementsCard'
+import { CoachNotes } from '@/components/coach/CoachNotes'
+import { MuscleWeek } from '@/components/coach/MuscleWeek'
+import { TabPanel, Tabs, type TabItem } from '@/components/ui/tabs'
 import { createStudent } from './actions'
+
+type DetailTab = 'summary' | 'body' | 'measures' | 'notes'
+const DETAIL_TABS: TabItem<DetailTab>[] = [
+  { value: 'summary', label: 'Resumo', icon: LayoutList },
+  { value: 'body', label: 'Corpo 3D', icon: Box },
+  { value: 'measures', label: 'Medidas', icon: Scale },
+  { value: 'notes', label: 'Notas', icon: NotebookPen },
+]
 
 type SessionRow = {
   id: string
@@ -78,6 +93,8 @@ export default function AdminStudentsPage() {
 
   // Links do painel abrem direto a ficha (?aluno=) ou o cadastro (?novo=1).
   const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('aluno'))
+  const [detailTab, setDetailTab] = useState<DetailTab>('summary')
+  const tabsId = useId()
   const [showCreateModal, setShowCreateModal] = useState(() => searchParams.get('novo') === '1')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -191,6 +208,7 @@ export default function AdminStudentsPage() {
   const closeDetail = useCallback(() => {
     setDetailId(null)
     setEditingName(null)
+    setDetailTab('summary')
   }, [])
 
   const openCreateModal = () => {
@@ -395,156 +413,177 @@ export default function AdminStudentsPage() {
               </dl>
             </div>
 
-            {(detailGoal || detail.bio || detail.instagram) && (
-              <div className="rounded-2xl border border-line bg-black/20 p-3.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {detailGoal && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-200">
-                      <span aria-hidden="true">{detailGoal.emoji}</span> Objetivo: {detailGoal.label}
-                    </span>
-                  )}
-                  {detail.instagram && (
-                    <a
-                      href={`https://instagram.com/${encodeURIComponent(detail.instagram)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold text-brand hover:underline"
-                    >
-                      <AtSign className="h-3.5 w-3.5" aria-hidden="true" />
-                      {detail.instagram}
-                      <span className="sr-only"> no Instagram (abre em nova aba)</span>
-                    </a>
-                  )}
-                </div>
-                {detail.bio && <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{detail.bio}</p>}
-              </div>
-            )}
+            <Tabs id={tabsId} items={DETAIL_TABS} value={detailTab} onChange={setDetailTab} label="Seções da ficha do aluno" />
 
-            <div className="grid grid-cols-2 gap-2">
-              <Link
-                href={`/admin/workouts?novo=${detail.id}`}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black"
+            <AnimatePresence mode="wait" initial={false}>
+              <m.div
+                key={detailTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               >
-                <ClipboardList className="h-4 w-4" aria-hidden="true" /> Prescrever
-              </Link>
-              <Link
-                href={`/admin/announcements?para=${detail.id}`}
-                className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white/[0.04] text-xs font-black uppercase tracking-wider text-white"
-              >
-                <Megaphone className="h-4 w-4" aria-hidden="true" /> Avisar
-              </Link>
-            </div>
+                <TabPanel tabsId={tabsId} value={detailTab} className="space-y-5">
+                  {detailTab === 'summary' && (
+                    <>
+                    {(detailGoal || detail.bio || detail.instagram) && (
+                      <div className="rounded-2xl border border-line bg-black/20 p-3.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {detailGoal && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-200">
+                              <span aria-hidden="true">{detailGoal.emoji}</span> Objetivo: {detailGoal.label}
+                            </span>
+                          )}
+                          {detail.instagram && (
+                            <a
+                              href={`https://instagram.com/${encodeURIComponent(detail.instagram)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold text-brand hover:underline"
+                            >
+                              <AtSign className="h-3.5 w-3.5" aria-hidden="true" />
+                              {detail.instagram}
+                              <span className="sr-only"> no Instagram (abre em nova aba)</span>
+                            </a>
+                          )}
+                        </div>
+                        {detail.bio && <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{detail.bio}</p>}
+                      </div>
+                    )}
 
-            <section aria-labelledby="detail-workouts">
-              <div className="mb-2 flex items-center justify-between">
-                <h3 id="detail-workouts" className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
-                  Treinos ativos
-                </h3>
-                <Link href={`/admin/workouts?aluno=${detail.id}`} className="text-[11px] font-bold text-brand">
-                  Gerenciar
-                </Link>
-              </div>
-              {detailWorkouts.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-line-strong p-4 text-center text-xs text-zinc-500">
-                  Nenhum treino ativo.
-                </p>
-              ) : (
-                <ul className="flex flex-wrap gap-2">
-                  {detailWorkouts.map((workout) => (
-                    <li key={workout.id} className="rounded-full bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-zinc-200">
-                      {workout.name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link
+                        href={`/admin/workouts?novo=${detail.id}`}
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black"
+                      >
+                        <ClipboardList className="h-4 w-4" aria-hidden="true" /> Prescrever
+                      </Link>
+                      <Link
+                        href={`/admin/announcements?para=${detail.id}`}
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white/[0.04] text-xs font-black uppercase tracking-wider text-white"
+                      >
+                        <Megaphone className="h-4 w-4" aria-hidden="true" /> Avisar
+                      </Link>
+                    </div>
 
-            <section aria-labelledby="detail-sessions">
-              <h3 id="detail-sessions" className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
-                Últimos treinos
-              </h3>
-              {detailStats.recent.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-line-strong p-4 text-center text-xs text-zinc-500">
-                  Nenhum treino nos últimos {WINDOW_DAYS} dias.
-                </p>
-              ) : (
-                <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
-                  {detailStats.recent.map((session) => (
-                    <li key={session.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-white">
-                          {session.assigned_workouts?.name ?? 'Treino'}
-                        </span>
-                        <span className="block text-[11px] text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
-                      </span>
-                      {session.session_rpe != null && (
-                        <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
-                          RPE {session.session_rpe}
-                        </span>
+                    <section aria-labelledby="detail-workouts">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 id="detail-workouts" className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+                          Treinos ativos
+                        </h3>
+                        <Link href={`/admin/workouts?aluno=${detail.id}`} className="text-[11px] font-bold text-brand">
+                          Gerenciar
+                        </Link>
+                      </div>
+                      {detailWorkouts.length === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-line-strong p-4 text-center text-xs text-zinc-500">
+                          Nenhum treino ativo.
+                        </p>
+                      ) : (
+                        <ul className="flex flex-wrap gap-2">
+                          {detailWorkouts.map((workout) => (
+                            <li key={workout.id} className="rounded-full bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-zinc-200">
+                              {workout.name}
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                    </section>
 
-            <MeasurementsCard key={detail.id} userId={detail.id} goal={detail.goal} studentName={detail.full_name || detail.email} bare />
+                    <section aria-labelledby="detail-sessions">
+                      <h3 id="detail-sessions" className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+                        Últimos treinos
+                      </h3>
+                      {detailStats.recent.length === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-line-strong p-4 text-center text-xs text-zinc-500">
+                          Nenhum treino nos últimos {WINDOW_DAYS} dias.
+                        </p>
+                      ) : (
+                        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
+                          {detailStats.recent.map((session) => (
+                            <li key={session.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-white">
+                                  {session.assigned_workouts?.name ?? 'Treino'}
+                                </span>
+                                <span className="block text-[11px] text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
+                              </span>
+                              {session.session_rpe != null && (
+                                <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                                  RPE {session.session_rpe}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
 
-            <AnimatePresence initial={false} mode="wait">
-              {editingName === null ? (
-                <m.button
-                  key="edit-button"
-                  type="button"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => {
-                    setEditingName(detail.full_name ?? '')
-                    setEditError('')
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line py-3 text-xs font-bold text-zinc-300 hover:text-white"
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar nome
-                </m.button>
-              ) : (
-                <m.form
-                  key="edit-form"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  onSubmit={handleSaveName}
-                  className="space-y-2"
-                >
-                  <label htmlFor="edit-student-name" className={labelClassName}>
-                    Nome completo
-                  </label>
-                  <input
-                    id="edit-student-name"
-                    type="text"
-                    required
-                    value={editingName}
-                    onChange={(event) => setEditingName(event.target.value)}
-                    className={inputClassName}
-                  />
-                  {editError && <Alert variant="error">{editError}</Alert>}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingName(null)}
-                      className="h-11 w-2/5 rounded-2xl border border-line text-xs font-bold uppercase text-zinc-300"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={savingEdit}
-                      className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black disabled:opacity-60"
-                    >
-                      {savingEdit ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Salvando" /> : 'Salvar nome'}
-                    </button>
-                  </div>
-                </m.form>
-              )}
+                    <AnimatePresence initial={false} mode="wait">
+                      {editingName === null ? (
+                        <m.button
+                          key="edit-button"
+                          type="button"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => {
+                            setEditingName(detail.full_name ?? '')
+                            setEditError('')
+                          }}
+                          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line py-3 text-xs font-bold text-zinc-300 hover:text-white"
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar nome
+                        </m.button>
+                      ) : (
+                        <m.form
+                          key="edit-form"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          onSubmit={handleSaveName}
+                          className="space-y-2"
+                        >
+                          <label htmlFor="edit-student-name" className={labelClassName}>
+                            Nome completo
+                          </label>
+                          <input
+                            id="edit-student-name"
+                            type="text"
+                            required
+                            value={editingName}
+                            onChange={(event) => setEditingName(event.target.value)}
+                            className={inputClassName}
+                          />
+                          {editError && <Alert variant="error">{editError}</Alert>}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingName(null)}
+                              className="h-11 w-2/5 rounded-2xl border border-line text-xs font-bold uppercase text-zinc-300"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={savingEdit}
+                              className="flex h-11 flex-1 items-center justify-center rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black disabled:opacity-60"
+                            >
+                              {savingEdit ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Salvando" /> : 'Salvar nome'}
+                            </button>
+                          </div>
+                        </m.form>
+                      )}
+                    </AnimatePresence>
+                    </>
+                  )}
+                  {detailTab === 'body' && <MuscleWeek studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />}
+                  {detailTab === 'measures' && (
+                    <MeasurementsCard userId={detail.id} goal={detail.goal} studentName={detail.full_name || detail.email} bare />
+                  )}
+                  {detailTab === 'notes' && <CoachNotes studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />}
+                </TabPanel>
+              </m.div>
             </AnimatePresence>
           </div>
         )}

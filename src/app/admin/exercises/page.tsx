@@ -1,15 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { m } from 'framer-motion'
-import { Dumbbell, LibraryBig, LoaderCircle, Play, Plus, Search } from 'lucide-react'
+import { Dumbbell, LibraryBig, LoaderCircle, Pencil, Play, Plus, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Exercise } from '@/lib/types'
 import { MUSCLE_GROUPS } from '@/lib/workouts'
 import { baseExerciseCatalog } from '@/lib/exercises/catalog'
 import { plural } from '@/lib/text'
 import { summarizeWork } from '@/lib/workout-summary'
+import type { MuscleRegion } from '@/lib/muscles'
 import { cn } from '@/lib/cn'
+import { Body3D } from '@/components/fitness/Body3D'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
@@ -39,6 +42,16 @@ function exerciseFills(name: string, muscle: string | null | undefined, secondar
   return summarizeWork([{ name, muscle, secondary, sets: 1 }]).fills
 }
 
+// "principal" para a região mais trabalhada, "secundário" para as demais.
+function roleDetails(fills: Partial<Record<MuscleRegion, string>>) {
+  const details: Partial<Record<MuscleRegion, string>> = {}
+  for (const [region, fill] of Object.entries(fills) as [MuscleRegion, string][]) {
+    const alpha = Number(fill.match(/,\s*([\d.]+)\s*\)$/)?.[1] ?? 1)
+    details[region] = alpha >= 0.99 ? 'principal' : 'secundário'
+  }
+  return details
+}
+
 export default function AdminExercisesPage() {
   const [supabase] = useState(() => createClient())
   const toast = useToast()
@@ -50,7 +63,12 @@ export default function AdminExercisesPage() {
   const [muscleFilter, setMuscleFilter] = useState(ALL)
   const [catalogLoading, setCatalogLoading] = useState(false)
 
-  const [editor, setEditor] = useState<{ id: string | null } | null>(null)
+  const [detail, setDetail] = useState<Exercise | null>(null)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // ?novo=1 (atalho do treinador) já abre o cadastro.
+  const [editor, setEditor] = useState<{ id: string | null } | null>(() => (searchParams.get('novo') === '1' ? { id: null } : null))
   const [name, setName] = useState('')
   const [muscleGroup, setMuscleGroup] = useState(MUSCLE_GROUPS[0])
   const [videoUrl, setVideoUrl] = useState('')
@@ -78,8 +96,13 @@ export default function AdminExercisesPage() {
     }
   }, [supabase, reloadKey])
 
+  useEffect(() => {
+    if (searchParams.get('novo')) router.replace(pathname, { scroll: false })
+  }, [searchParams, router, pathname])
+
   const reload = () => setReloadKey((key) => key + 1)
   const closeEditor = useCallback(() => setEditor(null), [])
+  const closeDetail = useCallback(() => setDetail(null), [])
 
   const openEditor = (exercise?: Exercise) => {
     setEditor({ id: exercise?.id ?? null })
@@ -274,16 +297,22 @@ export default function AdminExercisesPage() {
         </div>
       ) : (
         <ul className="grid grid-cols-2 gap-2.5">
-          {filteredExercises.map((exercise) => {
+          {filteredExercises.map((exercise, index) => {
             const hasVideo = Boolean(exercise.video_url)
             return (
-              <li key={exercise.id}>
+              <m.li
+                key={exercise.id}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-24px' }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28, delay: (index % 2) * 0.05 }}
+              >
                 <button
                   type="button"
-                  onClick={() => openEditor(exercise)}
+                  onClick={() => setDetail(exercise)}
                   className="flex h-full w-full flex-col rounded-3xl border border-line bg-surface p-2.5 text-left transition hover:border-line-strong active:scale-[0.98]"
                 >
-                  <span className="sr-only">Editar </span>
+                  <span className="sr-only">Ver o modelo 3D de </span>
                   <span aria-hidden="true" className="relative block rounded-2xl bg-black/40 px-2 py-2.5">
                     <MuscleMap fills={fillsById.get(exercise.id) ?? {}} animated={false} />
                     {hasVideo && (
@@ -298,11 +327,44 @@ export default function AdminExercisesPage() {
                     {hasVideo && <span className="sr-only">, com vídeo</span>}
                   </span>
                 </button>
-              </li>
+              </m.li>
             )
           })}
         </ul>
       )}
+
+      <Modal
+        open={detail !== null}
+        onClose={closeDetail}
+        variant="sheet"
+        title={detail?.name ?? ''}
+        description={detail ? `${detail.muscle_group || GENERAL} · modelo do exercício` : undefined}
+      >
+        {detail && (
+          <div className="space-y-4">
+            <Body3D
+              fills={fillsById.get(detail.id) ?? {}}
+              details={roleDetails(fillsById.get(detail.id) ?? {})}
+              label={`Músculos trabalhados em ${detail.name}`}
+              heightClassName="h-[26rem]"
+            />
+            {detail.video_url && getExerciseMedia(detail.video_url) && (
+              <ExerciseMedia muscleGroup={detail.muscle_group} videoUrl={detail.video_url} name={detail.name} />
+            )}
+            <m.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setDetail(null)
+                openEditor(detail)
+              }}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line-strong bg-white/[0.04] text-xs font-black uppercase tracking-wider text-white"
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" /> Editar exercício
+            </m.button>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={editor !== null} onClose={closeEditor} title={editor?.id ? 'Editar exercício' : 'Novo exercício'}>
         <form onSubmit={handleSaveExercise} className="space-y-4">
@@ -323,7 +385,7 @@ export default function AdminExercisesPage() {
 
           <fieldset>
             <legend className={labelClassName}>Grupo muscular</legend>
-            <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3">
+            <div className="space-y-3">
               <div className="flex flex-wrap gap-1.5">
                 {groupOptions.map((muscle) => (
                   <label
@@ -342,10 +404,8 @@ export default function AdminExercisesPage() {
                   </label>
                 ))}
               </div>
-              <div className="rounded-2xl bg-black/40 p-1.5">
-                <MuscleMap fills={editorFills} label="Prévia dos músculos trabalhados" />
-                <p className="mt-1 text-center text-[9px] font-bold uppercase tracking-wider text-zinc-500">Prévia</p>
-              </div>
+              {/* Prévia ao vivo: os músculos acendem conforme o grupo e o nome. */}
+              <Body3D fills={editorFills} label="Prévia 3D dos músculos trabalhados" heightClassName="h-60" showChips={false} />
             </div>
           </fieldset>
 

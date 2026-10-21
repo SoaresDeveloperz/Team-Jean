@@ -115,6 +115,62 @@ input, select, textarea {
     radial-gradient(80% 60% at 0% 100%, rgb(255 255 255 / 0.04), transparent 60%);
 }
 
+/* Luz esmeralda que segue o mouse nos cartões (só com mouse). */
+.tile-spotlight {
+  isolation: isolate;
+}
+@media (hover: hover) and (pointer: fine) {
+  .tile-spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(280px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgb(52 211 153 / 0.08), transparent 65%);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+  }
+  .tile-spotlight:hover::before {
+    opacity: 1;
+  }
+}
+
+/* Aurora suave atrás do cabeçalho do painel. */
+.aurora {
+  position: absolute;
+  inset: -48px -24px auto -24px;
+  height: 230px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 60% at 18% 32%, rgb(52 211 153 / 0.13), transparent 70%),
+    radial-gradient(36% 55% at 82% 18%, rgb(251 191 36 / 0.08), transparent 70%);
+  filter: blur(20px);
+  animation: aurora-drift 16s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate3d(-5%, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5%, 7%, 0) scale(1.08);
+  }
+}
+
+/* Borda em gradiente girando (cartões de desafio). */
+.challenge-border {
+  background: conic-gradient(from 0deg, rgb(251 191 36 / 0.95), rgb(52 211 153 / 0.7), transparent 35%, transparent 65%, rgb(251 191 36 / 0.95));
+  animation: border-spin 7s linear infinite;
+}
+
+@keyframes border-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Respeita "reduzir movimento" do sistema (WCAG 2.3.3). */
 @media (prefers-reduced-motion: reduce) {
   *,

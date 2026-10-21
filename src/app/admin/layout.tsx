@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth'
 import { AdminNav } from '@/components/layout/AdminNav'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LogoutButton } from '@/components/layout/LogoutButton'
+import { CoachQuickActions } from '@/components/layout/CoachQuickActions'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   // Só admins (profiles.role = 'admin') passam daqui. Os dados continuam
@@ -17,6 +18,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         actions={<LogoutButton className="h-10 w-10 justify-center rounded-2xl border border-line bg-surface text-zinc-300" />}
       />
       <main className="mx-auto max-w-md p-4">{children}</main>
+      <CoachQuickActions />
       <AdminNav />
     </div>
   )

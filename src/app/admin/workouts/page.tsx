@@ -27,6 +27,7 @@ import { createDefaultPlannedSets, getPlannedSets, normalizeRir } from '@/lib/wo
 import { plural } from '@/lib/text'
 import { summarizePrescription, summarizeWork, summaryLine, type WorkoutSummary } from '@/lib/workout-summary'
 import { cn } from '@/lib/cn'
+import { Body3D } from '@/components/fitness/Body3D'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { BuilderExerciseCard, type BuilderExercise, type BuilderSet } from '@/components/admin/BuilderExerciseCard'
 import { ExercisePicker } from '@/components/admin/ExercisePicker'
@@ -1185,18 +1186,19 @@ export default function AdminWorkoutsPage() {
 
           {selectedExercises.length > 0 && (
             <div className="rounded-3xl border border-line bg-surface p-4">
-              <div className="flex items-center gap-4">
-                <div className="min-w-0 flex-1">
-                  <Eyebrow>Resumo do treino</Eyebrow>
-                  <p className="mt-2 text-sm font-bold leading-snug text-white">
-                    {builderSummary.focus.join(' · ') || 'Grupo muscular não identificado'}
-                  </p>
-                  <p className="mt-1 text-[11px] text-zinc-500">Regiões mais trabalhadas, pelo número de séries.</p>
-                </div>
-                <div className="w-32 shrink-0">
-                  <MuscleMap fills={builderSummary.fills} />
-                </div>
-              </div>
+              <Eyebrow>Resumo do treino</Eyebrow>
+              <p className="mt-2 text-sm font-bold leading-snug text-white">
+                {builderSummary.focus.join(' · ') || 'Grupo muscular não identificado'}
+              </p>
+              <p className="mt-1 text-[11px] text-zinc-500">Regiões mais trabalhadas, pelo número de séries.</p>
+              {/* Cada exercício novo acende os músculos no corpo 3D. */}
+              <Body3D
+                fills={builderSummary.fills}
+                label={`Músculos do treino: ${builderSummary.focus.join(', ') || 'nenhum identificado'}`}
+                heightClassName="h-72"
+                showChips={false}
+                className="mt-3"
+              />
               <dl className="mt-3 grid grid-cols-3 divide-x divide-line border-t border-line pt-3 text-center">
                 <div>
                   <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Exercícios</dt>

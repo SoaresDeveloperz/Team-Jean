@@ -1,7 +1,7 @@
 // Uso: node a11y.cjs <maria|jean> <rota> [<rota> ...]
 const { chromium } = require('playwright')
 const BASE = process.env.BASE || 'http://localhost:3200'
-const AXE = require.resolve('axe-core/axe.min.js')
+const { runAxe } = require('./run-axe.cjs')
 
 ;(async () => {
   const [who, ...routes] = process.argv.slice(2)
@@ -18,17 +18,7 @@ const AXE = require.resolve('axe-core/axe.min.js')
   for (const route of routes) {
     await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 90000 })
     await page.waitForTimeout(1800)
-    await page.addScriptTag({ path: AXE })
-    const result = await page.evaluate(async () => {
-      const res = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })
-      return res.violations.map((v) => ({
-        id: v.id,
-        impact: v.impact,
-        help: v.help,
-        nodes: v.nodes.slice(0, 4).map((n) => `${n.target.join(' ')} :: ${(n.failureSummary || '').split('\n').slice(1, 2).join(' ')}`),
-        count: v.nodes.length,
-      }))
-    })
+    const result = await runAxe(page)
     total += result.length
     console.log(`\n== ${route}: ${result.length} violação(ões)`)
     for (const v of result) {

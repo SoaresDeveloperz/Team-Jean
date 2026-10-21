@@ -6,7 +6,7 @@ const { createDevice, fakePushScript } = require('../push-decrypt.cjs')
 
 const BASE = process.env.BASE || 'http://localhost:3200'
 const MOCK = 'http://localhost:54321'
-const AXE = require.resolve('axe-core/axe.min.js')
+const { runAxe } = require('./run-axe.cjs')
 
 ;(async () => {
   const device = createDevice()
@@ -16,27 +16,9 @@ const AXE = require.resolve('axe-core/axe.min.js')
   await context.addInitScript(fakePushScript({ endpoint: `${MOCK}/__push/a11y`, p256dh: device.p256dh, auth: device.authKey }))
   const page = await context.newPage()
   let total = 0
-  const runAxe = () =>
-    page.evaluate(async () => {
-      const res = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })
-      return res.violations.map((v) => ({
-        id: v.id,
-        impact: v.impact,
-        help: v.help,
-        nodes: v.nodes.slice(0, 4).map((n) => `${n.target.join(' ')} :: ${(n.failureSummary || '').split('\n').slice(1, 2).join(' ')}`),
-        count: v.nodes.length,
-      }))
-    })
   const audit = async (label) => {
     await page.waitForTimeout(900)
-    await page.addScriptTag({ path: AXE })
-    let result = await runAxe()
-    // Um toast entrando ou saindo tem o texto semitransparente (contraste falso):
-    // só conta o que continuar depois da animação.
-    if (result.length > 0) {
-      await page.waitForTimeout(1200)
-      result = await runAxe()
-    }
+    const result = await runAxe(page)
     total += result.length
     console.log(`== ${label}: ${result.length}`)
     for (const v of result) {

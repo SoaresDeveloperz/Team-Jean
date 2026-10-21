@@ -39,6 +39,9 @@ async function login(page, email, password = '123456') {
   await page.click('button[type=submit]')
 }
 
+// O foco vai para o campo no quadro seguinte (requestAnimationFrame): espera até 3 s.
+const becomesFocused = (page, test, arg) => page.waitForFunction(test, arg, { timeout: 3000 }).then(() => true, () => false)
+
 // O botão + some quando a página rola para baixo: volta ao topo e espera ele reaparecer.
 async function openShortcuts(page) {
   await page.evaluate(() => window.scrollTo(0, 0))
@@ -399,7 +402,7 @@ async function openShortcuts(page) {
   await openShortcuts(page)
   await page.waitForSelector('nav[aria-label="Atalhos do treinador"] a >> nth=5')
   check('atalhos do treinador abrem com 6 ações', (await page.locator('nav[aria-label="Atalhos do treinador"] a').count()) === 6)
-  check('foco vai para o primeiro atalho', await page.evaluate(() => document.activeElement?.textContent?.includes('Novo aluno')))
+  check('foco vai para o primeiro atalho', await becomesFocused(page, () => document.activeElement?.textContent?.includes('Novo aluno')))
   await page.keyboard.press('Escape')
   await page.waitForTimeout(400)
   check('Esc fecha os atalhos e devolve o foco', (await page.locator('nav[aria-label="Atalhos do treinador"]').count()) === 0 && (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === 'Atalhos do treinador')
@@ -589,7 +592,8 @@ async function openShortcuts(page) {
   await page.waitForTimeout(600)
   check('treinador fixa post de aluno', (await page.locator('article', { hasText: 'Peito e tríceps pago' }).textContent()).includes('Fixado pelo treinador'))
   await mariaWorkout.locator('button', { hasText: 'Comentar' }).click()
-  check('tocar em comentar abre o campo focado', await mariaWorkout.locator('input[placeholder^="Escreva um comentário"]').evaluate((input) => input === document.activeElement))
+  const commentInput = await mariaWorkout.locator('input[placeholder^="Escreva um comentário"]').elementHandle()
+  check('tocar em comentar abre o campo focado', await becomesFocused(page, (input) => input === document.activeElement, commentInput))
   await mariaWorkout.locator('input[placeholder^="Escreva um comentário"]').fill('Monstra! Semana que vem tem mais carga 💪')
   await mariaWorkout.locator('button[aria-label="Enviar comentário"]').click()
   await page.waitForSelector('text=Monstra! Semana que vem')

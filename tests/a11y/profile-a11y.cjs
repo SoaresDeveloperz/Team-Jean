@@ -3,7 +3,7 @@ const path = require('path')
 const { chromium } = require('playwright')
 const BASE = process.env.BASE || 'http://localhost:3200'
 const MOCK = 'http://localhost:54321'
-const AXE = require.resolve('axe-core/axe.min.js')
+const { runAxe } = require('./run-axe.cjs')
 const fixture = (name) => path.join(__dirname, '..', 'fixtures', name)
 
 ;(async () => {
@@ -13,17 +13,7 @@ const fixture = (name) => path.join(__dirname, '..', 'fixtures', name)
   let total = 0
   const audit = async (label) => {
     await page.waitForTimeout(900)
-    await page.addScriptTag({ path: AXE })
-    const result = await page.evaluate(async () => {
-      const res = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })
-      return res.violations.map((v) => ({
-        id: v.id,
-        impact: v.impact,
-        help: v.help,
-        nodes: v.nodes.slice(0, 4).map((n) => `${n.target.join(' ')} :: ${(n.failureSummary || '').split('\n').slice(1, 2).join(' ')}`),
-        count: v.nodes.length,
-      }))
-    })
+    const result = await runAxe(page)
     total += result.length
     console.log(`== ${label}: ${result.length}`)
     for (const v of result) {

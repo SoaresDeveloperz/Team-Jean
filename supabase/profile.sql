@@ -12,8 +12,9 @@
 --     O aluno já pode editar o próprio perfil (policies.sql); as restrições
 --     abaixo garantem que foto e capa apontem só para a pasta dele.
 --   - Bucket público "avatars" (foto e capa): cada um envia só na própria pasta.
---   - Tabela body_measurements (peso, % de gordura, cintura e fotos de
---     evolução). Só o aluno e o treinador veem; o treinador também registra.
+--   - Tabela body_measurements (peso, % de gordura, cintura, perímetros,
+--     dobras cutâneas e fotos de evolução). Só o aluno e o treinador veem; o
+--     treinador também registra.
 --   - Bucket privado "progress" para as fotos de evolução (aluno e treinador).
 -- =============================================================================
 
@@ -98,6 +99,28 @@ create table if not exists public.body_measurements (
 
 create index if not exists body_measurements_user_idx
   on public.body_measurements (user_id, measured_on desc, created_at desc);
+
+-- Avaliação física completa: perímetros, dobras cutâneas e protocolo do %
+-- de gordura (mesma definição do gestao.sql, para rodarem em qualquer ordem).
+alter table public.body_measurements add column if not exists perimeters jsonb;
+alter table public.body_measurements add column if not exists skinfolds jsonb;
+alter table public.body_measurements add column if not exists protocol text;
+
+alter table public.body_measurements drop constraint if exists body_measurements_perimeters_check;
+alter table public.body_measurements add constraint body_measurements_perimeters_check
+  check (perimeters is null or (jsonb_typeof(perimeters) = 'object' and octet_length(perimeters::text) <= 2000));
+alter table public.body_measurements drop constraint if exists body_measurements_skinfolds_check;
+alter table public.body_measurements add constraint body_measurements_skinfolds_check
+  check (skinfolds is null or (jsonb_typeof(skinfolds) = 'object' and octet_length(skinfolds::text) <= 1000));
+alter table public.body_measurements drop constraint if exists body_measurements_protocol_check;
+alter table public.body_measurements add constraint body_measurements_protocol_check
+  check (protocol is null or protocol in ('pollock3', 'pollock7'));
+
+alter table public.body_measurements drop constraint if exists body_measurements_has_data;
+alter table public.body_measurements add constraint body_measurements_has_data check (
+  weight_kg is not null or body_fat is not null or waist_cm is not null or cardinality(photos) > 0
+  or perimeters is not null or skinfolds is not null
+);
 
 alter table public.body_measurements enable row level security;
 

@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'framer-motion'
-import { BatteryWarning, Check, LoaderCircle, Radar as RadarIcon, Send, TrendingUp, Trophy } from 'lucide-react'
+import { BatteryWarning, Check, LoaderCircle, MessageSquareText, Radar as RadarIcon, Send, TrendingUp, Trophy } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
-import { loadRadar, type Radar } from '@/lib/coach-insights'
+import { applyProgression, loadRadar, type Radar, type RadarProgression } from '@/lib/coach-insights'
+import { loadFeedback, type FeedbackItem } from '@/lib/coach-feedback'
 import { notifyStudents } from '@/lib/coach'
+import { FeedbackCard } from './FeedbackCard'
 import { avatarUrlOf } from '@/lib/profile'
 import { formatKg } from '@/lib/workouts'
 import { relativeDay } from '@/lib/stats'
@@ -18,7 +20,8 @@ import { TabPanel, Tabs, type TabItem } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Tile } from '@/components/ui/tile'
 
-type RadarTab = 'records' | 'progressions' | 'alerts'
+type RadarTab = 'feedback' | 'records' | 'progressions' | 'alerts'
+type ListTab = Exclude<RadarTab, 'feedback'>
 type Item = {
   key: string
   studentId: string
@@ -26,6 +29,8 @@ type Item = {
   detail: string
   when?: string
   action: { label: string; tone: 'gold' | 'brand' | 'danger'; title: string; message: string }
+  // Progressão: o botão grava a nova carga no treino antes de avisar.
+  progression?: RadarProgression
 }
 
 const SENT_KEY = 'tj:radar-enviados'
@@ -51,7 +56,7 @@ function rememberSent(key: string) {
   }
 }
 
-function itemsFrom(radar: Radar): Record<RadarTab, Item[]> {
+function itemsFrom(radar: Radar): Record<ListTab, Item[]> {
   return {
     records: radar.records.map((record) => ({
       key: record.key,
@@ -71,12 +76,21 @@ function itemsFrom(radar: Radar): Record<RadarTab, Item[]> {
       studentId: item.studentId,
       title: `${item.studentName} · ${item.exercise}`,
       detail: `Fechou ${item.sets}×${item.reps} com ${formatKg(item.weight)} kg → ${formatKg(item.next)} kg`,
-      action: {
-        label: 'Avisar',
-        tone: 'brand',
-        title: 'Hora de subir a carga 📈',
-        message: `${item.exercise}: você fechou ${item.sets}×${item.reps} com ${formatKg(item.weight)} kg. No próximo treino, tente ${formatKg(item.next)} kg.`,
-      },
+      progression: item.prescriptions.length > 0 ? item : undefined,
+      action:
+        item.prescriptions.length > 0
+          ? {
+              label: `Aplicar ${formatKg(item.next)} kg`,
+              tone: 'brand',
+              title: 'Carga nova no seu treino 📈',
+              message: `${item.exercise}: você fechou ${item.sets}×${item.reps} com ${formatKg(item.weight)} kg. A carga-alvo agora é ${formatKg(item.next)} kg e já está no seu treino.`,
+            }
+          : {
+              label: 'Avisar',
+              tone: 'brand',
+              title: 'Hora de subir a carga 📈',
+              message: `${item.exercise}: você fechou ${item.sets}×${item.reps} com ${formatKg(item.weight)} kg. No próximo treino, tente ${formatKg(item.next)} kg.`,
+            },
     })),
     alerts: radar.alerts.map((alert) => ({
       key: alert.key,
@@ -94,6 +108,7 @@ function itemsFrom(radar: Radar): Record<RadarTab, Item[]> {
 }
 
 const EMPTY: Record<RadarTab, string> = {
+  feedback: 'Nenhum recado dos alunos nos últimos 14 dias.',
   records: 'Nenhum recorde novo nos últimos 7 dias.',
   progressions: 'Ninguém fechou todas as séries no topo da faixa ainda.',
   alerts: 'Ninguém com RPE 9+ nos últimos 3 treinos. 👌',
@@ -110,7 +125,9 @@ export function CoachRadar({ students }: { students: Profile[] }) {
   const [supabase] = useState(() => createClient())
   const toast = useToast()
   const tabsId = useId()
-  const [radar, setRadar] = useState<Record<RadarTab, Item[]> | null>(null)
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const [radar, setRadar] = useState<Record<ListTab, Item[]> | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([])
   const [error, setError] = useState('')
   const [tab, setTab] = useState<RadarTab>('records')
   const [sent, setSent] = useState<Set<string>>(() => new Set())
@@ -120,14 +137,18 @@ export function CoachRadar({ students }: { students: Profile[] }) {
     let active = true
     const load = async () => {
       try {
-        const data = await loadRadar(supabase, students)
+        const [data, inbox] = await Promise.all([loadRadar(supabase, students), loadFeedback(supabase, students).catch(() => [])])
         if (!active) return
         const items = itemsFrom(data)
         setRadar(items)
+        setFeedback(inbox)
         setSent(readSent())
-        // Abre na aba com mais coisa para fazer.
-        const firstWithItems = (['records', 'progressions', 'alerts'] as RadarTab[]).find((key) => items[key].length > 0)
+        // Link do push (?radar=recados) abre nos recados; senão, na aba com mais coisa para fazer.
+        const fromPush = new URLSearchParams(window.location.search).get('radar') === 'recados'
+        const unanswered = inbox.some((item) => !item.reply)
+        const firstWithItems = fromPush || unanswered ? 'feedback' : (['records', 'progressions', 'alerts'] as ListTab[]).find((key) => items[key].length > 0)
         if (firstWithItems) setTab(firstWithItems)
+        if (fromPush) sectionRef.current?.scrollIntoView({ block: 'start' })
       } catch (loadError) {
         if (active) setError(loadError instanceof Error ? loadError.message : 'Não foi possível montar o radar.')
       }
@@ -143,11 +164,21 @@ export function CoachRadar({ students }: { students: Profile[] }) {
   const send = async (item: Item) => {
     setSending(item.key)
     try {
+      const student = studentById.get(item.studentId)
+      if (item.progression) {
+        const updated = await applyProgression(supabase, item.progression)
+        if (updated === 0) throw new Error('O exercício não está mais nos treinos ativos do aluno.')
+      }
       await notifyStudents(supabase, [item.studentId], item.action.title, item.action.message)
       rememberSent(item.key)
       setSent((current) => new Set(current).add(item.key))
-      const student = studentById.get(item.studentId)
-      toast({ tone: 'success', title: 'Mensagem enviada', description: `${student?.full_name ?? 'Aluno'} vai ver no sino de avisos.` })
+      toast({
+        tone: 'success',
+        title: item.progression ? 'Carga aplicada no treino' : 'Mensagem enviada',
+        description: item.progression
+          ? `${student?.full_name ?? 'O aluno'} já vê ${formatKg(item.progression.next)} kg como meta e foi avisado.`
+          : `${student?.full_name ?? 'Aluno'} vai ver no sino de avisos.`,
+      })
     } catch (sendError) {
       toast({ tone: 'error', title: 'Não foi possível enviar', description: sendError instanceof Error ? sendError.message : undefined })
     } finally {
@@ -156,15 +187,16 @@ export function CoachRadar({ students }: { students: Profile[] }) {
   }
 
   const tabs: TabItem<RadarTab>[] = [
+    { value: 'feedback', label: 'Recados', icon: MessageSquareText, badge: feedback.filter((item) => !item.reply).length },
     { value: 'records', label: 'Recordes', icon: Trophy, badge: radar?.records.filter((item) => !sent.has(item.key)).length },
     { value: 'progressions', label: 'Progressão', icon: TrendingUp, badge: radar?.progressions.filter((item) => !sent.has(item.key)).length },
     { value: 'alerts', label: 'Cansaço', icon: BatteryWarning, badge: radar?.alerts.filter((item) => !sent.has(item.key)).length },
   ]
-  const items = radar?.[tab] ?? []
+  const items = tab === 'feedback' ? [] : radar?.[tab] ?? []
 
   return (
-    <Tile className="p-0">
-      <div className="p-5 pb-3">
+    <Tile className="scroll-mt-24 p-0">
+      <div ref={sectionRef} className="p-5 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2>
@@ -204,7 +236,25 @@ export function CoachRadar({ students }: { students: Profile[] }) {
               transition={{ duration: 0.18 }}
             >
               <TabPanel tabsId={tabsId} value={tab}>
-                {items.length === 0 ? (
+                {tab === 'feedback' ? (
+                  feedback.length === 0 ? (
+                    <p className="rounded-2xl border border-dashed border-line-strong p-4 text-center text-xs text-zinc-500">{EMPTY.feedback}</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {feedback.slice(0, 8).map((item) => (
+                        <li key={item.sessionId}>
+                          <FeedbackCard
+                            item={item}
+                            student={studentById.get(item.studentId)}
+                            onReplied={(replied) =>
+                              setFeedback((current) => current.map((entry) => (entry.sessionId === replied.sessionId ? replied : entry)))
+                            }
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : items.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-line-strong p-4 text-center text-xs text-zinc-500">{EMPTY[tab]}</p>
                 ) : (
                   <ul className="space-y-2">

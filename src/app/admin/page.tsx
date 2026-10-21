@@ -31,6 +31,8 @@ import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
 import { CoachRadar } from '@/components/coach/CoachRadar'
+import { FinanceSummaryTile } from '@/components/finance/FinanceSummaryTile'
+import { PushNotificationsTile } from '@/components/account/PushNotificationsTile'
 
 type SessionRow = {
   id: string
@@ -230,7 +232,7 @@ export default function AdminDashboardPage() {
         </m.header>
 
         {/* Indicadores */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile className="flex flex-col justify-between p-4">
             <Eyebrow icon={TrendingUp}>Adesão</Eyebrow>
             <div className="mt-3 flex items-center gap-3">
@@ -299,102 +301,113 @@ export default function AdminDashboardPage() {
           ))}
         </m.div>
 
-        {/* Radar: recordes, progressões e cansaço */}
-        <CoachRadar students={data.students} />
+        {/* No computador: radar e atividade à esquerda; dinheiro e alertas à direita. */}
+        <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-4 lg:space-y-0">
+          <div className="space-y-4">
+            {/* Radar: recados, recordes, progressões e cansaço */}
+            <CoachRadar students={data.students} />
 
-        {/* Atividade recente */}
-        <Tile className="p-0">
-          <div className="flex items-center justify-between px-5 pb-1 pt-5">
-            <Eyebrow>Atividade recente</Eyebrow>
-            <span className="text-[10px] font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
+            {/* Atividade recente */}
+            <Tile className="p-0">
+              <div className="flex items-center justify-between px-5 pb-1 pt-5">
+                <Eyebrow>Atividade recente</Eyebrow>
+                <span className="text-[10px] font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
+              </div>
+              {data.sessions.length === 0 ? (
+                <p className="px-5 pb-5 pt-2 text-sm text-zinc-500">Nenhum treino concluído no período.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {data.sessions.slice(0, 8).map((session) => {
+                    const student = derived.studentById.get(session.student_id)
+                    const volume = data.volumeBySession.get(session.id)
+                    return (
+                      <li key={session.id}>
+                        <Link
+                          href={`/admin/students?aluno=${session.student_id}`}
+                          className="flex items-center gap-3 px-5 py-3 transition hover:bg-white/[0.02]"
+                        >
+                          <Avatar name={student?.full_name ?? student?.email} seed={session.student_id} src={avatarUrlOf(student)} size="sm" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-zinc-300">
+                              <span className="font-bold text-white">{student?.full_name?.split(' ')[0] ?? 'Aluno'}</span> concluiu{' '}
+                              <span className="font-semibold text-zinc-200">{session.assigned_workouts?.name ?? 'um treino'}</span>
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-zinc-500">
+                              {relativeDay(new Date(session.completed_at))}
+                              {session.session_rpe != null && ` · RPE ${session.session_rpe}`}
+                              {volume ? ` · ${formatKg(volume)} kg` : ''}
+                            </span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </Tile>
           </div>
-          {data.sessions.length === 0 ? (
-            <p className="px-5 pb-5 pt-2 text-sm text-zinc-500">Nenhum treino concluído no período.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {data.sessions.slice(0, 8).map((session) => {
-                const student = derived.studentById.get(session.student_id)
-                const volume = data.volumeBySession.get(session.id)
-                return (
-                  <li key={session.id}>
-                    <Link
-                      href={`/admin/students?aluno=${session.student_id}`}
-                      className="flex items-center gap-3 px-5 py-3 transition hover:bg-white/[0.02]"
-                    >
-                      <Avatar name={student?.full_name ?? student?.email} seed={session.student_id} src={avatarUrlOf(student)} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm text-zinc-300">
-                          <span className="font-bold text-white">{student?.full_name?.split(' ')[0] ?? 'Aluno'}</span> concluiu{' '}
-                          <span className="font-semibold text-zinc-200">{session.assigned_workouts?.name ?? 'um treino'}</span>
-                        </span>
-                        <span className="mt-0.5 block text-[11px] text-zinc-500">
-                          {relativeDay(new Date(session.completed_at))}
-                          {session.session_rpe != null && ` · RPE ${session.session_rpe}`}
-                          {volume ? ` · ${formatKg(volume)} kg` : ''}
-                        </span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </Tile>
 
-        {/* Atenção */}
-        {(derived.inactive.length > 0 || derived.lowReadiness.length > 0) && (
-          <Tile className="space-y-4">
-            <Eyebrow className="text-gold/90">Precisam de atenção</Eyebrow>
-            {derived.inactive.length > 0 && (
-              <div>
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-zinc-300">
-                  <TimerOff className="h-3.5 w-3.5 text-gold" aria-hidden="true" /> Sem treinar há mais de 7 dias
-                </p>
-                <ul className="space-y-1.5">
-                  {derived.inactive.slice(0, 5).map(({ student, last }) => (
-                    <li key={student.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2">
-                      <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-white">{student.full_name || student.email}</span>
-                        <span className="block text-[11px] text-zinc-500">
-                          {last ? `Último treino ${relativeDayPhrase(last)}` : `Sem treinos nos últimos ${WINDOW_DAYS} dias`}
-                        </span>
-                      </span>
-                      <Link
-                        href={`/admin/announcements?para=${student.id}`}
-                        className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[11px] font-black uppercase text-black"
-                      >
-                        Avisar
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <div className="space-y-4">
+            <FinanceSummaryTile students={data.students} />
+
+            {/* Atenção */}
+            {(derived.inactive.length > 0 || derived.lowReadiness.length > 0) && (
+              <Tile className="space-y-4">
+                <Eyebrow className="text-gold/90">Precisam de atenção</Eyebrow>
+                {derived.inactive.length > 0 && (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-zinc-300">
+                      <TimerOff className="h-3.5 w-3.5 text-gold" aria-hidden="true" /> Sem treinar há mais de 7 dias
+                    </p>
+                    <ul className="space-y-1.5">
+                      {derived.inactive.slice(0, 5).map(({ student, last }) => (
+                        <li key={student.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2">
+                          <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-white">{student.full_name || student.email}</span>
+                            <span className="block text-[11px] text-zinc-500">
+                              {last ? `Último treino ${relativeDayPhrase(last)}` : `Sem treinos nos últimos ${WINDOW_DAYS} dias`}
+                            </span>
+                          </span>
+                          <Link
+                            href={`/admin/announcements?para=${student.id}`}
+                            className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[11px] font-black uppercase text-black"
+                          >
+                            Avisar
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {derived.lowReadiness.length > 0 && (
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-zinc-300">
+                      <BatteryLow className="h-3.5 w-3.5 text-danger" aria-hidden="true" /> Prontidão baixa
+                    </p>
+                    <ul className="flex flex-wrap gap-2">
+                      {derived.lowReadiness.map((student) => (
+                        <li key={student.id}>
+                          <Link
+                            href={`/admin/students?aluno=${student.id}`}
+                            className="flex items-center gap-2 rounded-full border border-danger/30 bg-danger-soft py-1 pl-1 pr-3 text-xs font-semibold text-white"
+                          >
+                            <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" className="h-7 w-7 rounded-full text-[10px]" />
+                            {student.full_name?.split(' ')[0] ?? 'Aluno'}
+                            <span className="font-bold text-danger">{student.readiness_score}%</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Tile>
             )}
-            {derived.lowReadiness.length > 0 && (
-              <div>
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-zinc-300">
-                  <BatteryLow className="h-3.5 w-3.5 text-danger" aria-hidden="true" /> Prontidão baixa
-                </p>
-                <ul className="flex flex-wrap gap-2">
-                  {derived.lowReadiness.map((student) => (
-                    <li key={student.id}>
-                      <Link
-                        href={`/admin/students?aluno=${student.id}`}
-                        className="flex items-center gap-2 rounded-full border border-danger/30 bg-danger-soft py-1 pl-1 pr-3 text-xs font-semibold text-white"
-                      >
-                        <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" className="h-7 w-7 rounded-full text-[10px]" />
-                        {student.full_name?.split(' ')[0] ?? 'Aluno'}
-                        <span className="font-bold text-danger">{student.readiness_score}%</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </Tile>
-        )}
+
+            <PushNotificationsTile coach />
+          </div>
+        </div>
       </Stagger>
 
       <WeeklyTrainingInsights mode="admin" />

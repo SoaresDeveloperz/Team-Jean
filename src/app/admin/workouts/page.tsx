@@ -23,7 +23,8 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PlannedSet, PrescribedExercise, Profile, WorkoutSession } from '@/lib/types'
 import { avatarUrlOf } from '@/lib/profile'
-import { createDefaultPlannedSets, getPlannedSets, normalizeRir } from '@/lib/workouts'
+import { createDefaultPlannedSets, getPlannedSets, normalizeRir, normalizeWeight } from '@/lib/workouts'
+import { requestPushDelivery } from '@/lib/push/client'
 import { plural } from '@/lib/text'
 import { summarizePrescription, summarizeWork, summaryLine, type WorkoutSummary } from '@/lib/workout-summary'
 import { cn } from '@/lib/cn'
@@ -284,7 +285,13 @@ export default function AdminWorkoutsPage() {
   }
 
   const createKey = useCallback(() => `item-${keyCounter.current++}`, [])
-  const toBuilderSets = (sets: PlannedSet[]): BuilderSet[] => sets.map((set) => ({ ...set, key: createKey() }))
+  const toBuilderSets = (sets: PlannedSet[]): BuilderSet[] =>
+    sets.map((set) => ({
+      ...set,
+      // Carga no formato brasileiro (42,5) para editar.
+      weight: set.weight === null || set.weight === undefined || set.weight === '' ? '' : String(set.weight).replace('.', ','),
+      key: createKey(),
+    }))
 
   // ---------------------------------------------------------------------------
   // Histórico de cargas do treino
@@ -461,11 +468,16 @@ export default function AdminWorkoutsPage() {
   }, [builder, workoutName, workouts, templates, selectedStudent])
 
   const buildRow = (item: BuilderExercise, index: number) => {
-    const plannedSets = item.planned_sets.map((set) => ({
-      type: set.type,
-      reps: String(set.reps ?? '').trim() || '8-12',
-      rir: normalizeRir(set.rir),
-    }))
+    const plannedSets = item.planned_sets.map((set) => {
+      const weight = normalizeWeight(set.weight)
+      return {
+        type: set.type,
+        reps: String(set.reps ?? '').trim() || '8-12',
+        rir: normalizeRir(set.rir),
+        // Carga-alvo só entra no JSON quando definida.
+        ...(weight !== null ? { weight } : {}),
+      }
+    })
     return {
       exercise_id: item.exercise_id,
       order: index + 1,
@@ -570,6 +582,7 @@ export default function AdminWorkoutsPage() {
           message: isNew ? `Seu treinador atribuiu o treino: ${name}.` : `Seu treinador atualizou o treino: ${name}.`,
         })
         notified = !error
+        if (notified) requestPushDelivery()
       }
 
       setBuilder(null)
@@ -746,6 +759,7 @@ export default function AdminWorkoutsPage() {
           message: `Seu treinador atribuiu o treino: ${templateToAssign.name}.`,
         })
         notified = !notificationError
+        if (notified) requestPushDelivery()
       }
 
       setTemplateToAssign(null)
@@ -863,148 +877,149 @@ export default function AdminWorkoutsPage() {
                 Nenhum aluno encontrado.
               </p>
             ) : (
-              studentGroups.map(({ student, workouts: studentWorkouts }) => {
-                const isExpanded = Boolean(expanded[student.id])
-                const activeCount = studentWorkouts.filter((workout) => workout.is_current).length
-                const archivedCount = studentWorkouts.length - activeCount
+              <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+                {studentGroups.map(({ student, workouts: studentWorkouts }) => {
+                  const isExpanded = Boolean(expanded[student.id])
+                  const activeCount = studentWorkouts.filter((workout) => workout.is_current).length
+                  const archivedCount = studentWorkouts.length - activeCount
 
-                return (
-                  <div
-                    key={student.id}
-                    id={`student-${student.id}`}
-                    className={cn(
-                      'scroll-mt-24 overflow-hidden rounded-3xl border bg-surface transition-[border-color,box-shadow] duration-700',
-                      highlightId === student.id ? 'border-brand/60 shadow-[0_0_0_4px_rgba(52,211,153,0.12)]' : 'border-line',
-                    )}
-                  >
-                    <button
-                      type="button"
-                      aria-expanded={isExpanded}
-                      onClick={() => toggleStudent(student.id)}
-                      className="flex w-full items-center gap-3.5 p-4 text-left transition-colors hover:bg-white/[0.02]"
+                  return (
+                    <div
+                      key={student.id}
+                      id={`student-${student.id}`}
+                      className={cn(
+                        'scroll-mt-24 overflow-hidden rounded-3xl border bg-surface transition-[border-color,box-shadow] duration-700',
+                        highlightId === student.id ? 'border-brand/60 shadow-[0_0_0_4px_rgba(52,211,153,0.12)]' : 'border-line',
+                      )}
                     >
-                      <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold text-white">
-                          {student.full_name || student.email || 'Aluno sem nome'}
-                        </span>
-                        <span className="block text-[11px] text-zinc-500">
-                          {plural(activeCount, 'treino ativo', 'treinos ativos')}
-                          {archivedCount > 0 && ` · ${plural(archivedCount, 'arquivado', 'arquivados')}`}
-                        </span>
-                      </span>
-                      <m.span
-                        animate={{ rotate: isExpanded ? 180 : 0 }}
-                        transition={{ duration: 0.25, ease }}
-                        className={cn('shrink-0', isExpanded ? 'text-white' : 'text-zinc-500')}
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        onClick={() => toggleStudent(student.id)}
+                        className="flex w-full items-center gap-3.5 p-4 text-left transition-colors hover:bg-white/[0.02]"
                       >
-                        <ChevronDown className="h-5 w-5" aria-hidden="true" />
-                      </m.span>
-                    </button>
-
-                    <AnimatePresence initial={false}>
-                      {isExpanded && (
-                        <m.div
-                          key="content"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3, ease }}
-                          className="overflow-hidden"
+                        <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-white">
+                            {student.full_name || student.email || 'Aluno sem nome'}
+                          </span>
+                          <span className="block text-[11px] text-zinc-500">
+                            {plural(activeCount, 'treino ativo', 'treinos ativos')}
+                            {archivedCount > 0 && ` · ${plural(archivedCount, 'arquivado', 'arquivados')}`}
+                          </span>
+                        </span>
+                        <m.span
+                          animate={{ rotate: isExpanded ? 180 : 0 }}
+                          transition={{ duration: 0.25, ease }}
+                          className={cn('shrink-0', isExpanded ? 'text-white' : 'text-zinc-500')}
                         >
-                          <div className="space-y-2.5 border-t border-line p-3">
-                            {studentWorkouts.length === 0 && (
-                              <p className="p-3 text-center text-xs text-zinc-500">Nenhum treino prescrito para este aluno.</p>
-                            )}
+                          <ChevronDown className="h-5 w-5" aria-hidden="true" />
+                        </m.span>
+                      </button>
 
-                            {studentWorkouts.map((workout) => {
-                              const summary = summaries[workout.id]
-                              return (
-                                <article
-                                  key={workout.id}
-                                  className={cn(
-                                    'rounded-2xl border p-3 transition-colors',
-                                    workout.is_current ? 'border-line bg-black/30' : 'border-dashed border-line-strong',
-                                  )}
-                                >
-                                  <div className="flex gap-3">
-                                    {/* Arquivado: só o mapa (decorativo) fica apagado; os textos mantêm o contraste. */}
-                                    <SummaryMap
-                                      summary={summary}
-                                      className={cn('w-[4.5rem] transition', !workout.is_current && 'opacity-40 grayscale')}
-                                    />
-                                    <div className="min-w-0 flex-1 py-0.5">
-                                      <div className="flex items-center gap-2">
-                                        <h3
-                                          className={cn(
-                                            'truncate text-sm font-bold',
-                                            workout.is_current ? 'text-white' : 'text-zinc-300',
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <m.div
+                            key="content"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease }}
+                            className="overflow-hidden"
+                          >
+                            <div className="space-y-2.5 border-t border-line p-3">
+                              {studentWorkouts.length === 0 && (
+                                <p className="p-3 text-center text-xs text-zinc-500">Nenhum treino prescrito para este aluno.</p>
+                              )}
+
+                              {studentWorkouts.map((workout) => {
+                                const summary = summaries[workout.id]
+                                return (
+                                  <article
+                                    key={workout.id}
+                                    className={cn(
+                                      'rounded-2xl border p-3 transition-colors',
+                                      workout.is_current ? 'border-line bg-black/30' : 'border-dashed border-line-strong',
+                                    )}
+                                  >
+                                    <div className="flex gap-3">
+                                      {/* Arquivado: só o mapa (decorativo) fica apagado; os textos mantêm o contraste. */}
+                                      <SummaryMap
+                                        summary={summary}
+                                        className={cn('w-[4.5rem] transition', !workout.is_current && 'opacity-40 grayscale')}
+                                      />
+                                      <div className="min-w-0 flex-1 py-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <h3
+                                            className={cn(
+                                              'truncate text-sm font-bold',
+                                              workout.is_current ? 'text-white' : 'text-zinc-300',
+                                            )}
+                                          >
+                                            {workout.name}
+                                          </h3>
+                                          {!workout.is_current && (
+                                            <span className="shrink-0 rounded-md border border-line-strong px-1.5 py-0.5 text-[9px] font-black uppercase text-zinc-400">
+                                              Arquivado
+                                            </span>
                                           )}
-                                        >
-                                          {workout.name}
-                                        </h3>
-                                        {!workout.is_current && (
-                                          <span className="shrink-0 rounded-md border border-line-strong px-1.5 py-0.5 text-[9px] font-black uppercase text-zinc-400">
-                                            Arquivado
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className="mt-0.5 text-[11px] text-zinc-500">
-                                        {summary ? summaryLine(summary) : 'Carregando resumo...'}
-                                      </p>
-                                      {summary && summary.focus.length > 0 && (
-                                        <p className="mt-1 truncate text-[11px] font-semibold text-brand">
-                                          {summary.focus.join(' · ')}
+                                        </div>
+                                        <p className="mt-0.5 text-[11px] text-zinc-500">
+                                          {summary ? summaryLine(summary) : 'Carregando resumo...'}
                                         </p>
-                                      )}
-                                      <p className="mt-1 text-[10px] text-zinc-600">
-                                        Criado em {new Date(workout.created_at).toLocaleDateString('pt-BR')}
-                                      </p>
+                                        {summary && summary.focus.length > 0 && (
+                                          <p className="mt-1 truncate text-[11px] font-semibold text-brand">
+                                            {summary.focus.join(' · ')}
+                                          </p>
+                                        )}
+                                        <p className="mt-1 text-[10px] text-zinc-600">
+                                          Criado em {new Date(workout.created_at).toLocaleDateString('pt-BR')}
+                                        </p>
+                                      </div>
                                     </div>
-                                  </div>
 
-                                  <div className="mt-3 flex gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenWorkoutHistory(workout)}
-                                      className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] px-2 text-[11px] font-bold text-zinc-200 transition hover:bg-white/10"
-                                    >
-                                      <History className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                      <span className="truncate">Ver cargas registradas</span>
-                                    </button>
-                                    <IconButton
-                                      label={`Editar ${workout.name}`}
-                                      tone="brand"
-                                      disabled={openingId !== null}
-                                      onClick={() =>
-                                        openBuilder(
-                                          { kind: 'workout', editingId: workout.id },
-                                          { studentId: workout.student_id, name: workout.name },
-                                        )
-                                      }
-                                    >
-                                      {openingId === workout.id ? (
-                                        <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                                      ) : (
-                                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                                      )}
-                                    </IconButton>
-                                    <IconButton
-                                      label={workout.is_current ? `Arquivar ${workout.name}` : `Reativar ${workout.name}`}
-                                      onClick={() => handleToggleActive(workout)}
-                                    >
-                                      {workout.is_current ? (
-                                        <Archive className="h-4 w-4" aria-hidden="true" />
-                                      ) : (
-                                        <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
-                                      )}
-                                    </IconButton>
-                                    <IconButton label={`Apagar ${workout.name}`} tone="danger" onClick={() => askDeleteWorkout(workout)}>
-                                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                    </IconButton>
-                                  </div>
-                                </article>
-                              )
+                                    <div className="mt-3 flex gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenWorkoutHistory(workout)}
+                                        className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] px-2 text-[11px] font-bold text-zinc-200 transition hover:bg-white/10"
+                                      >
+                                        <History className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        <span className="truncate">Ver cargas registradas</span>
+                                      </button>
+                                      <IconButton
+                                        label={`Editar ${workout.name}`}
+                                        tone="brand"
+                                        disabled={openingId !== null}
+                                        onClick={() =>
+                                          openBuilder(
+                                            { kind: 'workout', editingId: workout.id },
+                                            { studentId: workout.student_id, name: workout.name },
+                                          )
+                                        }
+                                      >
+                                        {openingId === workout.id ? (
+                                          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                        ) : (
+                                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                                        )}
+                                      </IconButton>
+                                      <IconButton
+                                        label={workout.is_current ? `Arquivar ${workout.name}` : `Reativar ${workout.name}`}
+                                        onClick={() => handleToggleActive(workout)}
+                                      >
+                                        {workout.is_current ? (
+                                          <Archive className="h-4 w-4" aria-hidden="true" />
+                                        ) : (
+                                          <ArchiveRestore className="h-4 w-4" aria-hidden="true" />
+                                        )}
+                                      </IconButton>
+                                      <IconButton label={`Apagar ${workout.name}`} tone="danger" onClick={() => askDeleteWorkout(workout)}>
+                                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                      </IconButton>
+                                    </div>
+                                  </article>
+                                )
                             })}
 
                             <button
@@ -1020,7 +1035,8 @@ export default function AdminWorkoutsPage() {
                     </AnimatePresence>
                   </div>
                 )
-              })
+                })}
+              </div>
             )}
           </m.section>
         ) : (
@@ -1053,50 +1069,52 @@ export default function AdminWorkoutsPage() {
                 </button>
               </div>
             ) : (
-              templates.map((template) => {
-                const summary = summaries[template.id]
-                return (
-                  <article key={template.id} className="rounded-3xl border border-line bg-surface p-4">
-                    <div className="flex gap-3.5">
-                      <SummaryMap summary={summary} className="w-24" />
-                      <div className="min-w-0 flex-1 py-0.5">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Modelo</p>
-                        <h3 className="mt-0.5 truncate text-base font-bold text-white">{template.name}</h3>
-                        <p className="mt-1 text-[11px] text-zinc-500">{summary ? summaryLine(summary) : 'Carregando resumo...'}</p>
-                        {summary && summary.focus.length > 0 && (
-                          <p className="mt-1 truncate text-[11px] font-semibold text-brand">{summary.focus.join(' · ')}</p>
-                        )}
+              <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+                {templates.map((template) => {
+                  const summary = summaries[template.id]
+                  return (
+                    <article key={template.id} className="rounded-3xl border border-line bg-surface p-4">
+                      <div className="flex gap-3.5">
+                        <SummaryMap summary={summary} className="w-24" />
+                        <div className="min-w-0 flex-1 py-0.5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Modelo</p>
+                          <h3 className="mt-0.5 truncate text-base font-bold text-white">{template.name}</h3>
+                          <p className="mt-1 text-[11px] text-zinc-500">{summary ? summaryLine(summary) : 'Carregando resumo...'}</p>
+                          {summary && summary.focus.length > 0 && (
+                            <p className="mt-1 truncate text-[11px] font-semibold text-brand">{summary.focus.join(' · ')}</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-3.5 flex gap-1.5">
-                      <m.button
-                        type="button"
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => openAssign(template)}
-                        className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black"
-                      >
-                        <Send className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span className="truncate">Atribuir a um aluno</span>
-                      </m.button>
-                      <IconButton
-                        label={`Editar modelo ${template.name}`}
-                        tone="brand"
-                        disabled={openingId !== null}
-                        onClick={() => openBuilder({ kind: 'template', editingId: template.id }, { name: template.name })}
-                      >
-                        {openingId === template.id ? (
-                          <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <Pencil className="h-4 w-4" aria-hidden="true" />
-                        )}
-                      </IconButton>
-                      <IconButton label={`Apagar modelo ${template.name}`} tone="danger" onClick={() => askDeleteTemplate(template)}>
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </IconButton>
-                    </div>
-                  </article>
-                )
-              })
+                      <div className="mt-3.5 flex gap-1.5">
+                        <m.button
+                          type="button"
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => openAssign(template)}
+                          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black"
+                        >
+                          <Send className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          <span className="truncate">Atribuir a um aluno</span>
+                        </m.button>
+                        <IconButton
+                          label={`Editar modelo ${template.name}`}
+                          tone="brand"
+                          disabled={openingId !== null}
+                          onClick={() => openBuilder({ kind: 'template', editingId: template.id }, { name: template.name })}
+                        >
+                          {openingId === template.id ? (
+                            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </IconButton>
+                        <IconButton label={`Apagar modelo ${template.name}`} tone="danger" onClick={() => askDeleteTemplate(template)}>
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </IconButton>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
             )}
           </m.section>
         )}

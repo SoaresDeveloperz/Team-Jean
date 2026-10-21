@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { m } from 'framer-motion'
 import {
   Bell,
@@ -40,10 +41,13 @@ import { LogoutButton } from '@/components/layout/LogoutButton'
 import { AchievementIcon } from '@/components/fitness/AchievementIcon'
 import { Composer } from '@/components/community/Composer'
 import { ChangePasswordTile } from '@/components/account/ChangePasswordTile'
+import { PushNotificationsTile } from '@/components/account/PushNotificationsTile'
 import { AthleteCard } from '@/components/profile/AthleteCard'
 import { EditProfileSheet } from '@/components/profile/EditProfileSheet'
 import { LevelTrail } from '@/components/profile/LevelTrail'
 import { MeasurementsCard } from '@/components/profile/MeasurementsCard'
+import { AnamneseCard } from '@/components/health/AnamneseCard'
+import { BillingCard } from '@/components/finance/BillingCard'
 import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
 
 type ProfileData = {
@@ -64,6 +68,11 @@ const REST_OPTIONS = [
 
 export default function StudentProfilePage() {
   const [supabase] = useState(() => createClient())
+  // Links do app (Hoje → "responda sua ficha") abrem direto o formulário.
+  const searchParams = useSearchParams()
+  const openAnamnese = searchParams.get('anamnese') === '1'
+  // Lembrete da mensalidade (push) leva até o cartão do PIX.
+  const highlightBilling = searchParams.get('mensalidade') === '1'
   const toast = useToast()
   const [data, setData] = useState<ProfileData | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -174,7 +183,11 @@ export default function StudentProfilePage() {
       />
 
       {/* Medidas e fotos de evolução */}
-      <MeasurementsCard userId={data.userId} goal={data.profile.goal} />
+      <MeasurementsCard userId={data.userId} goal={data.profile.goal} profile={data.profile} />
+
+      <BillingCard userId={data.userId} highlight={highlightBilling} />
+
+      <AnamneseCard studentId={data.userId} autoOpen={openAnamnese} />
 
       {/* Conquistas */}
       <m.section variants={tileVariants} aria-labelledby="achievements-title">
@@ -327,6 +340,8 @@ export default function StudentProfilePage() {
           <ChevronRight className="h-4 w-4 text-zinc-600" aria-hidden="true" />
         </button>
       </Tile>
+
+      <PushNotificationsTile />
 
       <ChangePasswordTile />
 

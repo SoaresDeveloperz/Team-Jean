@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { ChevronDown, ChevronLeft, ChevronRight, Clock, Dumbbell, Gauge, History, LoaderCircle, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Clock, CornerDownRight, Dumbbell, Gauge, History, LoaderCircle, MessageSquareText, X } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { WorkoutSession } from '@/lib/types'
 import { formatKg } from '@/lib/workouts'
+import { TAG_TONES, hasFeedback, tagInfo } from '@/lib/feedback'
 import { WEEKDAY_INITIALS, isSameDay, startOfDay, weekStreak } from '@/lib/stats'
 import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
@@ -336,6 +337,17 @@ export default function StudentHistoryPage() {
                                 <Clock className="h-3 w-3" aria-hidden="true" /> {duration} min
                               </span>
                             )}
+                            {session.coach_reply ? (
+                              <span className="flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-bold text-brand">
+                                <MessageSquareText className="h-3 w-3" aria-hidden="true" /> Treinador respondeu
+                              </span>
+                            ) : (
+                              hasFeedback(session) && (
+                                <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                                  <MessageSquareText className="h-3 w-3" aria-hidden="true" /> Recado enviado
+                                </span>
+                              )
+                            )}
                           </span>
                         </span>
                         <m.span animate={{ rotate: isExpanded ? 180 : 0 }} className="text-zinc-500">
@@ -354,6 +366,33 @@ export default function StudentHistoryPage() {
                             className="overflow-hidden"
                           >
                             <div className="space-y-2 border-t border-line p-4">
+                              {hasFeedback(session) && (
+                                <div className="space-y-2 rounded-2xl border border-line bg-black/20 p-3">
+                                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Seu recado</p>
+                                  {(session.feedback_tags?.length ?? 0) > 0 && (
+                                    <ul className="flex flex-wrap gap-1" aria-label="Como foi o treino">
+                                      {session.feedback_tags?.map((tag) => {
+                                        const info = tagInfo(tag)
+                                        return (
+                                          <li key={tag} className={cn('rounded-full border px-2 py-0.5 text-[10px] font-bold', TAG_TONES[info.tone])}>
+                                            <span aria-hidden="true">{info.emoji}</span> {tag}
+                                          </li>
+                                        )
+                                      })}
+                                    </ul>
+                                  )}
+                                  {session.feedback?.trim() && <p className="whitespace-pre-line text-[13px] leading-relaxed text-zinc-200">“{session.feedback.trim()}”</p>}
+                                  {session.coach_reply && (
+                                    <p className="flex gap-1.5 border-t border-line pt-2 text-xs leading-relaxed text-zinc-200">
+                                      <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" aria-hidden="true" />
+                                      <span>
+                                        <span className="font-bold text-brand">Treinador: </span>
+                                        {session.coach_reply}
+                                      </span>
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                               {detail === 'loading' || detail === undefined ? (
                                 <div className="flex justify-center py-3 text-zinc-500">
                                   <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Carregando séries" />

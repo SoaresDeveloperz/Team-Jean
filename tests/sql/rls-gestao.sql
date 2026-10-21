@@ -131,6 +131,9 @@ begin
   update public.anamneses set answers = '{"parq": {"heart": true}}' where student_id = '00000000-0000-0000-0000-000000000001' returning * into v;
   if v.parq_positive and v.updated_by = '00000000-0000-0000-0000-00000000000a' then raise notice 'OK  treinador atualiza a anamnese (autor registrado)';
   else raise notice 'FALHOU: atualização da anamnese pelo treinador'; end if;
+  select count(*) into n from public.notifications where recipient_id = '00000000-0000-0000-0000-00000000000a' and type = 'health';
+  if n = 1 then raise notice 'OK  treinador avisado quando o aluno preenche a ficha (e não pela própria edição)';
+  else raise notice 'FALHOU: avisos da ficha de saúde = %', n; end if;
 
   -- financeiro
   insert into public.student_billing (student_id, monthly_fee, due_day) values ('00000000-0000-0000-0000-000000000001', 150, 10);

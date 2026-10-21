@@ -2,7 +2,7 @@
 
 import { memo, useState } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
-import { ChevronDown, Info, Minus, Plus, Trophy, Video } from 'lucide-react'
+import { ChevronDown, Info, Minus, Plus, Target, Trophy, Video } from 'lucide-react'
 import { SET_TYPES, formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import { ExerciseMedia, getExerciseMedia } from '@/components/workout/ExerciseMedia'
@@ -14,6 +14,8 @@ type ExerciseBlockProps = {
   index: number
   entries: SetEntry[]
   record: PreviousSet | undefined
+  // Séries marcadas que ainda não chegaram ao servidor.
+  pendingIds: ReadonlySet<string>
   onChangeSet: (rowId: string, setIndex: number, patch: Partial<SetEntry>) => void
   onToggleSet: (rowId: string, setIndex: number) => void
   onAddSet: (rowId: string) => void
@@ -25,6 +27,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
   index,
   entries,
   record,
+  pendingIds,
   onChangeSet,
   onToggleSet,
   onAddSet,
@@ -37,7 +40,9 @@ export const ExerciseBlock = memo(function ExerciseBlock({
   const allDone = entries.length > 0 && done === entries.length
   const usedTypes = SET_TYPES.filter((type) => type.value !== 'working' && entries.some((entry) => entry.type === type.value))
   const lastExtra = entries[entries.length - 1]
-  const canRemoveExtra = lastExtra?.extra && !lastExtra.completed && !lastExtra.saving
+  const canRemoveExtra = lastExtra?.extra && !lastExtra.completed
+  // Carga-alvo única para as séries com meta (mostrada no cabeçalho).
+  const targets = [...new Set(entries.flatMap((entry) => (entry.targetWeight !== null ? [entry.targetWeight] : [])))]
 
   let workingCount = 0
   const labels = entries.map((entry) => {
@@ -72,6 +77,13 @@ export const ExerciseBlock = memo(function ExerciseBlock({
             <span>
               {done}/{entries.length} séries
             </span>
+            {targets.length > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 font-bold text-brand">
+                <Target className="h-3 w-3" aria-hidden="true" />
+                <span className="sr-only">Carga-alvo:</span>
+                {targets.length === 1 ? `${formatKg(targets[0])} kg` : `${formatKg(Math.min(...targets))}–${formatKg(Math.max(...targets))} kg`}
+              </span>
+            )}
             {record && record.weight > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-gold-soft px-2 py-0.5 font-bold text-gold">
                 <Trophy className="h-3 w-3" aria-hidden="true" /> {formatKg(record.weight)}kg × {record.reps}
@@ -147,6 +159,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
               entry={entry}
               label={labels[setIndex]}
               inputIdPrefix={`set-${row.id}-${setIndex}`}
+              pending={entry.rowId !== null && pendingIds.has(entry.rowId)}
               onChange={(patch) => onChangeSet(row.id, setIndex, patch)}
               onToggle={() => onToggleSet(row.id, setIndex)}
             />

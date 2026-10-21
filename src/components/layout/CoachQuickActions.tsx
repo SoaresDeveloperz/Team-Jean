@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, m } from 'framer-motion'
-import { ClipboardList, Dumbbell, Flame, Megaphone, Plus, UserPlus } from 'lucide-react'
+import { ClipboardList, Dumbbell, Flame, HandCoins, Megaphone, Plus, UserPlus } from 'lucide-react'
 import { haptic } from '@/lib/haptics'
 
 const ACTIONS = [
@@ -12,6 +12,7 @@ const ACTIONS = [
   { href: '/admin/announcements', label: 'Enviar aviso', icon: Megaphone },
   { href: '/admin/community?desafio=1', label: 'Novo desafio', icon: Flame },
   { href: '/admin/exercises?novo=1', label: 'Novo exercício', icon: Dumbbell },
+  { href: '/admin/finance', label: 'Receber mensalidade', icon: HandCoins },
 ]
 
 // Botão flutuante com os atalhos do treinador (abre em leque, de baixo para cima).
@@ -73,7 +74,8 @@ export function CoachQuickActions() {
         )}
       </AnimatePresence>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md justify-end px-4">
+      {/* No computador o menu lateral e os botões de cada tela já dão conta. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md justify-end px-4 lg:hidden">
         <m.div
           className="pointer-events-auto relative"
           // Navegando pelo teclado, o botão reaparece ao receber foco.

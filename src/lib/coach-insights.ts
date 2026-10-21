@@ -1,8 +1,9 @@
 // Radar do treinador: recordes recentes, cargas prontas para subir e sinais de
 // cansaço, tudo calculado a partir dos treinos já registrados (sem SQL novo).
 import type { createClient } from './supabase/client'
-import type { Profile } from './types'
+import type { PlannedSet, Profile } from './types'
 import { REGION_LABELS, loadFill, regionsForExercise, splitSecondary, type MuscleRegion } from './muscles'
+import { PREP_SET_TYPES, getPlannedSets } from './workouts'
 
 type Supabase = ReturnType<typeof createClient>
 
@@ -21,7 +22,14 @@ type SetRow = {
   set_type?: string | null
 }
 type ExerciseRow = { id: string; name: string; muscle_group: string | null; secondary_muscle?: string | null }
-type PrescriptionRow = { id: string; assigned_workout_id: string; exercise_id: string; target_reps: string | null }
+type PrescriptionRow = {
+  id: string
+  assigned_workout_id: string
+  exercise_id: string
+  target_reps: string | null
+  sets_count: number | null
+  planned_sets: PlannedSet[] | null
+}
 
 export type RadarRecord = {
   key: string
@@ -42,6 +50,8 @@ export type RadarProgression = {
   reps: number
   sets: number
   next: number
+  // Prescrições do exercício nos treinos ativos do aluno (onde a carga é aplicada).
+  prescriptions: PrescriptionRow[]
 }
 export type RadarAlert = { key: string; studentId: string; studentName: string; rpe: number[] }
 export type Radar = { records: RadarRecord[]; progressions: RadarProgression[]; alerts: RadarAlert[] }
@@ -113,7 +123,11 @@ export async function loadRadar(supabase: Supabase, students: Pick<Profile, 'id'
     inChunks<PrescriptionRow>(
       workouts.map((workout) => workout.id),
       40,
-      (chunk) => supabase.from('assigned_workout_exercises').select('id, assigned_workout_id, exercise_id, target_reps').in('assigned_workout_id', chunk),
+      (chunk) =>
+        supabase
+          .from('assigned_workout_exercises')
+          .select('id, assigned_workout_id, exercise_id, target_reps, sets_count, planned_sets')
+          .in('assigned_workout_id', chunk),
     ),
   ])
   const exerciseIds = [...new Set([...sets.map((set) => set.exercise_id), ...prescriptions.map((row) => row.exercise_id)])].filter(Boolean)
@@ -208,6 +222,9 @@ export async function loadRadar(supabase: Supabase, students: Pick<Profile, 'id'
       reps: Math.min(...working.map((set) => Number(set.reps) || 0)),
       sets: working.length,
       next: nextLoad(weight, primary !== undefined && LOWER_BODY.includes(primary)),
+      prescriptions: prescriptions.filter(
+        (row) => row.exercise_id === prescription.exercise_id && studentOfWorkout.get(row.assigned_workout_id) === studentId,
+      ),
     })
   }
 
@@ -225,6 +242,26 @@ export async function loadRadar(supabase: Supabase, students: Pick<Profile, 'id'
   }
 
   return { records, progressions, alerts }
+}
+
+// Grava a nova carga-alvo nas séries de trabalho (não mexe em aquecimento e
+// feeder) de cada prescrição do exercício. Devolve quantas foram atualizadas.
+export async function applyProgression(supabase: Supabase, progression: Pick<RadarProgression, 'prescriptions' | 'next'>) {
+  let updated = 0
+  for (const prescription of progression.prescriptions) {
+    const planned = getPlannedSets(prescription)
+    if (planned.length === 0) continue
+    const hasWork = planned.some((set) => !PREP_SET_TYPES.has(set.type))
+    const next = planned.map((set) => (!hasWork || !PREP_SET_TYPES.has(set.type) ? { ...set, weight: progression.next } : set))
+    const { data, error } = await supabase
+      .from('assigned_workout_exercises')
+      .update({ planned_sets: next, sets_count: next.length })
+      .eq('id', prescription.id)
+      .select('id')
+    if (error) throw new Error(error.message)
+    updated += data?.length ?? 0
+  }
+  return updated
 }
 
 // ------------------------------------------------------- carga da semana

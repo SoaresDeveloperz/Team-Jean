@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { AnimatePresence, m } from 'framer-motion'
 import { Plus, Trash2, X } from 'lucide-react'
 import type { PlannedSet } from '@/lib/types'
-import { REP_PRESETS, SET_TYPES, getSetTypeInfo } from '@/lib/workouts'
+import { PREP_SET_TYPES, REP_PRESETS, SET_TYPES, getSetTypeInfo } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 
 export type BuilderSet = PlannedSet & { key: string }
@@ -29,7 +29,7 @@ type BuilderExerciseCardProps = {
 }
 
 // Aquecimento e feeder não recebem os atalhos de repetições das séries válidas.
-const PREP_TYPES = new Set(['warmup', 'feeder'])
+const PREP_TYPES = PREP_SET_TYPES
 
 const cellInputClassName =
   'h-11 w-full rounded-xl border border-line bg-black/40 text-center font-bold tabular-nums text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
@@ -63,7 +63,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
         ...current,
         planned_sets: [
           ...current.planned_sets,
-          { key, type: copy?.type ?? 'working', reps: copy?.reps ?? '8-12', rir: copy?.rir ?? 1 },
+          { key, type: copy?.type ?? 'working', reps: copy?.reps ?? '8-12', rir: copy?.rir ?? 1, weight: copy?.weight ?? '' },
         ],
       }
     })
@@ -135,13 +135,16 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
         <div role="rowgroup">
           <div
             role="row"
-            className="grid grid-cols-[3rem_minmax(0,1fr)_4.5rem_2.5rem] gap-2 px-2 pb-1 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500"
+            className="grid grid-cols-[3rem_minmax(0,1fr)_4rem_3.5rem_2.5rem] gap-2 px-2 pb-1 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500"
           >
             <span role="columnheader" className="text-center">
               Série
             </span>
             <span role="columnheader" className="text-center">
               Repetições
+            </span>
+            <span role="columnheader" className="text-center">
+              Kg
             </span>
             <span role="columnheader" className="text-center">
               RIR
@@ -166,7 +169,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="grid grid-cols-[3rem_minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2 px-2 py-1">
+                  <div className="grid grid-cols-[3rem_minmax(0,1fr)_4rem_3.5rem_2.5rem] items-center gap-2 px-2 py-1">
                     <div role="cell" className="flex justify-center">
                       {/* Selo visível com a letra do tipo; o select nativo transparente por cima faz a escolha. */}
                       <span
@@ -198,6 +201,17 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
                         placeholder="8-12"
                         enterKeyHint="next"
                         aria-label={`Repetições da série ${number}`}
+                        className={cellInputClassName}
+                      />
+                    </div>
+                    <div role="cell">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={set.weight ?? ''}
+                        onChange={(event) => updateSet(set.key, { weight: event.target.value })}
+                        placeholder="—"
+                        aria-label={`Carga-alvo da série ${number} em kg (opcional)`}
                         className={cellInputClassName}
                       />
                     </div>

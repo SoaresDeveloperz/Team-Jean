@@ -1,7 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/login']
+// Só para quem não entrou (quem já está logado vai para o início).
+const GUEST_PATHS = ['/login', '/esqueci-senha']
+// Abertas com ou sem login: o link do e-mail de nova senha e o cron (protegido
+// pelo CRON_SECRET).
+const OPEN_PATHS = ['/auth/confirm', '/redefinir-senha', '/api/cron']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -30,13 +34,16 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const isLoggedIn = Boolean(data?.claims)
   const { pathname } = request.nextUrl
-  const isPublic = PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  const matches = (path: string) => pathname === path || pathname.startsWith(`${path}/`)
 
-  if (!isLoggedIn && !isPublic) {
+  if (OPEN_PATHS.some(matches)) return response
+
+  const isGuestPage = GUEST_PATHS.some(matches)
+  if (!isLoggedIn && !isGuestPage) {
     return redirectWithCookies(request, response, '/login')
   }
 
-  if (isLoggedIn && isPublic) {
+  if (isLoggedIn && isGuestPage) {
     return redirectWithCookies(request, response, '/')
   }
 

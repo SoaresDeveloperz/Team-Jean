@@ -22,6 +22,10 @@ export type Measurement = {
   note: string | null
   created_at: string
   photoUrls: (string | null)[]
+  // Avaliação completa (supabase/gestao.sql): cm e mm por ponto de medida.
+  perimeters?: Record<string, number> | null
+  skinfolds?: Record<string, number> | null
+  protocol?: 'pollock3' | 'pollock7' | null
 }
 
 export type MeasurementInput = {
@@ -31,6 +35,15 @@ export type MeasurementInput = {
   waist: number | null
   note: string
   photos: Blob[]
+  perimeters?: Record<string, number> | null
+  skinfolds?: Record<string, number> | null
+  protocol?: 'pollock3' | 'pollock7' | null
+}
+
+// Só os números válidos (os campos vazios ficam de fora do JSON).
+export function cleanValues(values: Record<string, number | null | undefined>) {
+  const entries = Object.entries(values).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]))
+  return entries.length > 0 ? Object.fromEntries(entries) : null
 }
 
 const toNumber = (value: unknown) => {
@@ -105,6 +118,12 @@ export async function addMeasurement(
       paths.push(path)
     }
     onProgress?.('Salvando')
+    // As colunas da avaliação completa só vão quando usadas (sem o gestao.sql
+    // elas não existem e o registro simples continua funcionando).
+    const assessment = {
+      ...(input.perimeters ? { perimeters: input.perimeters } : {}),
+      ...(input.skinfolds ? { skinfolds: input.skinfolds, protocol: input.protocol ?? null } : {}),
+    }
     const { error } = await supabase.from('body_measurements').insert({
       user_id: userId,
       measured_on: input.measuredOn,
@@ -113,7 +132,11 @@ export async function addMeasurement(
       waist_cm: input.waist,
       note: input.note.trim() || null,
       photos: paths,
+      ...assessment,
     })
+    if (error?.code === 'PGRST204' && Object.keys(assessment).length > 0) {
+      throw new ProfileError('Para salvar perímetros e dobras, rode o arquivo supabase/gestao.sql no Supabase.')
+    }
     if (error) fail('Não foi possível salvar a medida', error)
   } catch (error) {
     // Sem a linha no banco, as fotos enviadas ficariam soltas no Storage.

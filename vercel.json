@@ -4,5 +4,11 @@
   "env": {
     "NODE_VERSION": "24"
   },
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/billing",
+      "schedule": "0 12 * * *"
+    }
+  ]
 }

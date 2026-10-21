@@ -22,6 +22,7 @@ const ROUTES = {
 }
 const SUITES = {
   e2e: ['tests/e2e.cjs'],
+  gestao: ['tests/e2e-gestao.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],
@@ -31,6 +32,7 @@ const SUITES = {
   coach: ['tests/a11y/coach-a11y.cjs'],
   community: ['tests/a11y/community-a11y.cjs'],
   profile: ['tests/a11y/profile-a11y.cjs'],
+  'gestao-a11y': ['tests/a11y/gestao-a11y.cjs'],
 }
 
 const vapid = webpush.generateVAPIDKeys()

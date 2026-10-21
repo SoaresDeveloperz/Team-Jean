@@ -19,7 +19,14 @@ function makeJwt(sub, email) {
 const users = {
   'jean@teste.com': { id: 'u-admin', email: 'jean@teste.com' },
   'maria@teste.com': { id: 'u-student', email: 'maria@teste.com' },
+  'carlos@teste.com': { id: 'c0ffee00-0000-4000-8000-00000000c2c2', email: 'carlos@teste.com' },
 }
+// Senha nova (troca, recuperação ou nova senha do treinador). A padrão
+// "123456" continua valendo para os roteiros antigos.
+const passwords = {}
+const passwordOk = (user, password) => password === '123456' || (passwords[user.id] !== undefined && password === passwords[user.id])
+// Pedidos de "esqueci minha senha" (e-mail e link de volta).
+const recoveries = []
 const userById = Object.fromEntries(Object.values(users).map((user) => [user.id, user]))
 function authUser(user) {
   return { ...user, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: iso(-30) }
@@ -48,7 +55,7 @@ const exById = Object.fromEntries(exercises.map((item) => [item.id, item]))
 const profiles = [
   { id: 'u-admin', role: 'admin', full_name: 'Jean Treinador', email: 'jean@teste.com', readiness_score: null, created_at: iso(-60) },
   { id: 'u-student', role: 'student', full_name: 'Maria Souza', email: 'maria@teste.com', readiness_score: 70, created_at: iso(-20) },
-  { id: 'u-s2', role: 'student', full_name: 'Carlos Lima', email: 'carlos@teste.com', readiness_score: null, created_at: iso(-10) },
+  { id: 'c0ffee00-0000-4000-8000-00000000c2c2', role: 'student', full_name: 'Carlos Lima', email: 'carlos@teste.com', readiness_score: null, created_at: iso(-10) },
 ]
 
 // Colunas do supabase/profile.sql (somem com /__profile/off).
@@ -61,7 +68,7 @@ const assigned_workouts = [
   { id: 'w-a', student_id: 'u-student', name: 'Treino A - Peito e Tríceps', is_current: true, created_at: iso(-15) },
   { id: 'w-b', student_id: 'u-student', name: 'Treino B - Costas', is_current: true, created_at: iso(-15) },
   { id: 'w-old', student_id: 'u-student', name: 'Adaptação', is_current: false, created_at: iso(-50) },
-  { id: 'w-c', student_id: 'u-s2', name: 'Treino C - Peito', is_current: true, created_at: iso(-20) },
+  { id: 'w-c', student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', name: 'Treino C - Peito', is_current: true, created_at: iso(-20) },
 ]
 
 const assigned_workout_exercises = [
@@ -79,9 +86,9 @@ const workout_sessions = [
   // Sessão abandonada criada pelo código antigo (abria uma a cada acesso).
   { id: 's-old-open', assigned_workout_id: 'w-b', student_id: 'u-student', status: 'in_progress', completed_at: null, session_rpe: null },
   // Carlos: há mais de 7 dias sem treinar (continua "sem treinar"), RPE alto.
-  { id: 's-c1', assigned_workout_id: 'w-c', student_id: 'u-s2', status: 'completed', completed_at: iso(-8), session_rpe: 9 },
-  { id: 's-c2', assigned_workout_id: 'w-c', student_id: 'u-s2', status: 'completed', completed_at: iso(-9), session_rpe: 9 },
-  { id: 's-c3', assigned_workout_id: 'w-c', student_id: 'u-s2', status: 'completed', completed_at: iso(-10), session_rpe: 10 },
+  { id: 's-c1', assigned_workout_id: 'w-c', student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', status: 'completed', completed_at: iso(-8), session_rpe: 9 },
+  { id: 's-c2', assigned_workout_id: 'w-c', student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', status: 'completed', completed_at: iso(-9), session_rpe: 9 },
+  { id: 's-c3', assigned_workout_id: 'w-c', student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', status: 'completed', completed_at: iso(-10), session_rpe: 10 },
 ]
 
 const session_sets = [
@@ -111,11 +118,11 @@ const workout_template_exercises = [
 const community_posts = [
   { id: 'cp-coach', author_id: 'u-admin', author_name: 'Jean Treinador', author_role: 'admin', kind: 'post', body: 'Bem-vindos à comunidade do Team Jean! 💪 Postem os treinos, as dúvidas e as conquistas. Toda segunda o ranking zera.', photos: [], meta: null, pinned: true, created_at: iso(-2) },
   { id: 'cp-maria', author_id: 'u-student', author_name: 'Maria Souza', author_role: 'student', kind: 'workout', body: 'Costas destruídas hoje 🔥 Bora que a semana tá só começando!', photos: ['u-student/seed-1.jpg'], meta: { name: 'Treino B - Costas', volume: 1565, sets: 3, minutes: 48, rpe: 7, prs: [], regions: { lats: 1, biceps: 0.5, traps: 0.6, lowerback: 0.2 } }, pinned: false, created_at: iso(-1) },
-  { id: 'cp-carlos', author_id: 'u-s2', author_name: 'Carlos Lima', author_role: 'student', kind: 'post', body: 'Alguém tem dica de alongamento pós-treino? Tô sentindo muito a lombar.', photos: [], meta: null, pinned: false, created_at: iso(0, -95) },
+  { id: 'cp-carlos', author_id: 'c0ffee00-0000-4000-8000-00000000c2c2', author_name: 'Carlos Lima', author_role: 'student', kind: 'post', body: 'Alguém tem dica de alongamento pós-treino? Tô sentindo muito a lombar.', photos: [], meta: null, pinned: false, created_at: iso(0, -95) },
 ]
 const community_likes = [
   { post_id: 'cp-maria', user_id: 'u-admin', created_at: iso(-1) },
-  { post_id: 'cp-coach', user_id: 'u-s2', created_at: iso(-1) },
+  { post_id: 'cp-coach', user_id: 'c0ffee00-0000-4000-8000-00000000c2c2', created_at: iso(-1) },
 ]
 const community_comments = [
   { id: 'cc-1', post_id: 'cp-carlos', author_id: 'u-admin', author_name: 'Jean Treinador', author_role: 'admin', body: 'Faz 5 min de alongamento leve e capricha no core. Amanhã ajusto teu treino!', created_at: iso(0, -60) },
@@ -150,11 +157,46 @@ let coachEnabled = true
 const COACH_TABLES = ['coach_notes', 'challenges']
 const METRICS = ['workouts', 'volume', 'active_days']
 
+// --- Gestão (supabase/gestao.sql) ---
+// /__gestao/off simula o banco sem o gestao.sql.
+let gestaoEnabled = true
+const GESTAO_TABLES = ['push_subscriptions', 'anamneses', 'student_billing', 'payments', 'coach_settings']
+const GESTAO_COLUMNS = {
+  notifications: ['created_at', 'pushed_at'],
+  workout_sessions: ['feedback', 'feedback_tags', 'coach_reply', 'coach_reply_at'],
+  profiles: ['sex', 'birth_date', 'height_cm'],
+  body_measurements: ['perimeters', 'skinfolds', 'protocol'],
+}
+const monthISO = (offsetMonths = 0) => {
+  const date = new Date(now)
+  date.setDate(1)
+  date.setMonth(date.getMonth() + offsetMonths)
+  return date.toISOString().slice(0, 10).slice(0, 8) + '01'
+}
+const today = new Date(now)
+const push_subscriptions = []
+// Carlos respondeu o PAR-Q com um "sim"; Maria ainda não respondeu.
+const anamneses = [
+  { student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', answers: { parq: { heart: false, chest_pain: false, chest_pain_month: false, dizziness: false, bone_joint: true, medication: false, other: false }, injuries: 'Hérnia de disco (L4-L5)', conditions: ['hipertensao'] }, parq_positive: true, updated_by: 'c0ffee00-0000-4000-8000-00000000c2c2', created_at: iso(-9), updated_at: iso(-9) },
+]
+// Maria vence daqui a uns dias (pendente); Carlos venceu no dia 1 (atrasado).
+const student_billing = [
+  { student_id: 'u-student', monthly_fee: 150, due_day: Math.min(31, today.getDate() + 5), active: true, starts_on: monthISO(-2), last_reminder_on: null, note: null, created_at: iso(-60), updated_at: iso(-60) },
+  { student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', monthly_fee: 120, due_day: 1, active: true, starts_on: monthISO(-1), last_reminder_on: null, note: null, created_at: iso(-30), updated_at: iso(-30) },
+]
+const payments = [
+  { id: 'pay-1', student_id: 'u-student', reference_month: monthISO(-1), amount: 150, paid_on: dayISO(-25), method: 'pix', note: null, created_by: 'u-admin', created_at: iso(-25) },
+]
+const coach_settings = [{ id: 1, pix_key: 'jean@teamjean.app', pix_name: 'Jean Treinador', pix_city: 'Sao Paulo', billing_reminders: false, updated_at: iso(-30) }]
+// Pushes entregues pelo servidor no "serviço de push" falso (/__push/...).
+const pushes = []
+const PAYMENT_METHODS = ['pix', 'dinheiro', 'cartao', 'transferencia', 'outro']
+
 // /__community/off simula o banco sem o community.sql.
 let communityEnabled = true
 const COMMUNITY_TABLES = ['community_posts', 'community_likes', 'community_comments']
 
-const tables = { profiles, exercises, assigned_workouts, assigned_workout_exercises, workout_sessions, session_sets, notifications, workout_templates, workout_template_exercises, community_posts, community_likes, community_comments, body_measurements, coach_notes, challenges }
+const tables = { profiles, exercises, assigned_workouts, assigned_workout_exercises, workout_sessions, session_sets, notifications, workout_templates, workout_template_exercises, community_posts, community_likes, community_comments, body_measurements, coach_notes, challenges, push_subscriptions, anamneses, student_billing, payments, coach_settings }
 
 
 // Esquema estrito (colunas e relações comprovadas pelo código antigo).
@@ -174,10 +216,23 @@ const SCHEMA = {
   body_measurements: ['id', 'user_id', 'measured_on', 'weight_kg', 'body_fat', 'waist_cm', 'photos', 'note', 'created_at'],
   coach_notes: ['id', 'student_id', 'author_id', 'body', 'pinned', 'created_at'],
   challenges: ['id', 'title', 'description', 'metric', 'goal', 'starts_on', 'ends_on', 'created_by', 'created_at'],
+  push_subscriptions: ['id', 'user_id', 'endpoint', 'p256dh', 'auth', 'user_agent', 'created_at'],
+  anamneses: ['student_id', 'answers', 'parq_positive', 'updated_by', 'created_at', 'updated_at'],
+  student_billing: ['student_id', 'monthly_fee', 'due_day', 'active', 'starts_on', 'last_reminder_on', 'note', 'created_at', 'updated_at'],
+  payments: ['id', 'student_id', 'reference_month', 'amount', 'paid_on', 'method', 'note', 'created_by', 'created_at'],
+  coach_settings: ['id', 'pix_key', 'pix_name', 'pix_city', 'billing_reminders', 'updated_at'],
 }
 function columnsOf(table) {
-  if (table === 'profiles' && profileEnabled) return [...SCHEMA.profiles, ...PROFILE_COLUMNS]
-  return SCHEMA[table]
+  let columns = SCHEMA[table]
+  if (table === 'profiles' && profileEnabled) columns = [...columns, ...PROFILE_COLUMNS]
+  if (gestaoEnabled && GESTAO_COLUMNS[table] && (table !== 'body_measurements' || profileEnabled)) columns = [...columns, ...GESTAO_COLUMNS[table]]
+  return columns
+}
+// Colunas que o banco real não teria sem o gestao.sql/profile.sql somem das respostas.
+function visibleRow(table, row) {
+  const columns = columnsOf(table)
+  const relations = RELATIONS[table] ?? []
+  return Object.fromEntries(Object.entries(row).filter(([key]) => columns.includes(key) || relations.includes(key) || key === 'assigned_workout_exercises' || key === 'workout_template_exercises'))
 }
 const RELATIONS = {
   assigned_workouts: ['profiles'],
@@ -296,8 +351,14 @@ function applyFilters(rows, params) {
       const values = value.replace(/^\(|\)$/g, '').split(',').map((v) => v.replace(/"/g, ''))
       result = result.filter((row) => values.includes(String(row[key])))
     }
-    if (op === 'gte') result = result.filter((row) => row[key] && row[key] >= value)
-    if (op === 'lt') result = result.filter((row) => row[key] && row[key] < value)
+    const comparable = (row) => row[key] !== null && row[key] !== undefined
+    const compare = (row) => (typeof row[key] === 'number' ? row[key] - Number(value) : String(row[key]).localeCompare(value))
+    if (op === 'gte') result = result.filter((row) => comparable(row) && compare(row) >= 0)
+    if (op === 'gt') result = result.filter((row) => comparable(row) && compare(row) > 0)
+    if (op === 'lte') result = result.filter((row) => comparable(row) && compare(row) <= 0)
+    if (op === 'lt') result = result.filter((row) => comparable(row) && compare(row) < 0)
+    if (op === 'is') result = result.filter((row) => (value === 'null' ? !comparable(row) : String(row[key]) === value))
+    if (op === 'not' && value === 'is.null') result = result.filter(comparable)
   }
   return result
 }
@@ -372,6 +433,9 @@ function profileViolation(row) {
   if (row.bio != null && chars(row.bio) > 160) return 'profiles_bio_check'
   if (row.goal != null && !GOALS.includes(row.goal)) return 'profiles_goal_check'
   if (row.instagram != null && !/^[A-Za-z0-9._]{1,30}$/.test(row.instagram)) return 'profiles_instagram_check'
+  if (row.sex != null && !['M', 'F'].includes(row.sex)) return 'profiles_sex_check'
+  if (row.birth_date != null && !(String(row.birth_date) >= '1900-01-01' && String(row.birth_date) <= '2100-01-01')) return 'profiles_birth_date_check'
+  if (row.height_cm != null && !(Number(row.height_cm) >= 80 && Number(row.height_cm) <= 250)) return 'profiles_height_cm_check'
   return null
 }
 
@@ -383,7 +447,11 @@ function measurementViolation(row) {
   if (!between(row.waist_cm, 30, 250)) return 'body_measurements_waist_cm_check'
   if (!Array.isArray(row.photos) || row.photos.length > 3) return 'body_measurements_photos_check'
   if (row.note != null && chars(row.note) > 280) return 'body_measurements_note_check'
-  if (row.weight_kg === null && row.body_fat === null && row.waist_cm === null && row.photos.length === 0) return 'body_measurements_has_data'
+  const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+  if (row.perimeters != null && !isObject(row.perimeters)) return 'body_measurements_perimeters_check'
+  if (row.skinfolds != null && !isObject(row.skinfolds)) return 'body_measurements_skinfolds_check'
+  if (row.protocol != null && !['pollock3', 'pollock7'].includes(row.protocol)) return 'body_measurements_protocol_check'
+  if (row.weight_kg === null && row.body_fat === null && row.waist_cm === null && row.photos.length === 0 && row.perimeters == null && row.skinfolds == null) return 'body_measurements_has_data'
   return null
 }
 // numeric(5,2) / numeric(4,1) arredondam como o Postgres.
@@ -394,6 +462,58 @@ function startOfWeekISO() {
   day.setHours(0, 0, 0, 0)
   day.setDate(day.getDate() - ((day.getDay() + 6) % 7))
   return day.toISOString()
+}
+
+// A service_role do servidor (Server Actions e cron) ignora o RLS.
+const isService = (req) => (req.headers.authorization || '') === 'Bearer service-mock'
+
+// Aviso no sino com as colunas do gestao.sql (data e push pendente).
+function pushNotification(row) {
+  const item = { id: `notifications-new-${++idCounter}`, ...row }
+  if (gestaoEnabled) Object.assign(item, { created_at: new Date().toISOString(), pushed_at: null })
+  notifications.push(item)
+  return item
+}
+
+// Triggers do gestao.sql em workout_sessions (protege a resposta e avisa o treinador do recado).
+function sessionPatchViolation(user, req, body) {
+  if (('coach_reply' in body || 'coach_reply_at' in body) && !isService(req) && !isAdminUser(user)) {
+    return { code: 'P0001', message: 'Somente o treinador responde o recado do treino' }
+  }
+  if (body.feedback != null && chars(body.feedback) > 500) return { code: '23514', message: 'new row for relation "workout_sessions" violates check constraint "workout_sessions_feedback_check"' }
+  if (body.coach_reply != null && (chars(String(body.coach_reply).trim()) < 1 || chars(body.coach_reply) > 500)) return { code: '23514', message: 'new row for relation "workout_sessions" violates check constraint "workout_sessions_coach_reply_check"' }
+  return null
+}
+function notifyFeedback(before, after) {
+  const tags = after.feedback_tags ?? []
+  if (after.status !== 'completed' || (!String(after.feedback ?? '').trim() && tags.length === 0)) return
+  if (before.status === 'completed' && before.feedback === after.feedback && JSON.stringify(before.feedback_tags ?? []) === JSON.stringify(tags)) return
+  const workout = assigned_workouts.find((item) => item.id === after.assigned_workout_id)
+  const studentName = (profiles.find((profile) => profile.id === after.student_id)?.full_name || '').trim() || 'Aluno'
+  const message = [
+    [workout?.name ?? 'Treino', after.session_rpe != null ? `RPE ${after.session_rpe}` : null].filter(Boolean).join(' · '),
+    tags.length ? tags.join(' · ') : null,
+    String(after.feedback ?? '').trim() ? `“${String(after.feedback).trim().slice(0, 300)}”` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  for (const coach of profiles.filter((profile) => profile.role === 'admin')) {
+    pushNotification({ recipient_id: coach.id, type: 'feedback', title: `Recado de ${studentName}`, message })
+  }
+}
+// Trigger anamneses_notify: aviso ao treinador quando o próprio aluno preenche.
+function notifyAnamnese(before, after) {
+  if (before && (!after.parq_positive || before.parq_positive)) return
+  const name = (profiles.find((profile) => profile.id === after.student_id)?.full_name || '').trim() || 'Aluno'
+  const title = after.parq_positive ? `PAR-Q com alerta: ${name}` : `Ficha de saúde de ${name}`
+  const message = after.parq_positive
+    ? 'Respondeu "sim" em alguma pergunta do PAR-Q. Confira a ficha de saúde antes de intensificar o treino.'
+    : 'Anamnese preenchida, sem alertas no PAR-Q.'
+  for (const coach of profiles.filter((profile) => profile.role === 'admin')) pushNotification({ recipient_id: coach.id, type: 'health', title, message })
+}
+function parqPositive(answers) {
+  const parq = answers && typeof answers.parq === 'object' && !Array.isArray(answers.parq) ? answers.parq : {}
+  return Object.values(parq).some((value) => value === true || value === 'true')
 }
 
 function userFromAuth(req) {
@@ -420,7 +540,7 @@ http
     if (url.pathname === '/auth/v1/token') {
       const body = await readBody(req)
       const user = users[body?.email]
-      if (!user || body.password !== '123456') return send(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' })
+      if (!user || !passwordOk(user, body.password)) return send(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' })
       return send(res, 200, session(user))
     }
     if (url.pathname === '/auth/v1/user') {
@@ -428,11 +548,60 @@ http
       if (!user) return send(res, 401, { msg: 'invalid JWT' })
       if (req.method === 'PUT') {
         const body = await readBody(req)
-        if (body?.password === '123456') {
+        if (body?.password === '123456' || (body?.password && body.password === passwords[user.id])) {
           return send(res, 422, { code: 422, error_code: 'same_password', msg: 'New password should be different from the old password.' })
         }
+        if (body?.password && body.password.length < 6) return send(res, 422, { code: 422, error_code: 'weak_password', msg: 'Password should be at least 6 characters.' })
+        if (body?.password) passwords[user.id] = body.password
       }
       return send(res, 200, authUser(user))
+    }
+    // Esqueci minha senha: guarda o pedido; o "e-mail" leva token_hash=recovery-<id>.
+    if (url.pathname === '/auth/v1/recover' && req.method === 'POST') {
+      const body = await readBody(req)
+      const email = String(body?.email ?? '').toLowerCase()
+      const recent = recoveries.find((item) => item.email === email && Date.now() - item.at < 60_000)
+      if (recent) return send(res, 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'For security purposes, you can only request this after 60 seconds.' })
+      recoveries.push({ email, redirectTo: url.searchParams.get('redirect_to'), at: Date.now(), token: users[email] ? `recovery-${users[email].id}` : null })
+      return send(res, 200, {})
+    }
+    if (url.pathname === '/auth/v1/verify' && req.method === 'POST') {
+      const body = await readBody(req)
+      const user = Object.values(users).find((item) => body?.type === 'recovery' && body?.token_hash === `recovery-${item.id}`)
+      if (!user) return send(res, 403, { code: 403, error_code: 'otp_expired', msg: 'Email link is invalid or has expired' })
+      return send(res, 200, session(user))
+    }
+    // Nova senha gerada pelo treinador (auth.admin.updateUserById).
+    const adminUserMatch = url.pathname.match(/^\/auth\/v1\/admin\/users\/([^/]+)$/)
+    if (adminUserMatch && req.method === 'PUT') {
+      if (!isService(req)) return send(res, 403, { code: 403, msg: 'User not allowed' })
+      const body = await readBody(req)
+      const user = userById[adminUserMatch[1]]
+      if (!user) return send(res, 404, { code: 404, error_code: 'user_not_found', msg: 'User not found' })
+      if (body?.password) passwords[user.id] = body.password
+      return send(res, 200, authUser(user))
+    }
+    // Serviço de push falso: guarda o que o servidor entregou (gone-* = aparelho cancelado).
+    const pushMatch = url.pathname.match(/^\/__push\/([\w-]+)$/)
+    if (pushMatch && req.method === 'POST') {
+      const raw = await readRaw(req)
+      if (pushMatch[1].startsWith('gone')) return send(res, 410, {})
+      pushes.push({
+        endpoint: `http://localhost:${PORT}${url.pathname}`,
+        headers: { encoding: req.headers['content-encoding'], ttl: req.headers.ttl, authorization: req.headers.authorization },
+        body: raw.toString('base64'),
+      })
+      return send(res, 201, {})
+    }
+    if (url.pathname === '/__pushes') return send(res, 200, pushes.splice(0))
+    if (url.pathname === '/__recoveries') return send(res, 200, recoveries)
+    if (url.pathname === '/__gestao/off') {
+      gestaoEnabled = false
+      return send(res, 200, { gestaoEnabled })
+    }
+    if (url.pathname === '/__gestao/on') {
+      gestaoEnabled = true
+      return send(res, 200, { gestaoEnabled })
     }
     if (url.pathname === '/auth/v1/logout') return send(res, 204)
     if (url.pathname === '/auth/v1/admin/users' && req.method === 'POST') {
@@ -495,11 +664,20 @@ http
     if (url.pathname === '/__state') {
       return send(res, 200, {
         storage: Object.fromEntries(Object.entries(BUCKETS).map(([id, bucket]) => [id, [...bucket.files.keys()]])),
-        profiles: profiles.map(({ id, full_name, ...rest }) => ({ id, full_name, ...Object.fromEntries(PROFILE_COLUMNS.map((key) => [key, rest[key]])) })),
+        profiles: profiles.map(({ id, full_name, ...rest }) => ({ id, full_name, ...Object.fromEntries([...PROFILE_COLUMNS, ...GESTAO_COLUMNS.profiles].map((key) => [key, rest[key]])) })),
         body_measurements,
         coach_notes,
         challenges,
         notifications,
+        workout_sessions,
+        session_sets,
+        assigned_workout_exercises,
+        push_subscriptions,
+        anamneses,
+        student_billing,
+        payments,
+        coach_settings,
+        passwords,
       })
     }
 
@@ -609,6 +787,9 @@ http
     if (COACH_TABLES.includes(table) && !coachEnabled) {
       return send(res, 404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` })
     }
+    if (GESTAO_TABLES.includes(table) && !gestaoEnabled) {
+      return send(res, 404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` })
+    }
     const select = url.searchParams.get('select') ?? '*'
     const wantsObject = (req.headers.accept || '').includes('vnd.pgrst.object')
 
@@ -633,6 +814,14 @@ http
         const requester = userFromAuth(req)
         rows = rows.filter((row) => row.user_id === requester?.id || isAdminUser(requester))
       }
+      if (GESTAO_TABLES.includes(table) && !isService(req)) {
+        // RLS do gestao.sql.
+        const requester = userFromAuth(req)
+        if (table === 'push_subscriptions') rows = rows.filter((row) => row.user_id === requester?.id)
+        else if (table === 'coach_settings') rows = requester ? rows : []
+        else rows = rows.filter((row) => row.student_id === requester?.id || isAdminUser(requester))
+      }
+      rows = rows.map((row) => visibleRow(table, row))
       rows = applyFilters(rows, url.searchParams)
       const order = url.searchParams.get('order')
       if (order) {
@@ -665,6 +854,107 @@ http
       return send(res, 400, payloadError)
     }
     const user = userFromAuth(req)
+    const service = isService(req)
+    const upsert = String(req.headers.prefer || '').includes('resolution=merge-duplicates')
+    const forbidden = () => send(res, 403, { code: '42501', message: `new row violates row-level security policy for table "${table}"` })
+    const violates = (constraint) => send(res, 400, { code: '23514', message: `new row for relation "${table}" violates check constraint "${constraint}"` })
+
+    if (GESTAO_TABLES.includes(table)) {
+      const admin = service || isAdminUser(user)
+      const items = (Array.isArray(body) ? body : [body ?? {}]).map((item) => ({ ...item }))
+      const keyOf = { push_subscriptions: 'endpoint', anamneses: 'student_id', student_billing: 'student_id', payments: 'id', coach_settings: 'id' }[table]
+      const conflictKey = url.searchParams.get('on_conflict') || keyOf
+      const canWrite = (row) => {
+        if (table === 'push_subscriptions') return service || (req.method === 'DELETE' && row.user_id === user?.id)
+        if (table === 'anamneses') return admin || (req.method !== 'DELETE' && row.student_id === user?.id)
+        return admin
+      }
+      const check = (row) => {
+        if (table === 'anamneses' && (typeof row.answers !== 'object' || row.answers === null || Array.isArray(row.answers))) return 'anamneses_answers_check'
+        if (table === 'student_billing') {
+          if (!(Number(row.monthly_fee) > 0 && Number(row.monthly_fee) <= 100000)) return 'student_billing_monthly_fee_check'
+          if (!(Number(row.due_day) >= 1 && Number(row.due_day) <= 31)) return 'student_billing_due_day_check'
+        }
+        if (table === 'payments') {
+          if (!/^\d{4}-\d{2}-01$/.test(String(row.reference_month))) return 'payments_reference_month_check'
+          if (!(Number(row.amount) > 0 && Number(row.amount) <= 100000)) return 'payments_amount_check'
+          if (!PAYMENT_METHODS.includes(row.method)) return 'payments_method_check'
+        }
+        if (table === 'coach_settings') {
+          if (Number(row.id) !== 1) return 'coach_settings_id_check'
+          if (row.pix_key != null && (chars(row.pix_key) < 1 || chars(row.pix_key) > 77)) return 'coach_settings_pix_key_check'
+          if (row.pix_name != null && (chars(row.pix_name) < 1 || chars(row.pix_name) > 25)) return 'coach_settings_pix_name_check'
+          if (row.pix_city != null && (chars(row.pix_city) < 1 || chars(row.pix_city) > 15)) return 'coach_settings_pix_city_check'
+        }
+        return null
+      }
+      const prepare = (row) => {
+        if (table === 'anamneses') Object.assign(row, { parq_positive: parqPositive(row.answers), updated_at: new Date().toISOString(), updated_by: user?.id ?? row.updated_by ?? null })
+        if (table === 'student_billing' || table === 'coach_settings') row.updated_at = new Date().toISOString()
+        if (table === 'student_billing' || table === 'payments') {
+          if (row.monthly_fee !== undefined) row.monthly_fee = roundTo(row.monthly_fee, 2)
+          if (row.amount !== undefined) row.amount = roundTo(row.amount, 2)
+        }
+        return row
+      }
+      const defaults = () => ({
+        push_subscriptions: { id: crypto.randomUUID(), user_id: user?.id ?? null, user_agent: null, created_at: new Date().toISOString() },
+        anamneses: { answers: {}, created_at: new Date().toISOString() },
+        student_billing: { due_day: 10, active: true, starts_on: monthISO(0), last_reminder_on: null, note: null, created_at: new Date().toISOString() },
+        payments: { id: crypto.randomUUID(), paid_on: dayISO(0), method: 'pix', note: null, created_by: user?.id ?? null, created_at: new Date().toISOString() },
+        coach_settings: { id: 1, pix_key: null, pix_name: null, pix_city: null, billing_reminders: false },
+      })[table]
+
+      if (req.method === 'POST') {
+        const saved = []
+        for (const item of items) {
+          const existing = tables[table].find((row) => row[conflictKey] !== undefined && String(row[conflictKey]) === String(item[conflictKey]))
+          const target = existing && upsert ? { ...existing, ...item } : { ...defaults(), ...item }
+          if (!canWrite(target) || (existing && upsert && !canWrite(existing))) return forbidden()
+          if (existing && !upsert) return send(res, 409, { code: '23505', message: `duplicate key value violates unique constraint "${table}_pkey"` })
+          if (table === 'payments' && tables.payments.some((row) => row !== existing && row.student_id === target.student_id && row.reference_month === target.reference_month)) {
+            return send(res, 409, { code: '23505', message: 'duplicate key value violates unique constraint "payments_student_id_reference_month_key"' })
+          }
+          const violation = check(target)
+          if (violation) return violates(violation)
+          prepare(target)
+          const before = existing ? { ...existing } : null
+          if (existing) Object.assign(existing, target)
+          else tables[table].push(target)
+          if (table === 'anamneses' && user?.id === target.student_id) notifyAnamnese(before, target)
+          saved.push(existing ?? target)
+        }
+        return send(res, 201, wantsObject ? saved[0] : saved)
+      }
+      const rows = applyFilters(tables[table], url.searchParams)
+      if (req.method === 'PATCH') {
+        const allowed = rows.filter((row) => canWrite(row) && (table !== 'coach_settings' || admin))
+        for (const row of allowed) {
+          const violation = check({ ...row, ...body })
+          if (violation) return violates(violation)
+        }
+        allowed.forEach((row) => Object.assign(row, prepare({ ...row, ...body })))
+        return send(res, 200, wantsObject ? allowed[0] ?? null : allowed)
+      }
+      if (req.method === 'DELETE') {
+        const allowed = rows.filter(canWrite)
+        for (const row of allowed) tables[table].splice(tables[table].indexOf(row), 1)
+        return send(res, 200, allowed)
+      }
+      return send(res, 405, {})
+    }
+
+    if (table === 'workout_sessions' && req.method === 'PATCH') {
+      const violation = sessionPatchViolation(user, req, body ?? {})
+      if (violation) return send(res, 400, violation)
+      const rows = applyFilters(tables[table], url.searchParams).filter((row) => service || row.student_id === user?.id || isAdminUser(user))
+      for (const row of rows) {
+        const before = { ...row }
+        Object.assign(row, body)
+        notifyFeedback(before, row)
+      }
+      return send(res, 200, wantsObject ? rows[0] ?? null : rows.map((row) => visibleRow(table, row)))
+    }
     if (req.method === 'POST' && COMMUNITY_TABLES.includes(table)) {
       const items = (Array.isArray(body) ? body : [body]).map((item) => ({ ...item }))
       for (const item of items) {
@@ -690,7 +980,7 @@ http
           if (!String(item.body ?? '').trim()) return send(res, 400, { code: '23514', message: 'new row violates check constraint "community_comments_body_check"' })
           const post = community_posts.find((entry) => entry.id === item.post_id)
           if (post && post.author_id !== user?.id) {
-            notifications.push({ id: `notifications-new-${++idCounter}`, recipient_id: post.author_id, type: 'community', title: 'Novo comentário 💬', message: `${item.author_name}: ${item.body.slice(0, 140)}` })
+            pushNotification({ recipient_id: post.author_id, type: 'community', title: 'Novo comentário 💬', message: `${item.author_name}: ${item.body.slice(0, 140)}` })
           }
         }
       }
@@ -795,9 +1085,26 @@ http
       return send(res, 405, { message: 'unsupported' })
     }
     if (req.method === 'POST') {
-      const items = (Array.isArray(body) ? body : [body]).map((item) => ({ id: `${table}-new-${++idCounter}`, ...(columnsOf(table).includes('created_at') ? { created_at: new Date().toISOString() } : {}), ...item }))
+      const items = (Array.isArray(body) ? body : [body]).map((item) => ({
+        id: `${table}-new-${++idCounter}`,
+        ...(columnsOf(table).includes('created_at') ? { created_at: new Date().toISOString() } : {}),
+        ...(table === 'notifications' && gestaoEnabled ? { pushed_at: null } : {}),
+        ...item,
+      }))
+      // Chave primária (ids gerados no aparelho: reenviar dá 23505).
+      for (const item of items) {
+        if (tables[table].some((row) => row.id === item.id)) {
+          return send(res, 409, { code: '23505', message: `duplicate key value violates unique constraint "${table}_pkey"` })
+        }
+      }
       tables[table].push(...items)
       return send(res, 201, wantsObject ? items[0] : items)
+    }
+    if (req.method === 'PATCH' && table === 'notifications') {
+      // Só a service_role marca o envio por push (e o treinador edita os seus).
+      const rows = applyFilters(tables[table], url.searchParams).filter(() => service || isAdminUser(user))
+      rows.forEach((row) => Object.assign(row, body))
+      return send(res, 200, wantsObject ? rows[0] ?? null : rows)
     }
     if (req.method === 'PATCH') {
       const rows = applyFilters(tables[table], url.searchParams)

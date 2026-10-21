@@ -17,7 +17,8 @@
 --     responde (workout_sessions.feedback, feedback_tags, coach_reply). O
 --     treinador recebe um aviso quando chega recado.
 --   - anamneses: ficha de saúde (PAR-Q) do aluno; o alerta do PAR-Q é
---     calculado pelo banco a partir das respostas.
+--     calculado pelo banco a partir das respostas e o treinador é avisado
+--     quando o aluno preenche a ficha.
 --   - Avaliação física: sexo, nascimento e altura em profiles; perímetros,
 --     dobras cutâneas e protocolo em body_measurements (se o profile.sql já
 --     tiver sido rodado; ele cria as mesmas colunas).
@@ -233,6 +234,52 @@ drop trigger if exists anamneses_prepare on public.anamneses;
 create trigger anamneses_prepare
   before insert or update on public.anamneses
   for each row execute function public.anamneses_prepare();
+
+-- Aviso para o treinador quando o aluno preenche a ficha ou quando o PAR-Q
+-- passa a ter um "sim" (o envio falhar não impede salvar a ficha).
+create or replace function public.anamneses_notify()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  student_name text;
+  title text;
+  body text;
+begin
+  -- Só o que o próprio aluno preenche gera aviso.
+  if auth.uid() is distinct from new.student_id then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' and (not new.parq_positive or old.parq_positive) then
+    return new;
+  end if;
+  select coalesce(nullif(trim(full_name), ''), 'Aluno') into student_name from public.profiles where id = new.student_id;
+  if new.parq_positive then
+    title := 'PAR-Q com alerta: ' || coalesce(student_name, 'Aluno');
+    body := 'Respondeu "sim" em alguma pergunta do PAR-Q. Confira a ficha de saúde antes de intensificar o treino.';
+  else
+    title := 'Ficha de saúde de ' || coalesce(student_name, 'Aluno');
+    body := 'Anamnese preenchida, sem alertas no PAR-Q.';
+  end if;
+  begin
+    insert into public.notifications (recipient_id, type, title, message)
+    select p.id, 'health', title, body from public.profiles p where lower(trim(p.role::text)) = 'admin';
+  exception when check_violation then
+    insert into public.notifications (recipient_id, type, title, message)
+    select p.id, 'announcement', title, body from public.profiles p where lower(trim(p.role::text)) = 'admin';
+  end;
+  return new;
+exception when others then
+  return new;
+end;
+$$;
+
+drop trigger if exists anamneses_notify on public.anamneses;
+create trigger anamneses_notify
+  after insert or update of answers on public.anamneses
+  for each row execute function public.anamneses_notify();
 
 alter table public.anamneses enable row level security;
 

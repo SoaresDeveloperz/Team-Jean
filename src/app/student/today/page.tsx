@@ -20,6 +20,7 @@ import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { ReadinessCard } from '@/components/fitness/ReadinessCard'
+import { AnamnesePrompt } from '@/components/health/AnamnesePrompt'
 
 type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null }
 
@@ -401,6 +402,8 @@ export default function StudentTodayPage() {
           </ol>
         </Tile>
       </div>
+
+      {userId && <AnamnesePrompt studentId={userId} />}
 
       <ReadinessCard value={readiness} onChange={handleReadinessChange} status={readinessStatus} />
 

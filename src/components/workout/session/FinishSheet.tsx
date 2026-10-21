@@ -1,8 +1,10 @@
 'use client'
 
+import { useId } from 'react'
 import { m } from 'framer-motion'
-import { Clock, Layers, LoaderCircle, Weight } from 'lucide-react'
+import { Clock, CloudOff, Layers, LoaderCircle, Weight } from 'lucide-react'
 import { formatKg } from '@/lib/workouts'
+import { FEEDBACK_MAX, FEEDBACK_TAGS } from '@/lib/feedback'
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
@@ -36,6 +38,12 @@ type FinishSheetProps = {
   volume: number
   rpe: number
   onRpeChange: (value: number) => void
+  feedback: string
+  onFeedbackChange: (value: string) => void
+  tags: string[]
+  onTagsChange: (value: string[]) => void
+  // Sem internet: o treino fica no aparelho e sobe quando a conexão voltar.
+  offline: boolean
   finishing: boolean
   error: string
   onConfirm: () => void
@@ -50,14 +58,22 @@ export function FinishSheet({
   volume,
   rpe,
   onRpeChange,
+  feedback,
+  onFeedbackChange,
+  tags,
+  onTagsChange,
+  offline,
   finishing,
   error,
   onConfirm,
 }: FinishSheetProps) {
   const missing = total - done
+  const feedbackId = useId()
+  const toggleTag = (label: string) =>
+    onTagsChange(tags.includes(label) ? tags.filter((tag) => tag !== label) : [...tags, label])
 
   return (
-    <Modal open={open} onClose={onClose} title="Finalizar treino" description="Registre o esforço da sessão">
+    <Modal open={open} onClose={onClose} title="Finalizar treino" description="Registre o esforço e deixe um recado para o treinador">
       <div className="space-y-5">
         <dl className="grid grid-cols-3 gap-2">
           {[
@@ -122,6 +138,63 @@ export function FinishSheet({
             <span>Máximo</span>
           </div>
         </fieldset>
+
+        <fieldset>
+          <legend className="mb-2.5 text-sm font-bold text-white">
+            Como foi? <span className="text-xs font-semibold text-zinc-500">(opcional)</span>
+          </legend>
+          <div className="flex flex-wrap gap-1.5">
+            {FEEDBACK_TAGS.map((tag) => {
+              const selected = tags.includes(tag.label)
+              return (
+                <m.button
+                  key={tag.label}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => toggleTag(tag.label)}
+                  whileTap={{ scale: 0.94 }}
+                  className={cn(
+                    'flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors',
+                    selected ? 'border-white bg-white text-black' : 'border-line bg-white/[0.04] text-zinc-300 hover:text-white',
+                  )}
+                >
+                  <span aria-hidden="true">{tag.emoji}</span>
+                  {tag.label}
+                </m.button>
+              )
+            })}
+          </div>
+        </fieldset>
+
+        <div>
+          <div className="mb-1.5 flex items-end justify-between gap-2">
+            <label htmlFor={feedbackId} className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+              Recado para o treinador
+            </label>
+            <span
+              className={cn('text-[10px] font-bold tabular-nums', feedback.length > FEEDBACK_MAX * 0.9 ? 'text-gold' : 'text-zinc-500')}
+              aria-hidden="true"
+            >
+              {feedback.length}/{FEEDBACK_MAX}
+            </span>
+          </div>
+          <textarea
+            id={feedbackId}
+            value={feedback}
+            maxLength={FEEDBACK_MAX}
+            rows={2}
+            onChange={(event) => onFeedbackChange(event.target.value)}
+            placeholder="Ex.: senti o ombro no supino, mas o resto foi tranquilo."
+            className="block max-h-40 w-full resize-none rounded-2xl border border-line-strong bg-black/40 px-3.5 py-3 text-white placeholder:text-zinc-600 [field-sizing:content] focus:border-brand focus:outline-none"
+          />
+        </div>
+
+        {offline && (
+          <p className="flex items-start gap-2 rounded-2xl border border-gold/25 bg-gold-soft px-3.5 py-3 text-xs leading-relaxed text-gold">
+            <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            Sem internet agora. O treino fica salvo no aparelho e é enviado sozinho quando a conexão voltar.
+          </p>
+        )}
 
         {error && <Alert variant="error">{error}</Alert>}
 

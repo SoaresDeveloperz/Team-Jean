@@ -2,6 +2,7 @@
 // As tabelas, o bucket e as permissões ficam em supabase/community.sql.
 import { REGION_LABELS, type MuscleRegion } from './muscles'
 import type { createClient } from './supabase/client'
+import { requestPushDelivery } from './push/client'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -303,6 +304,8 @@ export async function addComment(supabase: Supabase, postId: string, userId: str
     .select('*')
     .single()
   if (error || !data) fail('Não foi possível comentar', error ?? { message: 'sem resposta' })
+  // O banco avisa o autor do post (trigger); o push sai em seguida.
+  requestPushDelivery()
   return data as CommentRow
 }
 

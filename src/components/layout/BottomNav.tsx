@@ -15,14 +15,17 @@ export type NavItem = {
   exact?: boolean
 }
 
-export function BottomNav({ items, label }: { items: NavItem[]; label: string }) {
+export function BottomNav({ items, label, className }: { items: NavItem[]; label: string; className?: string }) {
   const pathname = usePathname()
   const pillId = useId()
 
   return (
     <nav
       aria-label={label}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl backdrop-saturate-150"
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-50 border-t border-line bg-black/90 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl backdrop-saturate-150',
+        className,
+      )}
     >
       <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((item) => {

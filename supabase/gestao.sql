@@ -97,17 +97,19 @@ alter table public.workout_sessions add column if not exists feedback_tags text[
 alter table public.workout_sessions add column if not exists coach_reply text;
 alter table public.workout_sessions add column if not exists coach_reply_at timestamptz;
 
+-- "not valid": valem para o que for gravado daqui em diante (não travam o
+-- script se o banco já tiver dados antigos nessas colunas).
 alter table public.workout_sessions drop constraint if exists workout_sessions_feedback_check;
 alter table public.workout_sessions add constraint workout_sessions_feedback_check
-  check (feedback is null or char_length(feedback) <= 500);
+  check (feedback is null or char_length(feedback) <= 500) not valid;
 
 alter table public.workout_sessions drop constraint if exists workout_sessions_feedback_tags_check;
 alter table public.workout_sessions add constraint workout_sessions_feedback_tags_check
-  check (cardinality(feedback_tags) <= 8 and char_length(array_to_string(feedback_tags, ',')) <= 200);
+  check (cardinality(feedback_tags) <= 8 and char_length(array_to_string(feedback_tags, ',')) <= 200) not valid;
 
 alter table public.workout_sessions drop constraint if exists workout_sessions_coach_reply_check;
 alter table public.workout_sessions add constraint workout_sessions_coach_reply_check
-  check (coach_reply is null or char_length(trim(coach_reply)) between 1 and 500);
+  check (coach_reply is null or char_length(trim(coach_reply)) between 1 and 500) not valid;
 
 -- Só o treinador responde (o aluno pode editar a própria sessão, mas não a resposta).
 create or replace function public.protect_coach_reply()
@@ -313,15 +315,15 @@ alter table public.profiles add column if not exists height_cm numeric(4, 1);
 
 alter table public.profiles drop constraint if exists profiles_sex_check;
 alter table public.profiles add constraint profiles_sex_check
-  check (sex is null or sex in ('M', 'F'));
+  check (sex is null or sex in ('M', 'F')) not valid;
 
 alter table public.profiles drop constraint if exists profiles_birth_date_check;
 alter table public.profiles add constraint profiles_birth_date_check
-  check (birth_date is null or birth_date between date '1900-01-01' and date '2100-01-01');
+  check (birth_date is null or birth_date between date '1900-01-01' and date '2100-01-01') not valid;
 
 alter table public.profiles drop constraint if exists profiles_height_cm_check;
 alter table public.profiles add constraint profiles_height_cm_check
-  check (height_cm is null or height_cm between 80 and 250);
+  check (height_cm is null or height_cm between 80 and 250) not valid;
 
 -- Perímetros e dobras em body_measurements (mesma definição do profile.sql).
 do $$

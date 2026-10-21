@@ -173,7 +173,8 @@ const monthISO = (offsetMonths = 0) => {
   date.setMonth(date.getMonth() + offsetMonths)
   return date.toISOString().slice(0, 10).slice(0, 8) + '01'
 }
-const today = new Date(now)
+// Dia de hoje no fuso do app (o financeiro conta os dias em America/Sao_Paulo).
+const todaySP = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: 'numeric' }).format(new Date(now)))
 const push_subscriptions = []
 // Carlos respondeu o PAR-Q com um "sim"; Maria ainda não respondeu.
 const anamneses = [
@@ -181,7 +182,7 @@ const anamneses = [
 ]
 // Maria vence daqui a uns dias (pendente); Carlos venceu no dia 1 (atrasado).
 const student_billing = [
-  { student_id: 'u-student', monthly_fee: 150, due_day: Math.min(31, today.getDate() + 5), active: true, starts_on: monthISO(-2), last_reminder_on: null, note: null, created_at: iso(-60), updated_at: iso(-60) },
+  { student_id: 'u-student', monthly_fee: 150, due_day: Math.min(31, todaySP + 5), active: true, starts_on: monthISO(-2), last_reminder_on: null, note: null, created_at: iso(-60), updated_at: iso(-60) },
   { student_id: 'c0ffee00-0000-4000-8000-00000000c2c2', monthly_fee: 120, due_day: 1, active: true, starts_on: monthISO(-1), last_reminder_on: null, note: null, created_at: iso(-30), updated_at: iso(-30) },
 ]
 const payments = [

@@ -108,8 +108,8 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   await page.click('button:has-text("Usar outro e-mail")')
   await page.fill('#reset-email', 'maria@teste.com')
   await page.click('button:has-text("Enviar link")')
-  await page.waitForSelector('[role=alert]')
-  check('pedido repetido explica o limite de 1 minuto', (await page.textContent('[role=alert]')).includes('Aguarde um minuto'))
+  await page.waitForSelector('main [role=alert]')
+  check('pedido repetido explica o limite de 1 minuto', (await page.textContent('main [role=alert]')).includes('Aguarde um minuto'))
   await page.goto(`${BASE}/auth/confirm?token_hash=vencido&type=recovery&next=/redefinir-senha`)
   await page.waitForURL('**/login?erro=link')
   check('link vencido volta ao login com aviso', (await page.textContent('main')).includes('expirou'))
@@ -123,8 +123,8 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   await page.fill('#new-password', 'NovaSenha2026')
   await page.fill('#confirm-password', 'outra-coisa')
   await page.click('button:has-text("Salvar e entrar")')
-  await page.waitForSelector('[role=alert]')
-  check('senhas diferentes mostram erro', (await page.textContent('[role=alert]')).includes('não conferem'))
+  await page.waitForSelector('main [role=alert]')
+  check('senhas diferentes mostram erro', (await page.textContent('main [role=alert]')).includes('não conferem'))
   await page.fill('#confirm-password', 'NovaSenha2026')
   await page.click('button:has-text("Salvar e entrar")')
   await page.waitForURL('**/student/today', { timeout: 30000 })
@@ -178,7 +178,7 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   // ---------------------------------------------- mensalidade e PIX (aluna)
   const billingCard = page.locator('section', { hasText: 'Mensalidade' }).first()
   await billingCard.waitFor()
-  check('Perfil mostra a mensalidade a vencer', (await billingCard.textContent()).includes('Vence dia') && (await billingCard.textContent()).includes('150,00'))
+  check('Perfil mostra a mensalidade a vencer', /Vence (dia|hoje)/.test(await billingCard.textContent()) && (await billingCard.textContent()).includes('150,00'))
   await page.click('button:has-text("Copiar PIX copia e cola")')
   await page.waitForSelector('text=PIX copiado')
   const pix = await page.evaluate(() => navigator.clipboard.readText())
@@ -385,8 +385,14 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
 
   // Cron diário da Vercel.
   check('cron sem o segredo é recusado', (await fetch(`${BASE}/api/cron/billing`)).status === 401)
+  // Carlos vence hoje; Maria só entra se o vencimento dela cair 3 dias antes/depois.
+  const mariaBilling = (await state()).student_billing.find((row) => row.student_id === 'u-student')
+  const lastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()
+  const mariaDue = `${month.slice(0, 8)}${String(Math.min(mariaBilling.due_day, lastDay)).padStart(2, '0')}`
+  const mariaOffset = Math.round((Date.parse(`${todayIso()}T12:00:00Z`) - Date.parse(`${mariaDue}T12:00:00Z`)) / 86_400_000)
+  const expectedReminders = 1 + ([-3, 0, 3].includes(mariaOffset) ? 1 : 0)
   const cron = await (await fetch(`${BASE}/api/cron/billing`, { headers: { Authorization: 'Bearer cron-teste' } })).json()
-  check('cron lembra quem vence hoje (Carlos)', cron.ok === true && cron.reminders === 1)
+  check('cron lembra quem vence hoje (Carlos)', cron.ok === true && cron.reminders === expectedReminders)
   const again = await (await fetch(`${BASE}/api/cron/billing`, { headers: { Authorization: 'Bearer cron-teste' } })).json()
   check('cron não repete o lembrete no mesmo dia', again.reminders === 0)
 

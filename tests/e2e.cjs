@@ -39,6 +39,16 @@ async function login(page, email, password = '123456') {
   await page.click('button[type=submit]')
 }
 
+// O botão + some quando a página rola para baixo: volta ao topo e espera ele reaparecer.
+async function openShortcuts(page) {
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForFunction(() => {
+    const holder = document.querySelector('button[aria-label="Atalhos do treinador"]')?.parentElement
+    return holder != null && getComputedStyle(holder).opacity === '1'
+  })
+  await page.click('button[aria-label="Atalhos do treinador"]')
+}
+
 ;(async () => {
   require('fs').mkdirSync(OUT, { recursive: true })
   const browser = await chromium.launch()
@@ -60,8 +70,8 @@ async function login(page, email, password = '123456') {
   check('sem login redireciona para /login', page.url().endsWith('/login'))
   await shot(page, '01-login')
   await login(page, 'maria@teste.com', 'errada')
-  await page.waitForSelector('[role=alert]')
-  check('senha errada mostra erro', (await page.textContent('[role=alert]')).includes('incorretos'))
+  await page.waitForSelector('main [role=alert]')
+  check('senha errada mostra erro', (await page.textContent('main [role=alert]')).includes('incorretos'))
   await shot(page, '02-login-erro')
 
   await login(page, 'maria@teste.com')
@@ -386,7 +396,7 @@ async function login(page, email, password = '123456') {
   await page.waitForTimeout(400)
   check('abas do radar trocam com as setas', (await radar.locator('[role=tab][aria-selected=true]').textContent()).includes('Cansaço'))
   check('radar avisa RPE alto do Carlos', (await radar.textContent()).includes('RPE 9 · 9 · 10'))
-  await page.click('button[aria-label="Atalhos do treinador"]')
+  await openShortcuts(page)
   await page.waitForSelector('nav[aria-label="Atalhos do treinador"] a >> nth=5')
   check('atalhos do treinador abrem com 6 ações', (await page.locator('nav[aria-label="Atalhos do treinador"] a').count()) === 6)
   check('foco vai para o primeiro atalho', await page.evaluate(() => document.activeElement?.textContent?.includes('Novo aluno')))
@@ -640,7 +650,7 @@ async function login(page, email, password = '123456') {
   // Atalho "Novo exercício" abre o cadastro em outra página.
   await page.goto(`${BASE}/admin`)
   await page.waitForSelector('text=Radar do treinador')
-  await page.click('button[aria-label="Atalhos do treinador"]')
+  await openShortcuts(page)
   await page.click('nav[aria-label="Atalhos do treinador"] a:has-text("Novo exercício")')
   await page.waitForSelector('#exercise-name', { timeout: 30000 })
   check('atalho abre o cadastro de exercício', page.url().includes('/admin/exercises'))

@@ -16,10 +16,8 @@ const AXE = require.resolve('axe-core/axe.min.js')
   await context.addInitScript(fakePushScript({ endpoint: `${MOCK}/__push/a11y`, p256dh: device.p256dh, auth: device.authKey }))
   const page = await context.newPage()
   let total = 0
-  const audit = async (label) => {
-    await page.waitForTimeout(900)
-    await page.addScriptTag({ path: AXE })
-    const result = await page.evaluate(async () => {
+  const runAxe = () =>
+    page.evaluate(async () => {
       const res = await axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })
       return res.violations.map((v) => ({
         id: v.id,
@@ -29,6 +27,16 @@ const AXE = require.resolve('axe-core/axe.min.js')
         count: v.nodes.length,
       }))
     })
+  const audit = async (label) => {
+    await page.waitForTimeout(900)
+    await page.addScriptTag({ path: AXE })
+    let result = await runAxe()
+    // Um toast entrando ou saindo tem o texto semitransparente (contraste falso):
+    // só conta o que continuar depois da animação.
+    if (result.length > 0) {
+      await page.waitForTimeout(1200)
+      result = await runAxe()
+    }
     total += result.length
     console.log(`== ${label}: ${result.length}`)
     for (const v of result) {
@@ -58,7 +66,7 @@ const AXE = require.resolve('axe-core/axe.min.js')
   await page.click('button:has-text("Usar outro e-mail")')
   await page.fill('#reset-email', 'maria@teste.com')
   await page.click('button:has-text("Enviar link")')
-  await page.waitForSelector('[role=alert]')
+  await page.waitForSelector('main [role=alert]')
   await audit('esqueci a senha: limite de pedidos')
   await page.goto(BASE + '/redefinir-senha')
   await page.waitForSelector('text=Link expirado')
@@ -145,7 +153,7 @@ const AXE = require.resolve('axe-core/axe.min.js')
   await radar.locator('button:has-text("Responder")').first().click()
   await audit('responder recado')
   await radar.locator('button:has-text("Enviar resposta")').click()
-  await page.waitForSelector('[role=alert]')
+  await page.waitForSelector('main [role=alert]')
   await audit('responder recado vazio')
   await page.goto(BASE + '/admin/students?aluno=u-student')
   await page.waitForSelector('[role=dialog] >> text=Último exercício pesado demais.')

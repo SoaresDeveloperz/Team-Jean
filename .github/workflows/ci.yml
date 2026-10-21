@@ -48,6 +48,8 @@ jobs:
           name: capturas
           path: tests/.output
           if-no-files-found: ignore
+          # A pasta começa com ponto: sem isto o upload ignora as capturas.
+          include-hidden-files: true
 
   sql:
     name: Banco (RLS, restrições e funções)

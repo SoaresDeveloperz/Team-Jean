@@ -221,8 +221,11 @@ async function openShortcuts(page) {
   current = await waitForState((value) => value.body_measurements.length === 3)
   const newest = current.body_measurements.at(-1)
   check('medida salva (vírgula vira ponto) com foto privada', newest.weight_kg === 66.9 && newest.waist_cm === 74 && newest.photos.length === 1 && current.storage.progress.includes(newest.photos[0]))
-  await page.waitForSelector('svg[aria-label^="Evolução do peso"]')
-  check('gráfico do peso com 3 registros', (await page.getAttribute('svg[aria-label^="Evolução do peso"]', 'aria-label')).endsWith('em 3 registros'))
+  // A tela atualiza depois do banco (o gráfico com 2 registros já existia): espera o novo.
+  const chartUpdated = await page
+    .waitForSelector('svg[aria-label^="Evolução do peso"][aria-label$="em 3 registros"]', { timeout: 15000 })
+    .then(() => true, () => false)
+  check('gráfico do peso com 3 registros', chartUpdated)
   check('variação desde a primeira medida', (await page.textContent('main')).includes('−1,5 kg desde'))
 
   await page.click('button:has-text("Antes e depois")')

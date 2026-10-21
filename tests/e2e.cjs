@@ -458,7 +458,8 @@ async function openShortcuts(page) {
   await page.waitForSelector('[role=dialog] >> text=Dor leve no ombro')
   await page.fill('[role=dialog] textarea', 'Prefere treinar cedo.')
   await page.click('[role=dialog] button:has-text("Salvar nota")')
-  await page.waitForSelector('[role=dialog] >> text=Prefere treinar cedo.')
+  // O React copia o texto do <textarea> para dentro dele: espera a nota já na lista.
+  await page.waitForSelector('[role=dialog] li >> text=Prefere treinar cedo.')
   current = await state()
   check('nota salva em nome do treinador', current.coach_notes.some((note) => note.body === 'Prefere treinar cedo.' && note.author_id === 'u-admin'))
   check('nota fixada continua no topo', (await page.locator('[role=dialog] ul[aria-label^="Notas sobre"] li').first().textContent()).includes('Dor leve no ombro'))

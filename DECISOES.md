@@ -23,8 +23,9 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - **Opções:** A) produção, só leitura, com SQL (o comando que o painel do Supabase sugeriu); B) produção, só leitura e sem SQL (docs, development e debugging: estrutura, logs e alertas de segurança); C) um projeto Supabase de teste, com dados inventados.
 - **Revisor:** com A, a IA consegue ler anamnese, medidas, nomes e e-mails dos alunos (LGPD), e também textos escritos por alunos, onde alguém poderia esconder instruções para ela. Recomendou C, ou B se for em produção. A documentação do Supabase também desaconselha ligar o MCP em produção.
 - **Conselheiro e advogado do diabo:** ainda não consultados.
-- **Decisão:** B por enquanto, já aplicado no `.mcp.json`. O dono decide se libera SQL (A) ou cria um projeto de teste (C).
-- **Por quê:** estrutura, logs e alertas já respondem à maioria das dúvidas sem expor dados de alunos.
+- **Revisor (segunda passada):** a configuração está certa, mas os logs (grupo `debugging`) ainda podem mostrar e-mails, IPs e IDs dos alunos; fichas de saúde, medidas e fotos não aparecem.
+- **Decisão:** provisória, tomada pela IA enquanto o dono não responde: B, já aplicado no `.mcp.json`. O dono decide se libera SQL (A) ou cria um projeto de teste (C).
+- **Por quê:** estrutura, logs e alertas já respondem à maioria das dúvidas sem abrir fichas de saúde, medidas e fotos.
 - **Rever quando:** um bug só puder ser achado olhando dados; de preferência, num projeto de teste.
 
 ## 2026-10-24 — Por onde sai o e-mail de "Esqueci minha senha"
@@ -33,7 +34,7 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - **Conselheiro (Opus, certeza média-alta):** opção 5 agora: grátis, uns 20 minutos, cerca de 500 e-mails por dia e boa entrega. Domínio (cerca de R$ 40 por ano) + Resend quando houver outros e-mails. O Brevo sem domínio troca o remetente @gmail por um endereço dele e tende a cair no spam. A página de senha de app só aparece com a verificação em duas etapas ligada.
 - **Voz do usuário:** a mensagem de erro não pode culpar o aluno nem sugerir que o treinador vai saber a senha dele: "Não conseguimos enviar o e-mail agora. Peça ajuda ao seu treinador para entrar." No e-mail, botão grande e o mesmo verbo no assunto e no botão: "Criar nova senha".
 - **Advogado do diabo:**
-  1. Com SMTP de verdade, o cadastro público deixaria um estranho criar conta e ver a Comunidade. Mitigado à mão: o README manda desligar *Allow new users to sign up* antes. Falta a correção no banco: o revisor mostrou que as políticas da Comunidade aceitam qualquer conta logada e pediu para exigir perfil.
+  1. Com SMTP de verdade, o cadastro público deixaria um estranho criar conta e ver a Comunidade. Mitigado à mão: o README manda desligar *Allow new users to sign up* antes. Falta a correção no banco: o revisor mostrou que as políticas da Comunidade aceitam qualquer conta logada. Exigir perfil pode não bastar: o `policies.sql` cita um gatilho que cria o perfil no cadastro, e com ele o estranho também ganharia perfil. Conferir em Database → Triggers (tabela `auth.users`); se o gatilho existir, o critério tem de ser algo que só o treinador preenche. Até lá, a barreira é manter o cadastro público desligado.
   2. Antivírus de e-mail podem abrir o link antes do aluno e gastar o código. Ver o especialista.
   3. O limite por hora aparecia como "Aguarde um minuto". Corrigido.
   4. Sem CAPTCHA, alguém pode esgotar o limite de e-mails. Corrigido em parte: o README pede Rate Limits baixos; o CAPTCHA fica para depois.

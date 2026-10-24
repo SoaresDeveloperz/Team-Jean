@@ -152,26 +152,34 @@ Na tela de login, "Esqueci minha senha" manda um link por e-mail que abre
    app e em *Redirect URLs* adicione `https://SEU-DOMINIO/auth/confirm`.
 2. **Authentication → Emails → SMTP**: configure um SMTP próprio (Gmail com
    senha de app, Resend etc.). O envio padrão do Supabase só entrega para
-   membros da equipe do projeto e tem limite baixo. Em **Rate Limits**, deixe o
-   limite de e-mails em cerca de 10 por hora (240 por dia, abaixo dos cerca de
-   500 por dia do Gmail).
+   membros da equipe do projeto e tem limite baixo. Em **Rate Limits**, coloque
+   `10` no limite de e-mails por hora (240 por dia, abaixo dos cerca de 500 por
+   dia do Gmail; com outro provedor, divida o limite diário dele por 24).
 3. Em **Emails → Templates → Reset Password**, use o assunto
    `Criar nova senha — Team Jean` e cole o modelo de
    [`supabase/email-recuperar-senha.html`](supabase/email-recuperar-senha.html).
    O link dele (`/auth/confirm?token_hash=...`) funciona mesmo abrindo o e-mail
-   em outro aparelho.
+   em outro aparelho. O e-mail diz que o link vale 1 hora: mantenha *Email OTP
+   Expiration* em `3600` (Authentication → Providers → Email) ou troque o texto
+   do e-mail.
 
 Se o e-mail não chegar, o treinador usa **Gerar senha nova** na ficha do aluno
 e envia a senha provisória.
 
 Se quem esqueceu foi o próprio treinador e o e-mail não chegar, rode no **SQL
-Editor** do Supabase, trocando a senha e o e-mail:
+Editor** do Supabase. Troque só o texto entre as aspas (mantenha as aspas) e
+escreva o e-mail em letras minúsculas:
 
 ```sql
 update auth.users
 set encrypted_password = extensions.crypt('SENHA-NOVA', extensions.gen_salt('bf'))
-where email = 'seu@email.com';
+where email = 'seu@email.com'
+returning email;
 ```
+
+Se a resposta mostrar o seu e-mail, a senha foi trocada; se vier vazia, o e-mail
+não confere. Depois apague a consulta do SQL Editor, porque a senha digitada
+fica guardada no histórico dele.
 
 ### Treino sem internet
 
@@ -201,9 +209,10 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
   decisões importantes ficam em [`DECISOES.md`](DECISOES.md).
 - [`.mcp.json`](.mcp.json) liga o MCP oficial do Supabase ao projeto, em modo só
   leitura e **sem SQL**: dá para ver a estrutura do banco, os logs e os alertas
-  de segurança, mas não os dados dos alunos (que incluem dados de saúde). Para
-  usar, rode `claude /mcp`, escolha *supabase* e entre com a sua conta do
-  Supabase.
+  de segurança, mas não as fichas de saúde, medidas, fotos e recados dos alunos
+  (os logs ainda podem mostrar e-mails e IDs). Para usar, abra o Claude Code
+  nesta pasta, digite `/mcp`, escolha *supabase* e autorize no navegador com a
+  sua conta do Supabase.
 
 ## Scripts
 

@@ -11,7 +11,7 @@
     - `gestao` (`tests/e2e-gestao.cjs`): esqueci minha senha, push, ficha de saúde, avaliação, treino sem internet, recados, carga-alvo, financeiro e o treinador no computador;
     - `routes`, `admin`, `coach`, `community`, `profile` e `gestao-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
   - banco: `pnpm test:sql` (precisa de um Postgres; veja o README);
-  - não rode dois `tests/run.mjs` ao mesmo tempo: eles usam as mesmas portas (3200 e 54321) e a mesma pasta `.next`;
+  - não rode dois `tests/run.mjs` ao mesmo tempo, nem `pnpm test:build` com um teste rodando: eles usam as mesmas portas (3200 e 54321) e a mesma pasta `.next`;
   - o CI do GitHub roda tudo isso a cada push e a cada PR.
 - Regras do projeto:
   - textos da tela em português do Brasil; mobile-first; paleta do Team Jean (verde `#34d399`, dourado `#fbbf24`, fundos escuros);

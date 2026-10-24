@@ -13,7 +13,7 @@ const ORDERS = [
   ['policies.sql', 'community.sql', 'profile.sql', 'coach.sql', 'gestao.sql'],
   ['policies.sql', 'gestao.sql', 'coach.sql', 'profile.sql', 'community.sql'],
 ]
-const TESTS = ['rls-test.sql', 'rls-profile.sql', 'rls-coach.sql', 'rls-gestao.sql']
+const TESTS = ['rls-test.sql', 'rls-profile.sql', 'rls-coach.sql', 'rls-gestao.sql', 'rls-funcoes.sql']
 
 function psql(database, sql) {
   const result = spawnSync('psql', ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-d', database], { input: sql, encoding: 'utf8' })

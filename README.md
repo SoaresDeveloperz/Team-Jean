@@ -33,6 +33,12 @@ O `.env.local` não deve ser commitado.
 Todo o controle de acesso aos dados depende do RLS do Supabase. Revise e rode
 [`supabase/policies.sql`](supabase/policies.sql) no SQL Editor do projeto.
 
+As funções do banco têm `search_path` fixo e as de gatilho não podem ser
+chamadas pela API (só `is_admin`, `challenge_standings` e `community_members`
+ficam liberadas, e só para quem está logado). Se o seu banco é de antes dessa
+mudança, rode de novo os arquivos `supabase/*.sql` que você já usa para aplicar
+as permissões novas.
+
 ## Comunidade
 
 A aba **Equipe** (feed com fotos, fogo, comentários e ranking da semana) usa
@@ -144,17 +150,42 @@ chamada. Com "Lembrete automático" ligado no Financeiro, o aluno recebe aviso
 Na tela de login, "Esqueci minha senha" manda um link por e-mail que abre
 `/redefinir-senha`. No Supabase:
 
+0. **Antes de tudo, Authentication → Sign In / Providers**: desligue *Allow new
+   users to sign up*. Os alunos são criados pelo treinador (no servidor), então
+   o cadastro público não faz falta. Com um SMTP de verdade ligado, ele deixaria
+   qualquer pessoa criar conta e ver a Comunidade.
 1. **Authentication → URL Configuration**: em *Site URL* coloque o endereço do
    app e em *Redirect URLs* adicione `https://SEU-DOMINIO/auth/confirm`.
-2. **Authentication → Emails → SMTP**: configure um SMTP próprio (Resend,
-   Brevo etc.). O envio padrão do Supabase só entrega para membros da equipe do
-   projeto e tem limite baixo.
-3. Recomendado: em **Emails → Templates → Reset Password**, troque o link por
-   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/redefinir-senha`
-   (funciona mesmo abrindo o e-mail em outro aparelho).
+2. **Authentication → Emails → SMTP**: configure um SMTP próprio (Gmail com
+   senha de app, Resend etc.). O envio padrão do Supabase só entrega para
+   membros da equipe do projeto e tem limite baixo. Em **Rate Limits**, coloque
+   `10` no limite de e-mails por hora (240 por dia, abaixo dos cerca de 500 por
+   dia do Gmail; com outro provedor, divida o limite diário dele por 24).
+3. Em **Emails → Templates → Reset Password**, use o assunto
+   `Criar nova senha — Team Jean` e cole o modelo de
+   [`supabase/email-recuperar-senha.html`](supabase/email-recuperar-senha.html).
+   O link dele (`/auth/confirm?token_hash=...`) funciona mesmo abrindo o e-mail
+   em outro aparelho. O e-mail diz que o link vale 1 hora: mantenha *Email OTP
+   Expiration* em `3600` (Authentication → Providers → Email) ou troque o texto
+   do e-mail.
 
 Se o e-mail não chegar, o treinador usa **Gerar senha nova** na ficha do aluno
 e envia a senha provisória.
+
+Se quem esqueceu foi o próprio treinador e o e-mail não chegar, rode no **SQL
+Editor** do Supabase. Troque só o texto entre as aspas (mantenha as aspas) e
+escreva o e-mail em letras minúsculas:
+
+```sql
+update auth.users
+set encrypted_password = extensions.crypt('SENHA-NOVA', extensions.gen_salt('bf'))
+where email = 'seu@email.com'
+returning email;
+```
+
+Se a resposta mostrar o seu e-mail, a senha foi trocada; se vier vazia, o e-mail
+não confere. Depois apague a consulta do SQL Editor, porque a senha digitada
+fica guardada no histórico dele.
 
 ### Treino sem internet
 
@@ -175,6 +206,19 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
   `PGPASSWORD` apontando para o banco).
 - O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda
   lint, build, tipos, os testes de ponta a ponta e os do banco a cada push e PR.
+
+## Claude Code: agentes e Supabase
+
+- [`.claude/agents/`](.claude/agents) traz sete agentes (revisor, testador,
+  conselheiro, advogado do diabo, voz do usuário, ajudante rápido e
+  especialista). O [`CLAUDE.md`](CLAUDE.md) diz quando usar cada um, e as
+  decisões importantes ficam em [`DECISOES.md`](DECISOES.md).
+- [`.mcp.json`](.mcp.json) liga o MCP oficial do Supabase ao projeto, em modo só
+  leitura e **sem SQL**: dá para ver a estrutura do banco, os logs e os alertas
+  de segurança, mas não as fichas de saúde, medidas, fotos e recados dos alunos
+  (os logs ainda podem mostrar e-mails e IDs). Para usar, abra o Claude Code
+  nesta pasta, digite `/mcp`, escolha *supabase* e autorize no navegador com a
+  sua conta do Supabase.
 
 ## Scripts
 

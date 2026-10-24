@@ -34,6 +34,11 @@ as $$
   );
 $$;
 
+-- As políticas de RLS chamam is_admin() com o papel de quem está logado, por
+-- isso authenticated precisa executar. Visitante sem login (anon) não precisa.
+revoke execute on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
 -- Todo perfil novo nasce como aluno, mesmo que alguém envie role = 'admin' no
 -- user_metadata do cadastro (o trigger de signup costuma copiar esse campo).
 create or replace function public.force_student_role_on_insert()
@@ -47,6 +52,10 @@ begin
   return new;
 end;
 $$;
+
+-- Funções de gatilho disparam sem o EXECUTE de quem grava; tirar o EXECUTE só
+-- impede chamá-las pela API (/rest/v1/rpc).
+revoke execute on function public.force_student_role_on_insert() from public, anon, authenticated;
 
 drop trigger if exists force_student_role_on_insert on public.profiles;
 create trigger force_student_role_on_insert
@@ -71,10 +80,28 @@ begin
 end;
 $$;
 
+revoke execute on function public.protect_profile_role() from public, anon, authenticated;
+
 drop trigger if exists protect_profile_role on public.profiles;
 create trigger protect_profile_role
   before update on public.profiles
   for each row execute function public.protect_profile_role();
+
+-- Funções criadas no painel do Supabase (não estão em nenhum arquivo daqui):
+--   - handle_new_user(): gatilho on_auth_user_created de auth.users, cria o
+--     perfil no cadastro (o force_student_role_on_insert acima força 'student');
+--   - rls_auto_enable(): função do event trigger "ensure_rls".
+-- Só mexemos nelas se existirem: fixa o search_path e tira o EXECUTE da API.
+do $$
+begin
+  if to_regprocedure('public.handle_new_user()') is not null then
+    alter function public.handle_new_user() set search_path = public;
+    revoke execute on function public.handle_new_user() from public, anon, authenticated;
+  end if;
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+  end if;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- profiles

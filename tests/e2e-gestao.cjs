@@ -52,6 +52,24 @@ async function logout(page, context) {
   await page.evaluate(() => localStorage.clear())
 }
 
+// Mensagem da tela quando o Supabase não consegue enviar o e-mail de recuperação, a que ela substituiu e a do limite de 1 minuto.
+const RESET_NOT_SENT = 'Não conseguimos enviar o e-mail agora. Peça ajuda ao seu treinador para entrar.'
+const RESET_OLD_MESSAGE = 'Confira o e-mail digitado'
+const RESET_ONE_MINUTE = 'Aguarde um minuto'
+// Pede o link de nova senha e espera o estado final do pedido: a resposta do Supabase falso A ESSE endereço
+// e o botão voltando a "Enviar link". Esperar só "um alerta" não serve: o alerta do pedido anterior pode
+// estar na tela (às vezes com o mesmo texto) até o app apagá-lo e mostrar o novo. Depois disso qualquer
+// alerta em `main [role=alert]` é o deste pedido.
+async function requestResetLink(page, email) {
+  await page.fill('#reset-email', email)
+  const [response] = await Promise.all([
+    page.waitForResponse((item) => item.request().method() === 'POST' && item.url().includes('/auth/v1/recover') && String(item.request().postData()).includes(email)),
+    page.click('button:has-text("Enviar link")'),
+  ])
+  await page.waitForSelector('button:has-text("Enviar link"):not([disabled])')
+  return { status: response.status(), body: await response.json() }
+}
+
 // CRC16 do PIX (mesma regra do app) para conferir o código copiado.
 function crc16(text) {
   let crc = 0xffff
@@ -87,7 +105,9 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
     if (message.type() !== 'error') return
     const text = message.text()
     // Esperados: login/senha recusados (400/403/422/429), requisições sem internet e o banco sem o gestao.sql (404).
-    const expected = /\b(400|401|403|404|422|429)\b/.test(text) || /ERR_INTERNET_DISCONNECTED|Failed to fetch|net::ERR/i.test(text) || gestaoOff
+    // Também o 500 do pedido de nova senha (o SMTP fora do ar que o Supabase falso simula); um 500 em outro endereço continua sendo problema.
+    const resetSmtpDown = /\b500\b/.test(text) && message.location().url.includes('/auth/v1/recover')
+    const expected = /\b(400|401|403|404|422|429)\b/.test(text) || resetSmtpDown || /ERR_INTERNET_DISCONNECTED|Failed to fetch|net::ERR/i.test(text) || gestaoOff
     if (!expected) problems.push(`console @ ${page.url()}: ${text}`)
   })
 
@@ -110,6 +130,21 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   await page.click('button:has-text("Enviar link")')
   await page.waitForSelector('main [role=alert]')
   check('pedido repetido explica o limite de 1 minuto', (await page.textContent('main [role=alert]')).includes('Aguarde um minuto'))
+  // O alerta do limite de 1 minuto ainda está na tela: cada pedido espera o seu estado final (ver requestResetLink).
+  // Outro 429, o limite de e-mails por hora do projeto: não é "aguarde um minuto", o treinador é quem destrava.
+  const hourlyLimit = await requestResetLink(page, 'limite-por-hora@teste.com')
+  check('esqueci a senha, limite por hora do projeto: o Supabase responde 429 (email rate limit exceeded)', hourlyLimit.status === 429 && hourlyLimit.body.msg === 'email rate limit exceeded')
+  check('esqueci a senha, limite por hora do projeto: a tela pede ajuda ao treinador', (await page.textContent('main [role=alert]')).includes(RESET_NOT_SENT))
+  check('esqueci a senha, limite por hora do projeto: não diz "Aguarde um minuto"', !(await page.textContent('main')).includes(RESET_ONE_MINUTE))
+  const smtpDown = await requestResetLink(page, 'sem-smtp@teste.com')
+  check('esqueci a senha, SMTP fora do ar: o Supabase responde 500 (unexpected_failure)', smtpDown.status === 500 && smtpDown.body.error_code === 'unexpected_failure')
+  check('esqueci a senha, SMTP fora do ar: a tela pede ajuda ao treinador', (await page.textContent('main [role=alert]')).includes(RESET_NOT_SENT))
+  check('esqueci a senha, SMTP fora do ar: não aparece "Confira o e-mail digitado"', !(await page.textContent('main')).includes(RESET_OLD_MESSAGE))
+  await shot(page, 'g01b-esqueci-smtp-fora')
+  const notAuthorized = await requestResetLink(page, 'fora-da-equipe@teste.com')
+  check('esqueci a senha, e-mail fora da equipe: o Supabase responde 400 (email_address_not_authorized)', notAuthorized.status === 400 && notAuthorized.body.error_code === 'email_address_not_authorized')
+  check('esqueci a senha, e-mail fora da equipe: a tela pede ajuda ao treinador', (await page.textContent('main [role=alert]')).includes(RESET_NOT_SENT))
+  check('esqueci a senha, e-mail fora da equipe: não aparece "Confira o e-mail digitado"', !(await page.textContent('main')).includes(RESET_OLD_MESSAGE))
   await page.goto(`${BASE}/auth/confirm?token_hash=vencido&type=recovery&next=/redefinir-senha`)
   await page.waitForURL('**/login?erro=link')
   check('link vencido volta ao login com aviso', (await page.textContent('main')).includes('expirou'))

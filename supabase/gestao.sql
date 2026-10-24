@@ -31,12 +31,17 @@
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at := now();
   return new;
 end;
 $$;
+
+-- Funções de gatilho disparam sem o EXECUTE de quem grava; tirar o EXECUTE só
+-- impede chamá-las pela API (/rest/v1/rpc).
+revoke execute on function public.touch_updated_at() from public, anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Avisos: data e controle do push
@@ -128,6 +133,8 @@ begin
 end;
 $$;
 
+revoke execute on function public.protect_coach_reply() from public, anon, authenticated;
+
 drop trigger if exists protect_coach_reply on public.workout_sessions;
 create trigger protect_coach_reply
   before update on public.workout_sessions
@@ -189,6 +196,8 @@ exception when others then
 end;
 $$;
 
+revoke execute on function public.notify_workout_feedback() from public, anon, authenticated;
+
 drop trigger if exists workout_sessions_notify_feedback on public.workout_sessions;
 create trigger workout_sessions_notify_feedback
   after insert or update of status, feedback, feedback_tags on public.workout_sessions
@@ -215,6 +224,7 @@ alter table public.anamneses add constraint anamneses_answers_check
 create or replace function public.anamneses_prepare()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.parq_positive := coalesce(
@@ -231,6 +241,8 @@ begin
   return new;
 end;
 $$;
+
+revoke execute on function public.anamneses_prepare() from public, anon, authenticated;
 
 drop trigger if exists anamneses_prepare on public.anamneses;
 create trigger anamneses_prepare
@@ -277,6 +289,8 @@ exception when others then
   return new;
 end;
 $$;
+
+revoke execute on function public.anamneses_notify() from public, anon, authenticated;
 
 drop trigger if exists anamneses_notify on public.anamneses;
 create trigger anamneses_notify

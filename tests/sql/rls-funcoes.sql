@@ -78,6 +78,29 @@ begin
   else raise notice 'FALHOU: cadastro criou % / %', v.full_name, v.role; end if;
 end $$;
 
+-- O cadastro de verdade é gravado pelo GoTrue (supabase_auth_admin): não é
+-- superusuário e não tem EXECUTE nos gatilhos. O perfil tem que nascer igual.
+set role supabase_auth_admin;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-000000000004', 'bia@x', '{"full_name": "Bia Nova", "role": "admin"}'),
+  ('00000000-0000-0000-0000-000000000005', 'sem-dados@x', '{}');
+reset role;
+do $$
+declare v record;
+begin
+  if not has_function_privilege('supabase_auth_admin', 'public.handle_new_user()', 'execute')
+     and not has_function_privilege('supabase_auth_admin', 'public.force_student_role_on_insert()', 'execute')
+     and not (select rolsuper from pg_roles where rolname = 'supabase_auth_admin')
+    then raise notice 'OK  o papel do cadastro não é superusuário e não executa os gatilhos';
+    else raise notice 'FALHOU: o papel do cadastro tem privilégios demais para provar algo'; end if;
+  select * into v from public.profiles where id = '00000000-0000-0000-0000-000000000004';
+  if v.full_name = 'Bia Nova' and v.role = 'student' then raise notice 'OK  cadastro sem privilégios cria o perfil como aluno';
+  else raise notice 'FALHOU: cadastro sem privilégios criou % / %', v.full_name, v.role; end if;
+  select * into v from public.profiles where id = '00000000-0000-0000-0000-000000000005';
+  if v.id is not null and v.role = 'student' then raise notice 'OK  cadastro sem dados extras também cria o perfil';
+  else raise notice 'FALHOU: cadastro sem dados extras não criou o perfil (%)', v.role; end if;
+end $$;
+
 -- ------------------------------------------------------------------ aluna
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
@@ -109,6 +132,38 @@ begin
   if v.parq_positive and v.updated_at > now() - interval '1 minute'
     then raise notice 'OK  gatilho da ficha de saúde dispara para a aluna';
     else raise notice 'FALHOU: ficha (parq %, updated_at %)', v.parq_positive, v.updated_at; end if;
+end $$;
+
+-- ------------------------------------------------------------ outro aluno comenta
+-- Comentário no post da Maria ("oi equipe", criado acima): o autor vem do login
+-- (community_set_author) e a autora do post é avisada (community_notify_comment).
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
+do $$
+declare v record; n int;
+begin
+  insert into public.community_comments (post_id, author_id, author_name, body)
+  select id, '00000000-0000-0000-0000-000000000001'::uuid, 'Hacker', 'Mandou bem!' from public.community_posts where body = 'oi equipe'
+  returning * into v;
+  if v.author_id = '00000000-0000-0000-0000-000000000002' and v.author_name = 'Carlos Lima'
+    then raise notice 'OK  gatilho de autor dispara no comentário do aluno';
+    else raise notice 'FALHOU: autor do comentário % / %', v.author_id, v.author_name; end if;
+  select count(*) into n from public.notifications;
+  if n = 0 then raise notice 'OK  quem comenta não vê o aviso da autora'; else raise notice 'FALHOU: aluno viu % avisos alheios', n; end if;
+end $$;
+
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+do $$
+declare n int;
+begin
+  select count(*) into n from public.notifications
+   where recipient_id = '00000000-0000-0000-0000-000000000001' and type = 'community'
+     and title like 'Novo comentário%' and message = 'Carlos Lima: Mandou bem!';
+  if n = 1 then raise notice 'OK  gatilho do aviso de comentário dispara: a autora do post é avisada';
+  else raise notice 'FALHOU: avisos do comentário = %', n; end if;
+  -- comentar no próprio post não avisa ninguém
+  insert into public.community_comments (post_id, body) select id, 'Valeu, Carlos!' from public.community_posts where body = 'oi equipe';
+  select count(*) into n from public.notifications where recipient_id = '00000000-0000-0000-0000-000000000001' and type = 'community';
+  if n = 1 then raise notice 'OK  comentar no próprio post não gera aviso'; else raise notice 'FALHOU: avisos depois do próprio comentário = %', n; end if;
 end $$;
 
 -- ------------------------------------------------------------------ treinador

@@ -28,6 +28,8 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    // Dois Enter seguidos não mandam dois pedidos (cada um gasta o limite de e-mails).
+    if (sending) return
     setError('')
     setSending(true)
     try {

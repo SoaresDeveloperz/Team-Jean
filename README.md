@@ -153,7 +153,8 @@ Na tela de login, "Esqueci minha senha" manda um link por e-mail que abre
 2. **Authentication → Emails → SMTP**: configure um SMTP próprio (Gmail com
    senha de app, Resend etc.). O envio padrão do Supabase só entrega para
    membros da equipe do projeto e tem limite baixo. Em **Rate Limits**, deixe o
-   limite de e-mails por hora bem abaixo do limite diário do seu provedor.
+   limite de e-mails em cerca de 10 por hora (240 por dia, abaixo dos cerca de
+   500 por dia do Gmail).
 3. Em **Emails → Templates → Reset Password**, use o assunto
    `Criar nova senha — Team Jean` e cole o modelo de
    [`supabase/email-recuperar-senha.html`](supabase/email-recuperar-senha.html).
@@ -162,6 +163,15 @@ Na tela de login, "Esqueci minha senha" manda um link por e-mail que abre
 
 Se o e-mail não chegar, o treinador usa **Gerar senha nova** na ficha do aluno
 e envia a senha provisória.
+
+Se quem esqueceu foi o próprio treinador e o e-mail não chegar, rode no **SQL
+Editor** do Supabase, trocando a senha e o e-mail:
+
+```sql
+update auth.users
+set encrypted_password = extensions.crypt('SENHA-NOVA', extensions.gen_salt('bf'))
+where email = 'seu@email.com';
+```
 
 ### Treino sem internet
 
@@ -182,6 +192,18 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
   `PGPASSWORD` apontando para o banco).
 - O GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) roda
   lint, build, tipos, os testes de ponta a ponta e os do banco a cada push e PR.
+
+## Claude Code: agentes e Supabase
+
+- [`.claude/agents/`](.claude/agents) traz sete agentes (revisor, testador,
+  conselheiro, advogado do diabo, voz do usuário, ajudante rápido e
+  especialista). O [`CLAUDE.md`](CLAUDE.md) diz quando usar cada um, e as
+  decisões importantes ficam em [`DECISOES.md`](DECISOES.md).
+- [`.mcp.json`](.mcp.json) liga o MCP oficial do Supabase ao projeto, em modo só
+  leitura e **sem SQL**: dá para ver a estrutura do banco, os logs e os alertas
+  de segurança, mas não os dados dos alunos (que incluem dados de saúde). Para
+  usar, rode `claude /mcp`, escolha *supabase* e entre com a sua conta do
+  Supabase.
 
 ## Scripts
 

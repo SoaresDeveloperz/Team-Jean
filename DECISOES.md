@@ -18,17 +18,27 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-24 — Quanto a IA pode ver do Supabase (MCP)
+- **Pergunta:** até onde o Claude Code pode olhar o banco do app pelo MCP oficial do Supabase.
+- **Opções:** A) produção, só leitura, com SQL (o comando que o painel do Supabase sugeriu); B) produção, só leitura e sem SQL (docs, development e debugging: estrutura, logs e alertas de segurança); C) um projeto Supabase de teste, com dados inventados.
+- **Revisor:** com A, a IA consegue ler anamnese, medidas, nomes e e-mails dos alunos (LGPD), e também textos escritos por alunos, onde alguém poderia esconder instruções para ela. Recomendou C, ou B se for em produção. A documentação do Supabase também desaconselha ligar o MCP em produção.
+- **Conselheiro e advogado do diabo:** ainda não consultados.
+- **Decisão:** B por enquanto, já aplicado no `.mcp.json`. O dono decide se libera SQL (A) ou cria um projeto de teste (C).
+- **Por quê:** estrutura, logs e alertas já respondem à maioria das dúvidas sem expor dados de alunos.
+- **Rever quando:** um bug só puder ser achado olhando dados; de preferência, num projeto de teste.
+
 ## 2026-10-24 — Por onde sai o e-mail de "Esqueci minha senha"
 - **Pergunta:** o e-mail padrão do Supabase só entrega para a equipe do projeto (2 por hora), então nenhum aluno recebe o link. Qual SMTP usar? E o link do e-mail é seguro?
 - **Opções:** 1) Gmail pessoal do dono com senha de app; 2) Brevo grátis sem domínio; 3) domínio próprio + Resend; 4) sem SMTP, só a senha provisória do treinador; 5) um Gmail só do app com senha de app (trazida pelo conselheiro); 6) botão de WhatsApp com mensagem pronta para o treinador (trazida pelo advogado do diabo).
 - **Conselheiro (Opus, certeza média-alta):** opção 5 agora: grátis, uns 20 minutos, cerca de 500 e-mails por dia e boa entrega. Domínio (cerca de R$ 40 por ano) + Resend quando houver outros e-mails. O Brevo sem domínio troca o remetente @gmail por um endereço dele e tende a cair no spam. A página de senha de app só aparece com a verificação em duas etapas ligada.
 - **Voz do usuário:** a mensagem de erro não pode culpar o aluno nem sugerir que o treinador vai saber a senha dele: "Não conseguimos enviar o e-mail agora. Peça ajuda ao seu treinador para entrar." No e-mail, botão grande e o mesmo verbo no assunto e no botão: "Criar nova senha".
 - **Advogado do diabo:**
-  1. Com SMTP de verdade, o cadastro público deixaria um estranho criar conta e ver a Comunidade. Corrigido: o README manda desligar *Allow new users to sign up* antes.
+  1. Com SMTP de verdade, o cadastro público deixaria um estranho criar conta e ver a Comunidade. Mitigado à mão: o README manda desligar *Allow new users to sign up* antes. Falta a correção no banco: o revisor mostrou que as políticas da Comunidade aceitam qualquer conta logada e pediu para exigir perfil.
   2. Antivírus de e-mail podem abrir o link antes do aluno e gastar o código. Ver o especialista.
   3. O limite por hora aparecia como "Aguarde um minuto". Corrigido.
   4. Sem CAPTCHA, alguém pode esgotar o limite de e-mails. Corrigido em parte: o README pede Rate Limits baixos; o CAPTCHA fica para depois.
   5. A conta Gmail vira ponto único e guarda cópia dos links. O modelo do e-mail foi para o repositório; falta testar em Gmail, Outlook e iCloud antes de avisar os alunos.
+- **Testador:** 9 verificações novas pegam o erro com o código antigo e passaram 30 vezes seguidas. Observou que, com o SMTP falhando, o Supabase só dá erro para e-mails que têm conta, então a tela de erro pode revelar quem é aluno. Não é novo (a mensagem antiga também aparecia só nesse caso) e some com o SMTP funcionando.
 - **Especialista (Opus):** para o item 2, recomenda trocar o link por um código de 6 dígitos digitado no próprio app. Isso também resolve o iPhone com o app instalado. Tamanho médio; precisa de aprovação.
 - **Decisão:** aguardando o dono, que escolhe o SMTP (5, 3 ou 6) e se aprova o código de 6 dígitos. Já feito no app: mensagens de erro novas, modelo do e-mail em `supabase/email-recuperar-senha.html` e o aviso do cadastro público no README.
 - **Rever quando:** dois alunos disserem que o e-mail não chegou ou caiu no spam, ou aparecer o primeiro erro de envio.

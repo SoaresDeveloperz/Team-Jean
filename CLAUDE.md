@@ -30,6 +30,7 @@
 - Tarefa fácil e bem definida (trocar texto, ajustar valor, achar algo no código, rodar comando e resumir): `ajudante-rapido` (modelo leve).
 - Tarefa difícil (função nova, vários arquivos, bug sem causa, login, mensalidade, PIX, push, segurança, arquitetura): `especialista` (modelo forte).
 - Na dúvida, comece pelo ajudante: ele devolve a tarefa se for grande demais.
+- Mesma lógica para a tela: ajuste pequeno (texto, cor, espaçamento, rótulo) é do `front-leve` (modelo leve); tela ou fluxo novo, formulário, estado complexo, desempenho, treino sem internet e PWA são do `front-dificil` (modelo forte).
 
 ## Agentes do projeto
 - `revisor`: revisa cada mudança contra as regras. Chame antes de cada commit.
@@ -37,7 +38,12 @@
 - `conselheiro`: segunda opinião independente (modelo forte). Passe as opções sem dizer qual você prefere.
 - `advogado-do-diabo`: ataca o plano escolhido antes de implementar.
 - `voz-do-usuario`: reage como alunos e o treinador a telas, textos e preços.
-- `ajudante-rapido` e `especialista`: ver "Economia de tokens".
+- `animador`: animações e microinterações (Framer Motion), sempre com movimento reduzido e sem pesar o treino.
+- `animador-pro`: animação que pede desenho e engenharia (transições entre telas, sequências, gestos, 3D); a simples é do `animador`.
+- `revisor-visual`: compara a tela com apps de referência e diz se está bonita, clara e confiável. Só opina. Chame depois de mudar uma tela e antes de lançar função visual.
+- `mesa-de-design`: discute uma ideia de interface com as vozes dos especialistas de front e da voz-do-usuario antes de implementar. Passe as opções sem dizer qual você prefere. Decisão de rumo vai para o `DECISOES.md`.
+- `especialista-ciber`: segurança. Só lê e aponta. Chame antes de lançar função que mexa em login, permissões, dados de saúde, fotos, mensalidade ou push, e de tempos em tempos para auditar o app, o banco e as dependências.
+- `ajudante-rapido`, `especialista`, `front-leve` e `front-dificil`: ver "Economia de tokens".
 
 ## Como tomar uma decisão importante
 Vale para decisões que mudam o rumo do app ou são difíceis de desfazer (preço, serviço externo, tecnologia, banco de dados, funções grandes). Decisão pequena não precisa disso.

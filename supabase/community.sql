@@ -82,6 +82,10 @@ begin
 end;
 $$;
 
+-- Funções de gatilho disparam sem o EXECUTE de quem grava; tirar o EXECUTE só
+-- impede chamá-las pela API (/rest/v1/rpc).
+revoke execute on function public.community_set_author() from public, anon, authenticated;
+
 drop trigger if exists community_posts_set_author on public.community_posts;
 create trigger community_posts_set_author
   before insert on public.community_posts
@@ -120,6 +124,8 @@ begin
   return new;
 end;
 $$;
+
+revoke execute on function public.community_notify_comment() from public, anon, authenticated;
 
 drop trigger if exists community_comments_notify on public.community_comments;
 create trigger community_comments_notify

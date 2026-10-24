@@ -33,6 +33,12 @@ O `.env.local` não deve ser commitado.
 Todo o controle de acesso aos dados depende do RLS do Supabase. Revise e rode
 [`supabase/policies.sql`](supabase/policies.sql) no SQL Editor do projeto.
 
+As funções do banco têm `search_path` fixo e as de gatilho não podem ser
+chamadas pela API (só `is_admin`, `challenge_standings` e `community_members`
+ficam liberadas, e só para quem está logado). Se o seu banco é de antes dessa
+mudança, rode de novo os arquivos `supabase/*.sql` que você já usa para aplicar
+as permissões novas.
+
 ## Comunidade
 
 A aba **Equipe** (feed com fotos, fogo, comentários e ranking da semana) usa

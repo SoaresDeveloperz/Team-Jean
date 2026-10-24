@@ -6,7 +6,10 @@
 - Tecnologia: Next.js 16 (App Router, `src/proxy.ts`), React 19, Tailwind v4, Framer Motion (`LazyMotion`/`m`), Supabase (Postgres com RLS, Auth e Storage), PWA com service worker (`public/sw.js`), hospedado na Vercel (cron em `vercel.json`).
 - Testes:
   - rápidos: `pnpm lint` e `pnpm typecheck`;
-  - ponta a ponta e acessibilidade: `pnpm test:build` e depois `pnpm test:e2e` (tudo, ~7 min) ou `node tests/run.mjs <roteiro>` (roteiros: e2e, gestao, routes, admin, coach, community, profile, gestao-a11y);
+  - ponta a ponta e acessibilidade: `pnpm test:build` e depois `pnpm test:e2e` (tudo, ~7 min) ou só o roteiro que cobre a mudança, com `node tests/run.mjs <roteiro>`:
+    - `e2e` (`tests/e2e.cjs`): login, treino do aluno, perfil e medidas, comunidade, painel e ferramentas do treinador;
+    - `gestao` (`tests/e2e-gestao.cjs`): esqueci minha senha, push, ficha de saúde, avaliação, treino sem internet, recados, carga-alvo, financeiro e o treinador no computador;
+    - `routes`, `admin`, `coach`, `community`, `profile` e `gestao-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
   - banco: `pnpm test:sql` (precisa de um Postgres; veja o README);
   - o CI do GitHub roda tudo isso a cada push e a cada PR.
 - Regras do projeto:

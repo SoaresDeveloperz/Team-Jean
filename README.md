@@ -209,9 +209,9 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
 
 ## Claude Code: agentes e Supabase
 
-- [`.claude/agents/`](.claude/agents) traz sete agentes (revisor, testador,
-  conselheiro, advogado do diabo, voz do usuário, ajudante rápido e
-  especialista). O [`CLAUDE.md`](CLAUDE.md) diz quando usar cada um, e as
+- [`.claude/agents/`](.claude/agents) traz onze agentes (revisor, testador,
+  conselheiro, advogado do diabo, voz do usuário, ajudante rápido, especialista,
+  front leve, front difícil, animador e especialista em cibersegurança). O [`CLAUDE.md`](CLAUDE.md) diz quando usar cada um, e as
   decisões importantes ficam em [`DECISOES.md`](DECISOES.md).
 - [`.mcp.json`](.mcp.json) liga o MCP oficial do Supabase ao projeto, em modo só
   leitura e **sem SQL**: dá para ver a estrutura do banco, os logs e os alertas

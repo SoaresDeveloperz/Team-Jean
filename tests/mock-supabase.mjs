@@ -27,6 +27,10 @@ const passwords = {}
 const passwordOk = (user, password) => password === '123456' || (passwords[user.id] !== undefined && password === passwords[user.id])
 // Pedidos de "esqueci minha senha" (e-mail e link de volta).
 const recoveries = []
+// Endereços fixos em que o envio do e-mail de recuperação falha ou é barrado, como no GoTrue de verdade.
+const RECOVERY_SMTP_DOWN = 'sem-smtp@teste.com' // 500: o SMTP falhou
+const RECOVERY_NOT_AUTHORIZED = 'fora-da-equipe@teste.com' // 400: o e-mail padrão do Supabase só entrega para a equipe do projeto
+const RECOVERY_HOURLY_LIMIT = 'limite-por-hora@teste.com' // 429: limite de e-mails por hora do projeto (o outro 429 é o de 1 minuto por e-mail)
 const userById = Object.fromEntries(Object.values(users).map((user) => [user.id, user]))
 function authUser(user) {
   return { ...user, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: iso(-30) }
@@ -563,6 +567,10 @@ http
       const email = String(body?.email ?? '').toLowerCase()
       const recent = recoveries.find((item) => item.email === email && Date.now() - item.at < 60_000)
       if (recent) return send(res, 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'For security purposes, you can only request this after 60 seconds.' })
+      // Como no GoTrue, o envio que falha ou é barrado não guarda nada (nem o "e-mail", nem o limite de 1 minuto): pedir de novo dá o mesmo erro.
+      if (email === RECOVERY_HOURLY_LIMIT) return send(res, 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'email rate limit exceeded' })
+      if (email === RECOVERY_SMTP_DOWN) return send(res, 500, { code: 500, error_code: 'unexpected_failure', msg: 'Error sending recovery email' })
+      if (email === RECOVERY_NOT_AUTHORIZED) return send(res, 400, { code: 400, error_code: 'email_address_not_authorized', msg: `Email address "${email}" not authorized` })
       recoveries.push({ email, redirectTo: url.searchParams.get('redirect_to'), at: Date.now(), token: users[email] ? `recovery-${users[email].id}` : null })
       return send(res, 200, {})
     }

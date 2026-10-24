@@ -144,14 +144,21 @@ chamada. Com "Lembrete automático" ligado no Financeiro, o aluno recebe aviso
 Na tela de login, "Esqueci minha senha" manda um link por e-mail que abre
 `/redefinir-senha`. No Supabase:
 
+0. **Antes de tudo, Authentication → Sign In / Providers**: desligue *Allow new
+   users to sign up*. Os alunos são criados pelo treinador (no servidor), então
+   o cadastro público não faz falta. Com um SMTP de verdade ligado, ele deixaria
+   qualquer pessoa criar conta e ver a Comunidade.
 1. **Authentication → URL Configuration**: em *Site URL* coloque o endereço do
    app e em *Redirect URLs* adicione `https://SEU-DOMINIO/auth/confirm`.
-2. **Authentication → Emails → SMTP**: configure um SMTP próprio (Resend,
-   Brevo etc.). O envio padrão do Supabase só entrega para membros da equipe do
-   projeto e tem limite baixo.
-3. Recomendado: em **Emails → Templates → Reset Password**, troque o link por
-   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/redefinir-senha`
-   (funciona mesmo abrindo o e-mail em outro aparelho).
+2. **Authentication → Emails → SMTP**: configure um SMTP próprio (Gmail com
+   senha de app, Resend etc.). O envio padrão do Supabase só entrega para
+   membros da equipe do projeto e tem limite baixo. Em **Rate Limits**, deixe o
+   limite de e-mails por hora bem abaixo do limite diário do seu provedor.
+3. Em **Emails → Templates → Reset Password**, use o assunto
+   `Criar nova senha — Team Jean` e cole o modelo de
+   [`supabase/email-recuperar-senha.html`](supabase/email-recuperar-senha.html).
+   O link dele (`/auth/confirm?token_hash=...`) funciona mesmo abrindo o e-mail
+   em outro aparelho.
 
 Se o e-mail não chegar, o treinador usa **Gerar senha nova** na ficha do aluno
 e envia a senha provisória.

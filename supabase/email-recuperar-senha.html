@@ -1,0 +1,15 @@
+<!--
+  Modelo do e-mail "Reset password" do Supabase (Authentication → Emails →
+  Templates). Só dá para editar com SMTP próprio configurado.
+  Assunto: Criar nova senha — Team Jean
+  Cole o conteúdo abaixo na aba "Source" do modelo.
+-->
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; color: #18181b; max-width: 480px;">
+  <h2 style="font-size: 22px; margin: 0 0 12px;">Criar nova senha</h2>
+  <p style="margin: 0 0 20px;">Recebemos um pedido para criar uma senha nova na sua conta do Team Jean.</p>
+  <p style="margin: 0 0 24px;">
+    <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/redefinir-senha"
+       style="display: inline-block; background: #34d399; color: #000000; font-weight: bold; text-decoration: none; padding: 14px 28px; border-radius: 12px;">Criar nova senha</a>
+  </p>
+  <p style="margin: 0;">Se não foi você, pode ignorar este e-mail: sua senha continua a mesma.</p>
+</div>

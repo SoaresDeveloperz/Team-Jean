@@ -15,6 +15,7 @@ function translateResetError(message: string, status?: number) {
   const text = message.toLowerCase()
   if (status === 429 || text.includes('rate limit') || text.includes('security purposes')) return 'Aguarde um minuto antes de pedir outro link.'
   if (text.includes('fetch') || text.includes('network')) return 'Sem conexão. Verifique sua internet.'
+  if ((status ?? 0) >= 500 || text.includes('sending') || text.includes('not authorized')) return 'Não conseguimos enviar o e-mail agora. Peça ajuda ao seu treinador para entrar.'
   if (text.includes('email')) return 'Confira o e-mail digitado.'
   return 'Não foi possível enviar o link agora. Tente de novo em instantes.'
 }

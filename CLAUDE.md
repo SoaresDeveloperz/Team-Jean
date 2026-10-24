@@ -39,6 +39,9 @@
 - `advogado-do-diabo`: ataca o plano escolhido antes de implementar.
 - `voz-do-usuario`: reage como alunos e o treinador a telas, textos e preços.
 - `animador`: animações e microinterações (Framer Motion), sempre com movimento reduzido e sem pesar o treino.
+- `animador-pro`: animação que pede desenho e engenharia (transições entre telas, sequências, gestos, 3D); a simples é do `animador`.
+- `revisor-visual`: compara a tela com apps de referência e diz se está bonita, clara e confiável. Só opina. Chame depois de mudar uma tela e antes de lançar função visual.
+- `mesa-de-design`: discute uma ideia de interface com as vozes dos especialistas de front e da voz-do-usuario antes de implementar. Passe as opções sem dizer qual você prefere. Decisão de rumo vai para o `DECISOES.md`.
 - `especialista-ciber`: segurança. Só lê e aponta. Chame antes de lançar função que mexa em login, permissões, dados de saúde, fotos, mensalidade ou push, e de tempos em tempos para auditar o app, o banco e as dependências.
 - `ajudante-rapido`, `especialista`, `front-leve` e `front-dificil`: ver "Economia de tokens".
 

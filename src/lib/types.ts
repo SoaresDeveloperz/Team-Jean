@@ -28,6 +28,8 @@ export type Exercise = {
   secondary_muscle?: string | null
   image_url?: string | null
   video_url?: string | null
+  // supabase/exercicios.sql: arquivo do GIF na biblioteca (src/lib/exercises/media.ts).
+  media_id?: string | null
 }
 
 export type PlannedSet = {

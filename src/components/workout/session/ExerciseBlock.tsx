@@ -7,6 +7,8 @@ import { SET_TYPES, formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import { canSuggestWarmup } from '@/lib/warmup'
 import { ExerciseMedia, getExerciseMedia } from '@/components/workout/ExerciseMedia'
+import { ExerciseGif } from '@/components/workout/ExerciseGif'
+import { exerciseGifUrl } from '@/lib/exercises/media'
 import { SetRow } from './SetRow'
 import { WarmupPanel } from './WarmupPanel'
 import type { ExerciseRow, PreviousSet, SetEntry } from './types'
@@ -37,11 +39,16 @@ export const ExerciseBlock = memo(function ExerciseBlock({
 }: ExerciseBlockProps) {
   const [showMedia, setShowMedia] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
+  const [gifFailed, setGifFailed] = useState(false)
   const reduceMotion = useReducedMotion()
   // Aquecimento sugerido: só sem aquecimento prescrito e com carga (WarmupPanel).
   const warmupAvailable = canSuggestWarmup(entries)
   const exercise = row.exercises
-  const hasMedia = Boolean(getExerciseMedia(exercise?.video_url) ?? getExerciseMedia(exercise?.image_url))
+  // O vídeo cadastrado pelo treinador tem prioridade; sem ele, o GIF da
+  // biblioteca (opcional: se não carregar, o botão some e nada trava).
+  const coachMedia = getExerciseMedia(exercise?.video_url) ?? getExerciseMedia(exercise?.image_url)
+  const showGif = !coachMedia && !gifFailed && exerciseGifUrl(exercise?.media_id) !== null
+  const hasMedia = Boolean(coachMedia) || showGif
   const done = entries.filter((entry) => entry.completed).length
   const allDone = entries.length > 0 && done === entries.length
   const usedTypes = SET_TYPES.filter((type) => type.value !== 'working' && entries.some((entry) => entry.type === type.value))
@@ -104,7 +111,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
             aria-expanded={showMedia}
             aria-label={showMedia ? 'Esconder execução' : 'Ver execução do exercício'}
             className={cn(
-              'flex h-10 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition',
+              'flex h-11 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition',
               showMedia ? 'bg-white text-black' : 'bg-white/[0.06] text-zinc-300 hover:text-white',
             )}
           >
@@ -148,22 +155,26 @@ export const ExerciseBlock = memo(function ExerciseBlock({
       </AnimatePresence>
 
       <AnimatePresence initial={false}>
-        {showMedia && (
+        {showMedia && hasMedia && (
           <m.div
             key="media"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
             <div className="px-4 pb-3">
-              <ExerciseMedia
-                muscleGroup={exercise?.muscle_group}
-                videoUrl={exercise?.video_url}
-                imageUrl={exercise?.image_url}
-                name={exercise?.name}
-              />
+              {coachMedia ? (
+                <ExerciseMedia
+                  muscleGroup={exercise?.muscle_group}
+                  videoUrl={exercise?.video_url}
+                  imageUrl={exercise?.image_url}
+                  name={exercise?.name}
+                />
+              ) : (
+                <ExerciseGif mediaId={exercise?.media_id} name={exercise?.name} onUnavailable={() => setGifFailed(true)} />
+              )}
             </div>
           </m.div>
         )}

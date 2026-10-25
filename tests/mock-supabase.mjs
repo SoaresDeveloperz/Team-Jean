@@ -46,15 +46,15 @@ function session(user) {
   }
 }
 
-const ex = (id, name, muscle_group, extra = {}) => ({ id, name, muscle_group, video_url: null, ...extra })
+const ex = (id, name, muscle_group, extra = {}) => ({ id, name, muscle_group, video_url: null, media_id: null, ...extra })
+// media_id: GIF da biblioteca (supabase/exercicios.sql), servido em /__gif/.
 const exercises = [
-  ex('e1', 'Supino Reto com Barra', 'Peito', { video_url: 'https://www.youtube.com/watch?v=rT7DgCr-3pg' }),
-  ex('e2', 'Crucifixo com Halteres', 'Peito'),
+  ex('e1', 'Supino Reto com Barra', 'Peito', { video_url: 'https://www.youtube.com/watch?v=rT7DgCr-3pg', media_id: '0025-EIeI8Vf' }),
+  ex('e2', 'Crucifixo com Halteres', 'Peito', { media_id: '0308-yz9nUhF' }),
   ex('e3', 'Tríceps na Polia com Corda', 'Tríceps'),
-  ex('e4', 'Puxada Frontal', 'Costas'),
+  ex('e4', 'Puxada Frontal', 'Costas', { media_id: '0198-RVwzP10' }),
   ex('e5', 'Prancha', null),
 ]
-const exById = Object.fromEntries(exercises.map((item) => [item.id, item]))
 
 const profiles = [
   { id: 'u-admin', role: 'admin', full_name: 'Jean Treinador', email: 'jean@teste.com', readiness_score: null, created_at: iso(-60) },
@@ -197,6 +197,14 @@ const coach_settings = [{ id: 1, pix_key: 'jean@teamjean.app', pix_name: 'Jean T
 const pushes = []
 const PAYMENT_METHODS = ['pix', 'dinheiro', 'cartao', 'transferencia', 'outro']
 
+// --- GIFs dos exercícios (supabase/exercicios.sql) ---
+// /__exercicios/off simula o banco sem o exercicios.sql (sem a coluna media_id).
+let exerciciosEnabled = true
+const MEDIA_ID = /^[A-Za-z0-9_-]{1,64}$/
+// GIF válido de 1×1 (o app só precisa de uma imagem que carregue).
+const GIF = Buffer.from('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64')
+const gifRequests = []
+
 // /__community/off simula o banco sem o community.sql.
 let communityEnabled = true
 const COMMUNITY_TABLES = ['community_posts', 'community_likes', 'community_comments']
@@ -231,6 +239,7 @@ function columnsOf(table) {
   let columns = SCHEMA[table]
   if (table === 'profiles' && profileEnabled) columns = [...columns, ...PROFILE_COLUMNS]
   if (gestaoEnabled && GESTAO_COLUMNS[table] && (table !== 'body_measurements' || profileEnabled)) columns = [...columns, ...GESTAO_COLUMNS[table]]
+  if (table === 'exercises' && exerciciosEnabled) columns = [...columns, 'media_id']
   return columns
 }
 // Colunas que o banco real não teria sem o gestao.sql/profile.sql somem das respostas.
@@ -326,7 +335,10 @@ function embed(table, row, select) {
   if (select.includes('workout_template_exercises(count)')) {
     out.workout_template_exercises = [{ count: workout_template_exercises.filter((r) => r.template_id === row.id).length }]
   }
-  if (select.includes('exercises(') && row.exercise_id) out.exercises = exById[row.exercise_id] ?? null
+  if (select.includes('exercises(') && row.exercise_id) {
+    const exercise = exercises.find((item) => item.id === row.exercise_id)
+    out.exercises = exercise ? visibleRow('exercises', exercise) : null
+  }
   if (/assigned_workouts(!inner)?\(/.test(select) && row.assigned_workout_id) {
     const workout = assigned_workouts.find((w) => w.id === row.assigned_workout_id)
     out.assigned_workouts = workout ? { name: workout.name, student_id: workout.student_id } : null
@@ -629,6 +641,21 @@ http
       return send(res, 200, push_subscriptions)
     }
     if (url.pathname === '/__recoveries') return send(res, 200, recoveries)
+    if (url.pathname === '/__exercicios/off' || url.pathname === '/__exercicios/on') {
+      exerciciosEnabled = url.pathname.endsWith('/on')
+      return send(res, 200, { exerciciosEnabled })
+    }
+    if (url.pathname === '/__exercises') return send(res, 200, exercises)
+    if (url.pathname === '/__gifs') return send(res, 200, gifRequests.splice(0))
+    // "CDN" dos GIFs (NEXT_PUBLIC_EXERCISE_MEDIA_BASE_URL=http://localhost:54321/__gif).
+    const gifMatch = url.pathname.match(/^\/__gif\/([^/]+)\.gif$/)
+    if (gifMatch) {
+      gifRequests.push(gifMatch[1])
+      if (!MEDIA_ID.test(gifMatch[1]) || gifMatch[1].startsWith('sem-arquivo')) return send(res, 404, { message: 'not found' })
+      // no-store: sem internet o GIF falha de verdade (o navegador não guarda).
+      res.writeHead(200, { 'Content-Type': 'image/gif', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' })
+      return res.end(GIF)
+    }
     if (url.pathname === '/__gestao/off') {
       gestaoEnabled = false
       return send(res, 200, { gestaoEnabled })
@@ -1121,9 +1148,18 @@ http
       }
       return send(res, 405, { message: 'unsupported' })
     }
+    // Restrição exercises_media_id_check (supabase/exercicios.sql).
+    if (table === 'exercises' && (req.method === 'POST' || req.method === 'PATCH')) {
+      // RLS do policies.sql: só o treinador altera a biblioteca.
+      if (!service && !isAdminUser(user)) return forbidden()
+      for (const item of Array.isArray(body) ? body : [body ?? {}]) {
+        if (item.media_id != null && !MEDIA_ID.test(String(item.media_id))) return violates('exercises_media_id_check')
+      }
+    }
     if (req.method === 'POST') {
       const items = (Array.isArray(body) ? body : [body]).map((item) => ({
         id: `${table}-new-${++idCounter}`,
+        ...(table === 'exercises' ? { video_url: null, media_id: null } : {}),
         ...(columnsOf(table).includes('created_at') ? { created_at: new Date().toISOString() } : {}),
         ...(table === 'notifications' && gestaoEnabled ? { pushed_at: null } : {}),
         ...item,

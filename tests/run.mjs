@@ -25,6 +25,8 @@ const SUITES = {
   gestao: ['tests/e2e-gestao.cjs'],
   // Aquecimento com anilhas e WhatsApp para quem sumiu (contas puras + telas).
   novidades: ['tests/contas-novidades.mjs', 'tests/e2e-novidades.cjs'],
+  // GIFs dos exercícios: treino do aluno, biblioteca do treinador e o banco sem o SQL.
+  exercicios: ['tests/contas-exercicios.mjs', 'tests/e2e-exercicios.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],
@@ -36,6 +38,7 @@ const SUITES = {
   profile: ['tests/a11y/profile-a11y.cjs'],
   'gestao-a11y': ['tests/a11y/gestao-a11y.cjs'],
   'novidades-a11y': ['tests/a11y/novidades-a11y.cjs'],
+  'exercicios-a11y': ['tests/a11y/exercicios-a11y.cjs'],
 }
 
 const vapid = webpush.generateVAPIDKeys()

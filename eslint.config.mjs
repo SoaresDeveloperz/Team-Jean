@@ -20,7 +20,8 @@ const eslintConfig = defineConfig([
     // Sobras do template de monorepo do Replit: não fazem parte do app Next.
     "artifacts/**",
     "lib/**",
-    "scripts/**",
+    // (o scripts/gerar-biblioteca-exercicios.mjs é do app e entra no lint)
+    "scripts/src/**",
     "attached_assets/**",
   ]),
 ]);

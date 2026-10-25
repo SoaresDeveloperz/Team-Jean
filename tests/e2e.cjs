@@ -10,6 +10,8 @@ const results = []
 let communityOff = false
 let profileOff = false
 let coachOff = false
+// Pedidos cortados de propósito (Perfil sem internet): o navegador loga net::ERR_INTERNET_DISCONNECTED.
+let networkDown = false
 
 const state = async () => (await fetch(`${MOCK}/__state`)).json()
 // Espera o Supabase falso refletir uma gravação (até 15 s).
@@ -64,7 +66,8 @@ async function openShortcuts(page) {
     // 404: a rota inexistente testada no fim.
     const expected =
       /\b(400|422)\b/.test(message.text()) ||
-      ((page.url().includes('rota-inexistente') || communityOff || profileOff || coachOff) && message.text().includes('404'))
+      ((page.url().includes('rota-inexistente') || communityOff || profileOff || coachOff) && message.text().includes('404')) ||
+      (networkDown && /ERR_INTERNET_DISCONNECTED|Failed to fetch/i.test(message.text()))
     if (message.type() === 'error' && !expected) problems.push(`console @ ${page.url()}: ${message.text()}`)
   })
 
@@ -138,6 +141,40 @@ async function openShortcuts(page) {
   check('trocar senha: nova senha salva', true)
   await page.waitForTimeout(600)
   await shot(page, '07-perfil')
+
+  // --- Perfil sem internet: aviso amigável, nada de "Atleta" nem de zeros falsos ---
+  networkDown = true
+  const offline = (route) => route.abort('internetdisconnected')
+  await page.route('**/rest/v1/profiles**', offline)
+  await page.route('**/rest/v1/workout_sessions**', offline)
+  await page.goto(`${BASE}/student/profile`)
+  await page.waitForSelector('main [role=alert]:has-text("Sem internet agora. Tente de novo.")')
+  const profileText = await page.textContent('main')
+  check('perfil sem internet: aviso em português, sem mensagem técnica', !/Failed to fetch|TypeError|fetch/i.test(profileText))
+  check('perfil sem internet: não troca o nome por "Atleta"', !/\bAtleta\b/i.test(profileText))
+  check('perfil sem internet: não mostra conquistas zeradas', !profileText.includes('Conquistas'))
+  check('perfil sem internet: oferece "Tentar de novo"', await page.isVisible('main [role=alert] button:has-text("Tentar de novo")'))
+  await shot(page, '07b-perfil-sem-internet')
+  // Volta só o perfil: o nome aparece e os treinos (ainda sem rede) viram "—", não 0.
+  await page.unroute('**/rest/v1/profiles**', offline)
+  await page.click('main [role=alert] button:has-text("Tentar de novo")')
+  await page.waitForSelector('h1:has-text("Maria Souza")')
+  await page.waitForSelector('main [role=alert]:has-text("Sem internet agora")')
+  const statsText = await page.locator('dl').first().textContent()
+  check('perfil com treinos sem carregar: mostra "—" em vez de 0', statsText.includes('—'))
+  // A rede cai de novo: o nome que já estava na tela continua lá.
+  await page.route('**/rest/v1/profiles**', offline)
+  // Espera o pedido novo (cortado) antes de olhar o aviso: o aviso antigo some e volta.
+  await Promise.all([page.waitForRequest('**/rest/v1/profiles**'), page.click('main [role=alert] button:has-text("Tentar de novo")')])
+  await page.waitForSelector('main [role=alert]:has-text("Sem internet agora")')
+  await page.waitForTimeout(500)
+  check('rede caindo no Perfil não apaga o nome que estava na tela', await page.isVisible('h1:has-text("Maria Souza")'))
+  await page.unroute('**/rest/v1/profiles**', offline)
+  await page.unroute('**/rest/v1/workout_sessions**', offline)
+  await page.click('main [role=alert] button:has-text("Tentar de novo")')
+  await page.waitForSelector('#achievements-title')
+  check('Tentar de novo com internet tira o aviso e carrega os treinos', (await page.locator('main [role=alert]').count()) === 0)
+  networkDown = false
 
   // --- Perfil: foto com recorte, capa, dados, trilha e medidas ---
   await page.goto(`${BASE}/student/profile`)
@@ -268,6 +305,13 @@ async function openShortcuts(page) {
   await page.goto(`${BASE}/student/workout/w-a`)
   await page.waitForSelector('text=Anterior')
   check('menu inferior escondido no treino', (await page.$('nav[aria-label="Menu do aluno"]')) === null)
+  const workoutText = await page.textContent('main')
+  check('treino: RIR traduzido ("4 na reserva", "até a falha")', workoutText.includes('4 na reserva') && workoutText.includes('até a falha') && !/\bRIR\b/.test(workoutText))
+  check('treino: "Top set" vira "Série principal"', workoutText.includes('Série principal') && !workoutText.includes('Top set'))
+  const tableOverflow = await page.evaluate(() =>
+    [...document.querySelectorAll('[role=row] > [role=cell]:first-child, [role=columnheader]')].some((cell) => cell.scrollWidth > cell.clientWidth + 1),
+  )
+  check('treino em 390 px: rótulos da tabela de séries cabem nas colunas', !tableOverflow)
   await shot(page, '08-treino')
   await page.fill('#set-awe1-0-weight', '40')
   await page.fill('#set-awe1-0-reps', '15')

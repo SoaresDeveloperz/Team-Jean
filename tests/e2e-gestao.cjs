@@ -214,6 +214,10 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   const billingCard = page.locator('section', { hasText: 'Mensalidade' }).first()
   await billingCard.waitFor()
   check('Perfil mostra a mensalidade a vencer', /Vence (dia|hoje)/.test(await billingCard.textContent()) && (await billingCard.textContent()).includes('150,00'))
+  const billingText = await billingCard.textContent()
+  check('PIX mostra para quem vai e o tipo da chave', billingText.includes('Para: Jean Treinador') && billingText.includes('chave e-mail'))
+  check('PIX explica que o treinador confirma o pagamento', billingText.includes('Depois de pagar, seu treinador confirma aqui'))
+  check('PIX não mostra a chave inteira no cartão', !billingText.includes('jean@teamjean.app'))
   await page.click('button:has-text("Copiar PIX copia e cola")')
   await page.waitForSelector('text=PIX copiado')
   const pix = await page.evaluate(() => navigator.clipboard.readText())
@@ -379,12 +383,24 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   check('Maria aparece a vencer', (await mariaRow.textContent()).includes('Vence'))
   if (Number(todayIso().slice(8, 10)) > 1) check('Carlos aparece em atraso', (await carlosRow.textContent()).includes('Atrasado'))
   await shot(page, 'g08-financeiro')
+  // Cor do "Recebido": neutra com R$ 0,00 e verde só depois que entra dinheiro.
+  const receivedColor = () =>
+    page.evaluate(() => {
+      const tile = [...document.querySelectorAll('main section')].find((item) => item.textContent.includes('Recebido'))
+      const value = [...(tile?.querySelectorAll('p') ?? [])].find((item) => /^R\$\s?[\d.,]+$/.test(item.textContent.trim()))
+      return value ? { text: value.textContent.trim(), color: getComputedStyle(value).color } : null
+    })
+  const BRAND = 'rgb(52, 211, 153)'
+  const before = await receivedColor()
+  check('financeiro: R$ 0,00 recebidos fica neutro (sem verde)', Boolean(before) && /0,00/.test(before.text) && before.color !== BRAND)
   await mariaRow.locator('button:has-text("Receber")').click()
   await page.waitForSelector('#payment-amount')
   check('pagamento já vem com o valor da mensalidade', (await page.inputValue('#payment-amount')) === '150,00')
   await page.click('[role=dialog] button:has-text("Confirmar recebimento")')
   await page.waitForSelector('text=Pagamento registrado')
   await page.waitForSelector('article[aria-label="Maria Souza"] >> text=Pago')
+  const after = await receivedColor()
+  check('financeiro: recebido fica verde quando entra dinheiro', Boolean(after) && /150,00/.test(after.text) && after.color === BRAND)
   const month = `${todayIso().slice(0, 7)}-01`
   current = await state()
   check('pagamento salvo no mês', current.payments.some((payment) => payment.student_id === 'u-student' && payment.reference_month === month && Number(payment.amount) === 150 && payment.method === 'pix'))

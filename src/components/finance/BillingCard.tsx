@@ -6,7 +6,9 @@ import { Check, ChevronDown, Copy, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   dueDate,
+  PIX_KEY_TYPES,
   formatBRL,
+  guessPixKeyType,
   loadMyBilling,
   methodLabel,
   monthOf,
@@ -59,11 +61,14 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
   const status = statusFor(billing, payment ?? undefined, month, today)
   if (status === 'paused' || status === 'not_started') return null
   const due = dueDate(billing.due_day, month)
+  // Mesmo nome que vai no código do PIX: o aluno confere no banco antes de pagar.
+  const pixName = settings?.pix_name?.trim() || 'Team Jean'
+  const pixKeyLabel = settings?.pix_key ? PIX_KEY_TYPES.find((item) => item.value === guessPixKeyType(settings.pix_key))?.label : null
   const pix =
     settings?.pix_key && status !== 'paid'
       ? pixPayload({
           key: settings.pix_key,
-          name: settings.pix_name ?? 'Team Jean',
+          name: pixName,
           city: settings.pix_city ?? 'Brasil',
           amount: billing.monthly_fee,
           txid: pixTxid(userId, month),
@@ -118,6 +123,13 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
         {status !== 'paid' &&
           (pix ? (
             <div className="mt-4 space-y-2">
+              <div className="rounded-2xl border border-line bg-black/20 p-3 text-xs leading-relaxed text-zinc-300">
+                <p>
+                  Para: <span className="font-bold text-white">{pixName}</span>
+                  {pixKeyLabel && <span className="text-zinc-400"> · chave {pixKeyLabel.toLowerCase()}</span>}
+                </p>
+                <p className="mt-0.5 text-zinc-400">Confira se o banco mostra este nome. Depois de pagar, seu treinador confirma aqui.</p>
+              </div>
               <m.button
                 type="button"
                 whileTap={{ scale: 0.97 }}

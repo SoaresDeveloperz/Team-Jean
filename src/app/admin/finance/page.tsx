@@ -297,7 +297,9 @@ export default function AdminFinancePage() {
                 </ProgressRing>
                 <div className="min-w-0">
                   <Eyebrow icon={HandCoins}>Recebido</Eyebrow>
-                  <p className="mt-1 font-display text-3xl font-bold leading-none text-brand">{formatBRL(totals.received)}</p>
+                  <p className={cn('mt-1 font-display text-3xl font-bold leading-none', totals.received > 0 ? 'text-brand' : 'text-white')}>
+                    {formatBRL(totals.received)}
+                  </p>
                   <p className="mt-1 text-xs text-zinc-400">de {formatBRL(totals.expected)} previstos</p>
                 </div>
               </Tile>

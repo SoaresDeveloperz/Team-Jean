@@ -24,6 +24,7 @@ Abra http://localhost:3000.
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | **somente servidor**: notificações push (veja abaixo) |
 | `VAPID_SUBJECT` | contato do app para os serviços de push (`mailto:...`) |
 | `CRON_SECRET` | protege o cron diário `/api/cron/billing` |
+| `NEXT_PUBLIC_EXERCISE_MEDIA_BASE_URL` | opcional, navegador: de onde vêm os GIFs dos exercícios (vazio = CDN do dataset; `off` desliga). Veja "Biblioteca de exercícios com GIFs" |
 
 Em produção, cadastre todas em **Vercel → Settings → Environment Variables**.
 O `.env.local` não deve ser commitado.
@@ -102,6 +103,60 @@ muscular: arrastar para girar, pinça ou roda para aproximar, vistas de frente,
 lado e costas, e toque num músculo para focar. A malha é esculpida no próprio
 aparelho (num Web Worker, uma vez por sessão), e o three.js só é baixado quando
 o 3D aparece. Sem WebGL, o app mostra o mapa 2D.
+
+## Biblioteca de exercícios com GIFs
+
+> **Licença dos GIFs.** As animações são **© Gym visual — https://gymvisual.com/**
+> e vêm do dataset público
+> [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset).
+> O dono confirmou que são da biblioteca gratuita da Gym visual. O crédito
+> "© Gym visual", com link, **tem de aparecer junto de cada GIF** (o componente
+> `ExerciseGif` já faz isso; não remova). Confira os
+> [termos de uso](https://gymvisual.com/content/3-terms-and-conditions-of-use)
+> antes de mudar a forma de uso. Decisão registrada no [`DECISOES.md`](DECISOES.md).
+
+- **Treino do aluno:** o botão de execução de cada exercício mostra o GIF do
+  movimento (180 × 180) quando o exercício tem `media_id` e o treinador não
+  cadastrou um vídeo próprio (o vídeo dele tem prioridade). O GIF só é baixado
+  ao abrir o painel, tem botão "Pausar movimento" e, para quem pediu menos
+  movimento no aparelho, só toca depois de "Ver movimento". Sem internet, o GIF
+  que não carrega some junto com o botão; o treino e a fila de séries seguem
+  normais.
+- **Biblioteca do treinador** (`/admin/exercises`): "Buscar na biblioteca"
+  procura nos 1.324 exercícios por nome (português ou inglês), grupo muscular e
+  equipamento, 20 por vez, e cria o exercício já com nome em português, grupo e
+  GIF. No editor, "Vincular GIF", "Trocar GIF" e "Tirar GIF". O "Catálogo base"
+  também entra com os GIFs.
+- **Banco:** rode [`supabase/exercicios.sql`](supabase/exercicios.sql) (coluna
+  `exercises.media_id`, só o nome do arquivo, ex.: `0025-EIeI8Vf`, com restrição
+  de formato). Depois, se quiser ligar os exercícios que já existem, rode
+  [`supabase/exercicios-casamento.sql`](supabase/exercicios-casamento.sql):
+  é **específico do banco do Team Jean**, casa 51 exercícios pelo nome, só
+  preenche quem está sem GIF e pode ser rodado de novo. Antes do SQL, o app
+  funciona sem GIF e a biblioteca do treinador mostra um aviso.
+- **De onde vêm os GIFs:** sem `NEXT_PUBLIC_EXERCISE_MEDIA_BASE_URL`, da CDN
+  jsDelivr do repositório do dataset
+  (`https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/videos`).
+  Para usar um armazenamento próprio, copie a pasta `videos/` e defina a
+  variável com o endereço da pasta (http/https, sem barra no fim). `off`
+  desliga os GIFs por completo. Como é `NEXT_PUBLIC_`, a mudança só vale depois
+  de um novo build/deploy. O service worker não guarda os GIFs (são de outro
+  domínio).
+- **Dados:** [`public/exercicios/biblioteca.json`](public/exercicios/biblioteca.json)
+  (índice de ~320 KB: id, arquivo do GIF, nome em português e em inglês, grupo,
+  equipamento, músculo-alvo e crédito), baixado só quando o treinador abre a
+  busca, e `public/exercicios/passos/<grupo>.json` (passo a passo, em inglês por
+  ora). Para gerar de novo:
+
+  ```bash
+  # exercises.json do repositório do dataset (≈17 MB, não vai para o Git)
+  node scripts/gerar-biblioteca-exercicios.mjs --dataset caminho/exercises.json
+  # com traduções novas: --nomes saida-1.json saida-2.json ... (regrava
+  # scripts/dados/exercicios-nomes-pt.json com a junção)
+  ```
+
+  O script para com erro se algum exercício ficar sem nome em português, com
+  campo vazio, com nome repetido ou com grupo/equipamento sem tradução.
 
 ## Gestão: push, recados, anamnese, avaliação e financeiro
 
@@ -204,6 +259,11 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
 - `node tests/contas-novidades.mjs`: confere, sem navegador, as contas do
   aquecimento e das anilhas (`src/lib/warmup.ts`) e a mensagem de WhatsApp
   (`src/lib/whatsapp.ts`). Também roda no roteiro `novidades`.
+- `node tests/contas-exercicios.mjs`: confere, sem navegador, o endereço dos
+  GIFs (com e sem a variável, e com `off`), a biblioteca gerada, a busca e o
+  casamento. Também roda no roteiro `exercicios`; a auditoria axe das telas dos
+  GIFs é o roteiro `exercicios-a11y`. O `pnpm test:build` aponta os GIFs para o
+  Supabase falso (`/__gif/`), sem internet.
 - `pnpm test:sql`: aplica os `supabase/*.sql` duas vezes, em duas ordens, num
   Postgres 16 e testa RLS, restrições e funções (`PGHOST`, `PGUSER` e
   `PGPASSWORD` apontando para o banco).

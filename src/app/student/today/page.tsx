@@ -375,7 +375,7 @@ export default function StudentTodayPage() {
               <span className="flex items-center gap-2">
                 <Eyebrow>Recado do treinador</Eyebrow>
                 {unseen.length > 0 && (
-                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-black uppercase text-black">
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-brand px-2 py-0.5 text-xs font-black text-black">
                     {unseen.length} novo{unseen.length > 1 ? 's' : ''}
                   </span>
                 )}

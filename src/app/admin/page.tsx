@@ -31,6 +31,7 @@ import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
 import { CoachRadar } from '@/components/coach/CoachRadar'
+import { WhatsAppComeback } from '@/components/coach/WhatsAppComeback'
 import { FinanceSummaryTile } from '@/components/finance/FinanceSummaryTile'
 import { PushNotificationsTile } from '@/components/account/PushNotificationsTile'
 
@@ -376,6 +377,7 @@ export default function AdminDashboardPage() {
                           >
                             Avisar
                           </Link>
+                          <WhatsAppComeback fullName={student.full_name} last={last} />
                         </li>
                       ))}
                     </ul>

@@ -26,10 +26,11 @@ export function ExerciseGif({ mediaId, name, className, onUnavailable }: Exercis
   // null = segue a preferência do aparelho; depois, a escolha da pessoa.
   const [choice, setChoice] = useState<'play' | 'pause' | null>(null)
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  // Quadro congelado ao pausar (desenhado num canvas, sem baixar nada de novo).
+  // Quadro congelado ao pausar: um canvas criado só nessa hora (sem baixar
+  // nada de novo), colocado na moldura abaixo.
   const [frozenSrc, setFrozenSrc] = useState<string | null>(null)
   const imageRef = useRef<HTMLImageElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
 
   if (!src || failedSrc === src) return null
 
@@ -38,16 +39,28 @@ export function ExerciseGif({ mediaId, name, className, onUnavailable }: Exercis
   const hasFrame = frozenSrc === src
 
   const toggle = () => {
-    if (!playing) return setChoice('play')
+    if (!playing) {
+      frameRef.current?.replaceChildren()
+      setFrozenSrc(null)
+      return setChoice('play')
+    }
     const image = imageRef.current
-    const canvas = canvasRef.current
+    const frame = frameRef.current
     let frozen = false
-    if (image && canvas && image.complete && image.naturalWidth > 0) {
+    if (image && frame && image.complete && image.naturalWidth > 0) {
       try {
+        const canvas = document.createElement('canvas')
+        canvas.width = SIZE
+        canvas.height = SIZE
+        canvas.className = 'h-full w-full object-contain'
+        canvas.setAttribute('role', 'img')
+        canvas.setAttribute('aria-label', `${label} (pausado)`)
         const context = canvas.getContext('2d')
-        context?.clearRect(0, 0, SIZE, SIZE)
-        context?.drawImage(image, 0, 0, SIZE, SIZE)
-        frozen = Boolean(context)
+        if (context) {
+          context.drawImage(image, 0, 0, SIZE, SIZE)
+          frame.replaceChildren(canvas)
+          frozen = true
+        }
       } catch {
         frozen = false
       }
@@ -77,15 +90,8 @@ export function ExerciseGif({ mediaId, name, className, onUnavailable }: Exercis
             }}
           />
         )}
-        <canvas
-          ref={canvasRef}
-          width={SIZE}
-          height={SIZE}
-          role="img"
-          aria-label={`${label} (pausado)`}
-          hidden={playing || !hasFrame}
-          className="h-full w-full object-contain"
-        />
+        {/* Sem filhos do React: o canvas do quadro parado entra aqui na pausa. */}
+        <div ref={frameRef} hidden={playing || !hasFrame} className="h-full w-full" />
         {!playing && !hasFrame && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-950 p-3 text-center">
             <PersonStanding className="h-8 w-8 text-brand" aria-hidden="true" />

@@ -143,7 +143,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="mt-6 text-[11px] font-black uppercase tracking-[0.24em] text-brand"
+          className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-brand"
         >
           Treino concluído
         </m.p>
@@ -166,7 +166,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
             transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.55 + index * 0.06 }}
             className="rounded-3xl border border-line bg-surface p-4"
           >
-            <dt className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+            <dt className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
               <stat.icon className="h-3.5 w-3.5" aria-hidden="true" />
               {stat.label}
             </dt>
@@ -186,7 +186,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           className="rounded-3xl border border-gold/25 bg-gold-soft p-4"
           aria-label="Novos recordes"
         >
-          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-gold">
+          <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-gold">
             <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
             {data.prs.length === 1 ? 'Novo recorde pessoal' : `${data.prs.length} novos recordes`}
           </p>
@@ -210,7 +210,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
         className="rounded-3xl border border-line bg-surface p-4"
         aria-label="Músculos trabalhados"
       >
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Músculos trabalhados</p>
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-zinc-500">Músculos trabalhados</p>
         <div className="mx-auto mt-3 max-w-[260px]">
           <MuscleMap ref={mapRef} fills={data.fills} showLabels />
         </div>

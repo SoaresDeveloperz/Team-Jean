@@ -108,7 +108,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
           </div>
           <div className="text-right">
             <p className="font-display text-3xl font-bold leading-none text-white">{formatBRL(payment?.amount ?? billing.monthly_fee)}</p>
-            <p className={cn('mt-1 flex items-center justify-end gap-1 text-[11px] font-bold', tone)}>
+            <p className={cn('mt-1 flex items-center justify-end gap-1 text-xs font-bold', tone)}>
               {status === 'paid' && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
               {statusLabel}
             </p>
@@ -138,7 +138,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
                 type="button"
                 onClick={() => setShowCode((value) => !value)}
                 aria-expanded={showCode}
-                className="flex w-full items-center justify-center gap-1 text-[11px] font-bold text-zinc-400 hover:text-white"
+                className="flex w-full items-center justify-center gap-1 text-xs font-bold text-zinc-400 hover:text-white"
               >
                 {showCode ? 'Esconder código' : 'Ver código'}
                 <m.span animate={{ rotate: showCode ? 180 : 0 }}>
@@ -152,7 +152,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="select-all overflow-hidden break-all rounded-2xl bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
+                    className="select-all overflow-hidden break-all rounded-2xl bg-black/40 p-3 font-mono text-xs leading-relaxed text-zinc-300"
                   >
                     {pix}
                   </m.p>

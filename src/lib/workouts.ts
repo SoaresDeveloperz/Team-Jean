@@ -5,7 +5,7 @@ export const SET_TYPES = [
   { value: 'warmup', label: 'Aquecimento', badge: 'Aquecimento', letter: 'A', className: 'border-amber-800/40 bg-amber-950/40 text-amber-400' },
   { value: 'feeder', label: 'Feeder', badge: 'Feeder set', letter: 'F', className: 'border-sky-800/40 bg-sky-950/40 text-sky-400' },
   { value: 'working', label: 'Working', badge: 'Working set', letter: 'W', className: 'border-zinc-800 bg-zinc-900 text-zinc-400' },
-  { value: 'top', label: 'Top set', badge: 'Top set', letter: 'T', className: 'border-rose-800/40 bg-rose-950/40 text-rose-400' },
+  { value: 'top', label: 'Série principal', badge: 'Série principal', letter: 'P', className: 'border-rose-800/40 bg-rose-950/40 text-rose-400' },
   { value: 'backoff', label: 'Back-off', badge: 'Back-off set', letter: 'B', className: 'border-purple-800/40 bg-purple-950/40 text-purple-400' },
   { value: 'cluster', label: 'Cluster', badge: 'Cluster', letter: 'C', className: 'border-indigo-800/40 bg-indigo-950/40 text-indigo-400' },
   { value: 'myo_reps', label: 'Myo reps', badge: 'Myo reps', letter: 'M', className: 'border-emerald-800/40 bg-emerald-950/40 text-emerald-400' },

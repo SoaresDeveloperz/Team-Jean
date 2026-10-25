@@ -34,7 +34,7 @@ export function ReadinessCard({ value, onChange, status }: ReadinessCardProps) {
         </div>
         <div className="text-right">
           <p className={cn('font-display text-4xl font-bold leading-none', level.className)}>{value}%</p>
-          <p className="mt-1 text-[11px] font-semibold text-zinc-400">{level.label}</p>
+          <p className="mt-1 text-xs font-semibold text-zinc-400">{level.label}</p>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ export function ReadinessCard({ value, onChange, status }: ReadinessCardProps) {
         />
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+      <div className="mt-2.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-zinc-600">
         <span>Fadigado</span>
         <span aria-live="polite" className="normal-case tracking-normal">
           {status === 'saving' && <span className="text-zinc-500">Salvando...</span>}

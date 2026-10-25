@@ -108,7 +108,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
             <span className="sr-only">{index + 1}. </span>
             {item.name}
           </h4>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-brand">{item.muscle_group}</p>
+          <p className="text-xs font-black uppercase tracking-[0.1em] text-brand">{item.muscle_group}</p>
         </div>
         <button
           type="button"
@@ -135,7 +135,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
         <div role="rowgroup">
           <div
             role="row"
-            className="grid grid-cols-[3rem_minmax(0,1fr)_4rem_3.5rem_2.5rem] gap-2 px-2 pb-1 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500"
+            className="grid grid-cols-[3rem_minmax(0,1fr)_4rem_3.5rem_2.5rem] gap-2 px-2 pb-1 text-xs font-black uppercase tracking-[0.1em] text-zinc-500"
           >
             <span role="columnheader" className="text-center">
               Série
@@ -245,7 +245,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
       </div>
 
       {item.planned_sets.length === 0 && (
-        <p className="px-4 pb-1 pt-2 text-center text-[11px] font-semibold text-danger">Adicione pelo menos 1 série.</p>
+        <p className="px-4 pb-1 pt-2 text-center text-xs font-semibold text-danger">Adicione pelo menos 1 série.</p>
       )}
 
       <div className="mt-2 space-y-2.5 border-t border-line p-3">
@@ -261,7 +261,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
           </span>
         </m.button>
         <div role="group" aria-label={`Repetições nas séries válidas de ${item.name}`} className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="shrink-0 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">
+          <span aria-hidden="true" className="shrink-0 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
             Reps
           </span>
           <div className="no-scrollbar -mr-3 flex gap-1.5 overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,black_82%,transparent)]">
@@ -272,7 +272,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
                 aria-pressed={activePreset === preset}
                 onClick={() => applyReps(preset)}
                 className={cn(
-                  'h-8 shrink-0 rounded-lg border px-2.5 text-[11px] font-bold tabular-nums transition',
+                  'h-8 shrink-0 rounded-lg border px-2.5 text-xs font-bold tabular-nums transition',
                   activePreset === preset
                     ? 'border-brand/50 bg-brand-soft text-brand'
                     : 'border-line text-zinc-400 hover:border-line-strong hover:text-white',

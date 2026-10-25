@@ -46,7 +46,7 @@ type Photo = { id: string; file: File; preview: string }
 
 const inputClassName =
   'h-14 w-full rounded-2xl border border-line-strong bg-black/40 px-4 text-center font-display text-2xl font-bold text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const smallInputClassName =
   'h-11 w-full rounded-xl border border-line-strong bg-black/40 px-2 text-center font-bold tabular-nums text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 const chipClassName =
@@ -241,7 +241,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold text-white">Avaliação completa</span>
-              <span className="block text-[11px] text-zinc-400">Dobras cutâneas (Pollock), perímetros e IMC</span>
+              <span className="block text-xs text-zinc-400">Dobras cutâneas (Pollock), perímetros e IMC</span>
             </span>
             <m.span animate={{ rotate: fullOpen ? 180 : 0 }} className="text-zinc-500">
               <ChevronDown className="h-5 w-5" aria-hidden="true" />
@@ -314,7 +314,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
                             className="sr-only"
                           />
                           <span>{option.label}</span>
-                          {option.hint && <span className="text-[10px] font-semibold opacity-70">{option.hint}</span>}
+                          {option.hint && <span className="text-xs font-semibold opacity-70">{option.hint}</span>}
                         </label>
                       ))}
                     </div>
@@ -333,7 +333,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
                         <div className="grid grid-cols-3 gap-2">
                           {sites.map((site) => (
                             <div key={site}>
-                              <label htmlFor={`${fullId}-fold-${site}`} className="mb-1 block truncate text-[10px] font-bold text-zinc-400">
+                              <label htmlFor={`${fullId}-fold-${site}`} className="mb-1 block truncate text-xs font-bold text-zinc-400">
                                 {SKINFOLDS[site]}
                               </label>
                               <input
@@ -367,7 +367,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
                           <p className="text-xs text-zinc-400">Para calcular o % de gordura falta: {missingForFat.join(', ') || 'preencher as dobras'}.</p>
                         )}
                         {estimate && (
-                          <p className="mt-0.5 text-[11px] text-zinc-400">
+                          <p className="mt-0.5 text-xs text-zinc-400">
                             Soma {formatOne(estimate.sum)} mm · densidade {estimate.density.toFixed(4).replace('.', ',')} g/ml · {age} anos
                           </p>
                         )}
@@ -388,7 +388,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
                     <div className="grid grid-cols-3 gap-2">
                       {PERIMETERS.map((item) => (
                         <div key={item.key}>
-                          <label htmlFor={`${fullId}-round-${item.key}`} className="mb-1 block truncate text-[10px] font-bold text-zinc-400">
+                          <label htmlFor={`${fullId}-round-${item.key}`} className="mb-1 block truncate text-xs font-bold text-zinc-400">
                             {item.label}
                           </label>
                           <input
@@ -424,7 +424,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- prévia local (blob:) */}
                   <img src={photo.preview} alt={`Foto ${index + 1} (${PHOTO_HINTS[index]})`} className="h-full w-full object-cover" />
-                  <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                  <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-bold uppercase text-white">
                     {PHOTO_HINTS[index]}
                   </span>
                   <button
@@ -456,7 +456,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
                   }}
                   className="sr-only"
                 />
-                <span className="flex flex-col items-center gap-1 text-[10px] font-bold">
+                <span className="flex flex-col items-center gap-1 text-xs font-bold">
                   <ImagePlus className="h-6 w-6" aria-hidden="true" />
                   <span>
                     <span className="sr-only">Adicionar foto de </span>
@@ -466,7 +466,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
               </label>
             )}
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">Dica: mesma luz, mesma distância e mesma pose deixam a comparação justa.</p>
+          <p className="mt-2 text-xs text-zinc-500">Dica: mesma luz, mesma distância e mesma pose deixam a comparação justa.</p>
         </div>
 
         <div>

@@ -256,7 +256,7 @@ export default function StudentTodayPage() {
     <Stagger className="space-y-4">
       {errorAlert}
       <m.header variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="px-1 pb-1 pt-1">
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{today}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">{today}</p>
         <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9] tracking-tight">
           Fala, {data.firstName}!
         </h1>
@@ -270,7 +270,7 @@ export default function StudentTodayPage() {
             <div className="min-w-0 flex-1">
               <span
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]',
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em]',
                   data.inProgress
                     ? 'border-gold/30 bg-gold-soft text-gold'
                     : doneForToday
@@ -309,7 +309,7 @@ export default function StudentTodayPage() {
               { label: 'Duração', value: `~${derived.estimatedMinutes}′` },
             ].map((stat) => (
               <div key={stat.label} className="px-3 py-2.5 text-center">
-                <dt className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">{stat.label}</dt>
+                <dt className="text-xs font-bold text-zinc-400">{stat.label}</dt>
                 <dd className="font-display text-2xl font-bold leading-tight">{stat.value}</dd>
               </div>
             ))}
@@ -320,7 +320,7 @@ export default function StudentTodayPage() {
               {derived.muscles.slice(0, 5).map((muscle) => (
                 <li
                   key={muscle}
-                  className="rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-300"
+                  className="rounded-full bg-white/[0.06] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-zinc-300"
                 >
                   {muscle}
                 </li>
@@ -378,7 +378,7 @@ export default function StudentTodayPage() {
               {derived.streak === 1 ? 'semana seguida' : 'semanas seguidas'}
             </p>
           </div>
-          <p className="mt-3 border-t border-line pt-2.5 text-[11px] text-zinc-500">
+          <p className="mt-3 border-t border-line pt-2.5 text-xs text-zinc-500">
             <span className="font-bold text-zinc-300">{derived.monthCount}</span> treinos neste mês
           </p>
         </Tile>
@@ -392,7 +392,7 @@ export default function StudentTodayPage() {
                 <span className="text-sm text-zinc-500">/{weeklyGoal}</span>
               </span>
             </ProgressRing>
-            <p className="text-[11px] leading-snug text-zinc-400">
+            <p className="text-xs leading-snug text-zinc-400">
               {derived.weekCount >= weeklyGoal ? 'Meta batida!' : `Faltam ${weeklyGoal - derived.weekCount}`}
             </p>
           </div>
@@ -404,7 +404,7 @@ export default function StudentTodayPage() {
                 <li key={index}>
                   <span
                     className={cn(
-                      'grid h-5 w-5 place-items-center rounded-full text-[9px] font-black',
+                      'grid h-5 w-5 place-items-center rounded-full text-xs font-black',
                       trained
                         ? 'bg-brand text-black'
                         : isToday
@@ -473,7 +473,7 @@ export default function StudentTodayPage() {
           </div>
         </div>
         {derived.recovering.length > 0 && (
-          <div className="mt-3 flex gap-3 border-t border-line pt-2.5 text-[10px] font-semibold text-zinc-500">
+          <div className="mt-3 flex gap-3 border-t border-line pt-2.5 text-xs font-semibold text-zinc-500">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-danger" /> Recuperando
             </span>
@@ -495,7 +495,7 @@ export default function StudentTodayPage() {
               <span className="flex items-center gap-2">
                 <Eyebrow>Recado do treinador</Eyebrow>
                 {unseen.length > 0 && (
-                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-black uppercase text-black">
+                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-black uppercase text-black">
                     {unseen.length} novo{unseen.length > 1 ? 's' : ''}
                   </span>
                 )}
@@ -515,7 +515,7 @@ export default function StudentTodayPage() {
             <Eyebrow icon={Dumbbell} className="min-w-0 truncate">
               O que vem aí
             </Eyebrow>
-            <span className="flex shrink-0 items-center gap-1 text-[10px] font-bold text-zinc-500">
+            <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-zinc-500">
               <Clock className="h-3 w-3" aria-hidden="true" /> ~{derived.estimatedMinutes} min
             </span>
           </div>
@@ -529,7 +529,7 @@ export default function StudentTodayPage() {
                   <span className="w-5 text-center font-display text-lg font-bold text-zinc-600">{index + 1}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-zinc-100">{item.exercises?.name ?? 'Exercício'}</p>
-                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                    <p className="mt-0.5 text-xs text-zinc-500">
                       {sets.length} {sets.length === 1 ? 'série' : 'séries'}
                       {mainReps ? ` · ${mainReps} reps` : ''}
                       {item.exercises?.muscle_group ? ` · ${item.exercises.muscle_group}` : ''}
@@ -547,7 +547,7 @@ export default function StudentTodayPage() {
         <m.section variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }} aria-label="Sua rotina">
           <div className="mb-2.5 flex items-center justify-between px-1">
             <Eyebrow>Sua rotina</Eyebrow>
-            <Link href="/student/week" className="text-[11px] font-bold text-zinc-400 hover:text-white">
+            <Link href="/student/week" className="text-xs font-bold text-zinc-400 hover:text-white">
               Ver semana
             </Link>
           </div>
@@ -574,7 +574,7 @@ export default function StudentTodayPage() {
                       {workoutLetter(index)}
                     </span>
                     <span className="line-clamp-2 text-sm font-bold leading-snug text-white">{workout.name}</span>
-                    <span className="mt-auto text-[11px] text-zinc-500">
+                    <span className="mt-auto text-xs text-zinc-500">
                       {done ? `Feito ${relativeDay(new Date(done))}` : 'Ainda não feito'}
                     </span>
                   </Link>

@@ -58,7 +58,7 @@ export function ChangePasswordTile() {
           </span>
           <span className="flex-1">
             <span className="block text-sm font-bold text-white">Trocar senha</span>
-            <span className="block text-[11px] text-zinc-500">Troque a senha provisória por uma só sua</span>
+            <span className="block text-xs text-zinc-500">Troque a senha provisória por uma só sua</span>
           </span>
           <ChevronRight className="h-4 w-4 text-zinc-600" aria-hidden="true" />
         </button>

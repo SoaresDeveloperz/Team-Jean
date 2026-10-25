@@ -63,7 +63,7 @@ export function LeaderboardCard({
             Ranking da semana
           </Eyebrow>
         </h2>
-        <span className="text-[11px] font-semibold text-zinc-500">{weekLabel()}</span>
+        <span className="text-xs font-semibold text-zinc-500">{weekLabel()}</span>
       </div>
 
       {podium.length === 0 ? (
@@ -89,7 +89,7 @@ export function LeaderboardCard({
                   <span className="mt-2 text-xs font-bold text-zinc-400">
                     <span className="sr-only">{slot.place}º lugar: </span>Vaga
                   </span>
-                  <span className="text-[10px] text-zinc-500">em aberto</span>
+                  <span className="text-xs text-zinc-500">em aberto</span>
                   <div
                     aria-hidden="true"
                     className={cn('mt-2 grid w-full place-items-start justify-center rounded-t-2xl bg-white/[0.03] pt-1.5', slot.height)}
@@ -121,7 +121,7 @@ export function LeaderboardCard({
                   {firstName}
                   {member.id === viewerId && <span className="text-brand"> (você)</span>}
                 </span>
-                <span className="text-[10px] text-zinc-400">{plural(member.week_workouts, 'treino', 'treinos')}</span>
+                <span className="text-xs text-zinc-400">{plural(member.week_workouts, 'treino', 'treinos')}</span>
                 <m.div
                   aria-hidden="true"
                   initial={{ scaleY: 0 }}
@@ -142,7 +142,7 @@ export function LeaderboardCard({
         </ol>
       )}
 
-      <p className="mt-3 border-t border-line pt-3 text-center text-[11px] font-semibold text-zinc-400">{footer}</p>
+      <p className="mt-3 border-t border-line pt-3 text-center text-xs font-semibold text-zinc-400">{footer}</p>
     </Tile>
   )
 }

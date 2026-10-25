@@ -120,7 +120,7 @@ export const PostCard = memo(function PostCard({
   return (
     <article aria-labelledby={headingId} className="overflow-hidden rounded-3xl border border-line bg-surface">
       {post.pinned && (
-        <p className="flex items-center gap-1.5 border-b border-gold/20 bg-gold-soft px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-gold">
+        <p className="flex items-center gap-1.5 border-b border-gold/20 bg-gold-soft px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-gold">
           <Pin className="h-3.5 w-3.5" aria-hidden="true" /> Fixado pelo treinador
         </p>
       )}
@@ -138,7 +138,7 @@ export const PostCard = memo(function PostCard({
               authorWorkouts !== null && <LevelBadge workouts={authorWorkouts} />
             )}
           </div>
-          <p className="truncate text-[11px] text-zinc-500">
+          <p className="truncate text-xs text-zinc-500">
             <time dateTime={post.created_at}>{timeAgo(post.created_at)}</time>
             {KIND_LABEL[post.kind] && ` · ${KIND_LABEL[post.kind]}`}
           </p>
@@ -246,7 +246,7 @@ export const PostCard = memo(function PostCard({
                         <p className="flex min-w-0 items-center gap-1.5 text-xs">
                           <span className="truncate font-bold text-white">{name}</span>
                           {isAdminRole(item.author_role) && <CoachBadge />}
-                          <time dateTime={item.created_at} className="shrink-0 text-[10px] text-zinc-500">
+                          <time dateTime={item.created_at} className="shrink-0 text-xs text-zinc-500">
                             {timeAgo(item.created_at)}
                           </time>
                         </p>

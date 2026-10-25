@@ -36,7 +36,7 @@ type AvatarProps = {
 }
 
 const SIZES = {
-  xs: 'h-6 w-6 rounded-lg text-[9px]',
+  xs: 'h-6 w-6 rounded-lg text-xs',
   sm: 'h-9 w-9 text-xs',
   md: 'h-11 w-11 text-sm',
   lg: 'h-14 w-14 text-lg',

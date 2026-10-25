@@ -42,7 +42,7 @@ export function SegmentedControl<T extends string | number>({
             onClick={() => onChange(option.value)}
             className={cn(
               'relative flex-1 rounded-lg font-bold transition-colors',
-              size === 'sm' ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-xs',
+              size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-xs',
               selected ? 'text-black' : 'text-zinc-400 hover:text-white',
             )}
           >

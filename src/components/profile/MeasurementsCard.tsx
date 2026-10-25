@@ -212,13 +212,13 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
         <>
           <dl className="mt-3 grid grid-cols-3 gap-2">
             <div className="rounded-2xl bg-black/30 p-3">
-              <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Peso</dt>
+              <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">Peso</dt>
               <dd className="mt-1 font-display text-3xl font-bold leading-none">
                 {latestWeight ? formatKg(latestWeight.weight_kg as number) : '—'}
                 {latestWeight && <span className="ml-0.5 text-sm text-zinc-500">kg</span>}
               </dd>
               {delta !== null && firstWeight && (
-                <dd className={cn('mt-1.5 flex items-center gap-0.5 text-[10px] font-bold', deltaTone(delta, goal))}>
+                <dd className={cn('mt-1.5 flex items-center gap-0.5 text-xs font-bold', deltaTone(delta, goal))}>
                   {delta < 0 ? (
                     <TrendingDown className="h-3 w-3" aria-hidden="true" />
                   ) : (
@@ -230,14 +230,14 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
               )}
             </div>
             <div className="rounded-2xl bg-black/30 p-3">
-              <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Gordura</dt>
+              <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">Gordura</dt>
               <dd className="mt-1 font-display text-3xl font-bold leading-none">
                 {latestFat ? formatOne(latestFat.body_fat as number) : '—'}
                 {latestFat && <span className="ml-0.5 text-sm text-zinc-500">%</span>}
               </dd>
             </div>
             <div className="rounded-2xl bg-black/30 p-3">
-              <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Cintura</dt>
+              <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">Cintura</dt>
               <dd className="mt-1 font-display text-3xl font-bold leading-none">
                 {latestWaist ? formatOne(latestWaist.waist_cm as number) : '—'}
                 {latestWaist && <span className="ml-0.5 text-sm text-zinc-500">cm</span>}
@@ -248,16 +248,16 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
           {(latestBmi !== null || latestComposition) && (
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Composição corporal">
               {latestBmi !== null && (
-                <li className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-200">
+                <li className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-zinc-200">
                   IMC <span className="font-bold text-white">{formatOne(latestBmi)}</span> · {bmiLabel(latestBmi)}
                 </li>
               )}
               {latestComposition && (
                 <>
-                  <li className="rounded-full bg-brand-soft px-3 py-1 text-[11px] font-semibold text-brand">
+                  <li className="rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
                     Massa magra <span className="font-bold">{formatOne(latestComposition.leanMass)} kg</span>
                   </li>
-                  <li className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-zinc-200">
+                  <li className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-zinc-200">
                     Massa gorda <span className="font-bold text-white">{formatOne(latestComposition.fatMass)} kg</span>
                   </li>
                 </>
@@ -279,7 +279,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
           {photoEntries.length > 0 && (
             <div className="mt-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Fotos de evolução</p>
+                <p className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Fotos de evolução</p>
                 {photoEntries.length >= 2 && (
                   <button
                     type="button"
@@ -305,7 +305,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                         // eslint-disable-next-line @next/next/no-img-element -- link temporário de bucket privado
                         <img src={entry.photoUrls[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
                       )}
-                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-2 pb-1.5 pt-5 text-left text-[10px] font-bold text-white">
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-2 pb-1.5 pt-5 text-left text-xs font-bold text-white">
                         {dayMonth(entry.measured_on)}
                         {entry.photos.length > 1 && <span className="text-zinc-300"> · {entry.photos.length}</span>}
                       </span>
@@ -317,7 +317,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
           )}
 
           <div className="mt-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Histórico</p>
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Histórico</p>
             <ul className="mt-1 divide-y divide-line">
               <AnimatePresence initial={false}>
                 {visible.map((item) => {
@@ -336,7 +336,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                   return (
                     <m.li key={item.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} className="py-2.5">
                       <div className="flex items-center gap-3">
-                        <span className="w-16 shrink-0 text-[11px] font-bold tabular-nums text-zinc-400">{shortDate(item.measured_on)}</span>
+                        <span className="w-16 shrink-0 text-xs font-bold tabular-nums text-zinc-400">{shortDate(item.measured_on)}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-white">
                             {parts.length > 0 ? parts.join(' · ') : 'Só fotos'}
@@ -347,7 +347,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                               </>
                             )}
                           </span>
-                          {item.note && <span className="block truncate text-[11px] text-zinc-500">{item.note}</span>}
+                          {item.note && <span className="block truncate text-xs text-zinc-500">{item.note}</span>}
                         </span>
                         {hasDetails && (
                           <button
@@ -356,7 +356,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                             aria-expanded={expanded}
                             aria-label={`${expanded ? 'Esconder' : 'Ver'} avaliação completa de ${shortDate(item.measured_on)}`}
                             className={cn(
-                              'flex h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[11px] font-bold transition',
+                              'flex h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold transition',
                               expanded ? 'bg-white text-black' : 'bg-white/[0.06] text-zinc-300 hover:text-white',
                             )}
                           >
@@ -387,7 +387,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                             <div className="mt-2.5 space-y-3 rounded-2xl bg-black/25 p-3">
                               {rounds.length > 0 && (
                                 <div>
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Perímetros (cm)</p>
+                                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Perímetros (cm)</p>
                                   <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
                                     {rounds.map((point) => {
                                       const value = item.perimeters?.[point.key] as number
@@ -399,7 +399,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                                           <dd className="shrink-0 font-bold tabular-nums text-white">
                                             {formatOne(value)}
                                             {diff !== null && diff !== 0 && (
-                                              <span className={cn('ml-1 text-[10px]', diff > 0 ? 'text-brand' : 'text-gold')}>
+                                              <span className={cn('ml-1 text-xs', diff > 0 ? 'text-brand' : 'text-gold')}>
                                                 {diff > 0 ? '+' : '−'}
                                                 {formatOne(Math.abs(diff))}
                                               </span>
@@ -413,7 +413,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
                               )}
                               {folds.length > 0 && (
                                 <div>
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">
+                                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
                                     Dobras (mm){item.protocol ? ` · ${item.protocol === 'pollock7' ? 'Pollock 7' : 'Pollock 3'}` : ''}
                                   </p>
                                   <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">

@@ -63,7 +63,7 @@ const TEMPLATES = [
 
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 
 // Linhas de um mesmo envio têm o mesmo título e mensagem e, quando a coluna
 // existe, o mesmo created_at. Sem created_at, a ordem de inserção separa os envios.
@@ -101,7 +101,7 @@ function AvatarStack({ people }: { people: { id: string; name: string | null; av
         <Avatar key={person.id} name={person.name} seed={person.id} src={person.avatar} size="xs" className="ring-2 ring-surface" />
       ))}
       {people.length > shown.length && (
-        <span className="grid h-6 min-w-6 place-items-center rounded-lg bg-surface-3 px-1 text-[9px] font-bold text-zinc-300 ring-2 ring-surface">
+        <span className="grid h-6 min-w-6 place-items-center rounded-lg bg-surface-3 px-1 text-xs font-bold text-zinc-300 ring-2 ring-surface">
           +{people.length - shown.length}
         </span>
       )}
@@ -293,7 +293,7 @@ export default function AdminAnnouncementsPage() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center gap-2 overflow-hidden text-[11px] text-zinc-400"
+                  className="flex items-center gap-2 overflow-hidden text-xs text-zinc-400"
                 >
                   <AvatarStack
                     people={recipients.map((student) => ({
@@ -323,7 +323,7 @@ export default function AdminAnnouncementsPage() {
                   type="button"
                   onClick={() => applyTemplate(template)}
                   className={cn(
-                    'h-9 shrink-0 rounded-full border px-3.5 text-[11px] font-bold transition',
+                    'h-9 shrink-0 rounded-full border px-3.5 text-xs font-bold transition',
                     title === template.title
                       ? 'border-brand/50 bg-brand-soft text-brand'
                       : 'border-line text-zinc-300 hover:border-line-strong hover:text-white',
@@ -342,7 +342,7 @@ export default function AdminAnnouncementsPage() {
               </label>
               <span
                 id="announcement-title-count"
-                className={cn('text-[10px] font-bold tabular-nums', titleNearLimit ? 'text-gold' : 'text-zinc-500')}
+                className={cn('text-xs font-bold tabular-nums', titleNearLimit ? 'text-gold' : 'text-zinc-500')}
               >
                 {title.length}/{TITLE_MAX}
               </span>
@@ -368,7 +368,7 @@ export default function AdminAnnouncementsPage() {
               </label>
               <span
                 id="announcement-message-count"
-                className={cn('text-[10px] font-bold tabular-nums', messageNearLimit ? 'text-gold' : 'text-zinc-500')}
+                className={cn('text-xs font-bold tabular-nums', messageNearLimit ? 'text-gold' : 'text-zinc-500')}
               >
                 {message.length}/{MESSAGE_MAX}
               </span>
@@ -398,7 +398,7 @@ export default function AdminAnnouncementsPage() {
                   <p className={cn('truncate text-sm font-bold', title.trim() ? 'text-white' : 'text-zinc-500')}>
                     {title.trim() || 'Título do aviso'}
                   </p>
-                  <span className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-black uppercase text-black">
+                  <span className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-xs font-black uppercase text-black">
                     Novo
                   </span>
                 </div>
@@ -434,11 +434,11 @@ export default function AdminAnnouncementsPage() {
 
         <section aria-labelledby="sent-title" className="space-y-2.5">
           <div className="flex items-center justify-between px-1">
-            <h2 id="sent-title" className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+            <h2 id="sent-title" className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
               Enviados
             </h2>
             {history && history.length > 0 && (
-              <span className="text-[11px] text-zinc-500">{plural(history.length, 'envio', 'envios')}</span>
+              <span className="text-xs text-zinc-500">{plural(history.length, 'envio', 'envios')}</span>
             )}
           </div>
 
@@ -472,7 +472,7 @@ export default function AdminAnnouncementsPage() {
                       <button
                         type="button"
                         onClick={() => reuse(group)}
-                        className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-[11px] font-bold text-zinc-300 transition hover:border-line-strong hover:text-white"
+                        className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line px-3 text-xs font-bold text-zinc-300 transition hover:border-line-strong hover:text-white"
                       >
                         <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>
@@ -488,9 +488,9 @@ export default function AdminAnnouncementsPage() {
                           avatar: avatarUrlOf(studentById.get(id)),
                         }))}
                       />
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-400">{recipientLabel(group)}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-400">{recipientLabel(group)}</span>
                       {group.createdAt && (
-                        <span className="shrink-0 text-[11px] text-zinc-500">{relativeDay(new Date(group.createdAt))}</span>
+                        <span className="shrink-0 text-xs text-zinc-500">{relativeDay(new Date(group.createdAt))}</span>
                       )}
                     </div>
                   </m.li>

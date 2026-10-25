@@ -277,7 +277,7 @@ export default function StudentProgressPage() {
               <Dumbbell className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Exercício</span>
+              <span className="block text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Exercício</span>
               <span className="block truncate text-base font-bold text-white">{selectedExercise?.name}</span>
             </span>
             <span className="flex items-center gap-1 text-xs font-bold text-zinc-400">
@@ -301,7 +301,7 @@ export default function StudentProgressPage() {
                   {formatKg(summary.best.bestWeight)}
                   <span className="ml-1 text-base text-zinc-500">kg</span>
                 </p>
-                <p className="mt-1 text-[11px] text-zinc-500">× {summary.best.bestReps} repetições</p>
+                <p className="mt-1 text-xs text-zinc-500">× {summary.best.bestReps} repetições</p>
               </Tile>
               <Tile className="p-4">
                 <Eyebrow icon={Zap}>1RM estimado</Eyebrow>
@@ -309,7 +309,7 @@ export default function StudentProgressPage() {
                   {formatKg(Math.round(summary.bestOneRepMax))}
                   <span className="ml-1 text-base text-zinc-500">kg</span>
                 </p>
-                <p className="mt-1 text-[11px] text-zinc-500">Fórmula de Epley</p>
+                <p className="mt-1 text-xs text-zinc-500">Fórmula de Epley</p>
               </Tile>
             </div>
           )}
@@ -388,17 +388,17 @@ export default function StudentProgressPage() {
                   const isRecord = summary?.best.sessionId === stat.sessionId
                   return (
                     <li key={stat.sessionId} className="flex items-center gap-3 px-5 py-3">
-                      <span className="w-12 shrink-0 text-[11px] font-bold tabular-nums text-zinc-500">
+                      <span className="w-12 shrink-0 text-xs font-bold tabular-nums text-zinc-500">
                         {stat.date
                           ? new Date(stat.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                           : '--'}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-400">
+                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-400">
                         {stat.sets.map((set) => `${formatKg(set.weight)}×${set.reps}`).join('  ·  ')}
                       </span>
                       <span
                         className={cn(
-                          'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums',
+                          'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black tabular-nums',
                           isRecord ? 'bg-gold-soft text-gold' : 'bg-white/[0.06] text-white',
                         )}
                       >
@@ -430,7 +430,7 @@ export default function StudentProgressPage() {
           {groupedOptions.length === 0 && <p className="py-6 text-center text-xs text-zinc-500">Nenhum exercício encontrado.</p>}
           {groupedOptions.map(([muscle, options]) => (
             <div key={muscle}>
-              <p className="mb-1.5 px-1 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">{muscle}</p>
+              <p className="mb-1.5 px-1 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">{muscle}</p>
               <ul className="overflow-hidden rounded-2xl border border-line">
                 {options.map((exercise) => {
                   const selected = exercise.id === selectedExerciseId

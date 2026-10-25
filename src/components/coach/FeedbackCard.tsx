@@ -73,7 +73,7 @@ export function FeedbackCard({ item, student, onReplied, showStudent = true }: F
           <p className="text-sm font-bold leading-snug text-white">
             {showStudent ? `${name} · ${item.workoutName}` : item.workoutName}
           </p>
-          <p className="text-[11px] text-zinc-500">
+          <p className="text-xs text-zinc-500">
             {relativeDay(item.date)}
             {item.rpe !== null && ` · RPE ${item.rpe}`}
           </p>
@@ -82,7 +82,7 @@ export function FeedbackCard({ item, student, onReplied, showStudent = true }: F
               {item.tags.map((tag) => {
                 const info = tagInfo(tag)
                 return (
-                  <li key={tag} className={cn('rounded-full border px-2 py-0.5 text-[10px] font-bold', TAG_TONES[info.tone])}>
+                  <li key={tag} className={cn('rounded-full border px-2 py-0.5 text-xs font-bold', TAG_TONES[info.tone])}>
                     <span aria-hidden="true">{info.emoji}</span> {tag}
                   </li>
                 )
@@ -125,25 +125,25 @@ export function FeedbackCard({ item, student, onReplied, showStudent = true }: F
                       key={quick}
                       type="button"
                       onClick={() => setText(quick)}
-                      className="h-8 shrink-0 rounded-full border border-line px-3 text-[11px] font-semibold text-zinc-300 transition hover:border-line-strong hover:text-white"
+                      className="h-8 shrink-0 rounded-full border border-line px-3 text-xs font-semibold text-zinc-300 transition hover:border-line-strong hover:text-white"
                     >
                       {quick}
                     </button>
                   ))}
                 </div>
                 {error && (
-                  <p role="alert" className="text-[11px] font-semibold text-danger">
+                  <p role="alert" className="text-xs font-semibold text-danger">
                     {error}
                   </p>
                 )}
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setOpen(false)} className="h-9 rounded-xl border border-line px-3 text-[11px] font-bold text-zinc-300">
+                  <button type="button" onClick={() => setOpen(false)} className="h-9 rounded-xl border border-line px-3 text-xs font-bold text-zinc-300">
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={sending}
-                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand text-[11px] font-black text-black disabled:opacity-60"
+                    className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand text-xs font-black text-black disabled:opacity-60"
                   >
                     {sending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Send className="h-3.5 w-3.5" aria-hidden="true" />}
                     Enviar resposta
@@ -156,7 +156,7 @@ export function FeedbackCard({ item, student, onReplied, showStudent = true }: F
                 type="button"
                 onClick={() => setOpen(true)}
                 whileTap={{ scale: 0.95 }}
-                className="mt-2.5 flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-[11px] font-black text-black"
+                className="mt-2.5 flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-xs font-black text-black"
               >
                 <MessageSquareReply className="h-3.5 w-3.5" aria-hidden="true" /> Responder
                 <span className="sr-only"> {name}</span>

@@ -75,7 +75,7 @@ type Filter = 'all' | 'active' | 'inactive' | 'tired'
 const WINDOW_DAYS = 90
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 
 function readinessTone(score: number | null | undefined) {
   if (score === null || score === undefined) return { label: '—', className: 'text-zinc-500', bar: 'bg-white/20' }
@@ -345,7 +345,7 @@ export default function AdminStudentsPage() {
             aria-checked={filter === option.value}
             onClick={() => setFilter(option.value)}
             className={cn(
-              'h-9 shrink-0 rounded-full border px-3.5 text-[11px] font-bold transition',
+              'h-9 shrink-0 rounded-full border px-3.5 text-xs font-bold transition',
               filter === option.value
                 ? 'border-white bg-white text-black'
                 : 'border-line bg-surface text-zinc-400 hover:text-white',
@@ -398,8 +398,8 @@ export default function AdminStudentsPage() {
                   <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-white">{student.full_name || 'Aluno sem nome'}</span>
-                    <span className="block truncate text-[11px] text-zinc-500">{student.email}</span>
-                    <span className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                    <span className="block truncate text-xs text-zinc-500">{student.email}</span>
+                    <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-bold">
                       <span
                         className={cn(
                           'rounded-full px-2 py-0.5',
@@ -421,7 +421,7 @@ export default function AdminStudentsPage() {
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
                     <span className={cn('font-display text-xl font-bold leading-none', readiness.className)}>{readiness.label}</span>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Prontidão</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-zinc-500">Prontidão</span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
                 </button>
@@ -444,9 +444,9 @@ export default function AdminStudentsPage() {
                   { label: 'Prontidão', value: readinessTone(detail.readiness_score).label, hint: 'hoje' },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-2xl border border-line bg-black/30 px-1 py-2.5">
-                    <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">{stat.label}</dt>
+                    <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">{stat.label}</dt>
                     <dd className="font-display text-2xl font-bold leading-tight">{stat.value}</dd>
-                    <dd className="text-[9px] text-zinc-500">{stat.hint}</dd>
+                    <dd className="text-xs text-zinc-500">{stat.hint}</dd>
                   </div>
                 ))}
               </dl>
@@ -469,7 +469,7 @@ export default function AdminStudentsPage() {
                       <div className="rounded-2xl border border-line bg-black/20 p-3.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {detailGoal && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-200">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-zinc-200">
                               <span aria-hidden="true">{detailGoal.emoji}</span> Objetivo: {detailGoal.label}
                             </span>
                           )}
@@ -478,7 +478,7 @@ export default function AdminStudentsPage() {
                               href={`https://instagram.com/${encodeURIComponent(detail.instagram)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold text-brand hover:underline"
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-brand hover:underline"
                             >
                               <AtSign className="h-3.5 w-3.5" aria-hidden="true" />
                               {detail.instagram}
@@ -507,10 +507,10 @@ export default function AdminStudentsPage() {
 
                     <section aria-labelledby="detail-workouts">
                       <div className="mb-2 flex items-center justify-between">
-                        <h3 id="detail-workouts" className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+                        <h3 id="detail-workouts" className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
                           Treinos ativos
                         </h3>
-                        <Link href={`/admin/workouts?aluno=${detail.id}`} className="text-[11px] font-bold text-brand">
+                        <Link href={`/admin/workouts?aluno=${detail.id}`} className="text-xs font-bold text-brand">
                           Gerenciar
                         </Link>
                       </div>
@@ -530,7 +530,7 @@ export default function AdminStudentsPage() {
                     </section>
 
                     <section aria-labelledby="detail-sessions">
-                      <h3 id="detail-sessions" className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">
+                      <h3 id="detail-sessions" className="mb-2 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
                         Últimos treinos
                       </h3>
                       {detailStats.recent.length === 0 ? (
@@ -563,10 +563,10 @@ export default function AdminStudentsPage() {
                                   <span className="block truncate text-sm font-semibold text-white">
                                     {session.assigned_workouts?.name ?? 'Treino'}
                                   </span>
-                                  <span className="block text-[11px] text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
+                                  <span className="block text-xs text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
                                 </span>
                                 {session.session_rpe != null && (
-                                  <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                                  <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
                                     RPE {session.session_rpe}
                                   </span>
                                 )}
@@ -694,11 +694,11 @@ export default function AdminStudentsPage() {
               </div>
               <dl className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-black/30 text-sm">
                 <div className="flex items-center justify-between gap-3 px-4 py-3">
-                  <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">E-mail</dt>
+                  <dt className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">E-mail</dt>
                   <dd className="min-w-0 truncate font-semibold text-white">{created.email}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-4 py-3">
-                  <dt className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Senha provisória</dt>
+                  <dt className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Senha provisória</dt>
                   <dd className="font-mono font-bold tracking-wider text-brand">{created.password}</dd>
                 </div>
               </dl>
@@ -785,7 +785,7 @@ export default function AdminStudentsPage() {
                     <KeyRound className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-zinc-500">Envie a senha para o aluno; ele pode trocá-la no Perfil do app.</p>
+                <p className="mt-1.5 text-xs text-zinc-500">Envie a senha para o aluno; ele pode trocá-la no Perfil do app.</p>
               </div>
 
               {createError && <Alert variant="error">{createError}</Alert>}

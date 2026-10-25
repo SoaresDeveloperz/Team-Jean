@@ -51,7 +51,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
           whileTap={{ scale: 0.95 }}
           onClick={() => onEditImage('cover')}
           disabled={uploading !== null}
-          className="absolute right-3 top-3 flex h-9 items-center gap-1.5 rounded-xl bg-black/65 px-3 text-[11px] font-bold text-white backdrop-blur transition hover:bg-black/80"
+          className="absolute right-3 top-3 flex h-9 items-center gap-1.5 rounded-xl bg-black/65 px-3 text-xs font-bold text-white backdrop-blur transition hover:bg-black/80"
         >
           <ImageUp className="h-3.5 w-3.5" aria-hidden="true" />
           {coverUrl ? 'Trocar capa' : 'Adicionar capa'}
@@ -94,9 +94,9 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
         <p className="mt-1.5 truncate text-xs text-zinc-500">{profile.email || email}</p>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-          {stats && <LevelBadge workouts={stats.workouts} className="px-3 py-1 text-[10px] tracking-[0.16em]" />}
+          {stats && <LevelBadge workouts={stats.workouts} className="px-3 py-1 text-xs tracking-[0.1em]" />}
           {goal && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-200">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-zinc-200">
               <span aria-hidden="true">{goal.emoji}</span> {goal.label}
             </span>
           )}
@@ -147,7 +147,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
                   </>
                 )}
               </dd>
-              <dt className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">{stat.label}</dt>
+              <dt className="mt-1 text-xs font-bold text-zinc-400">{stat.label}</dt>
             </div>
           ))}
         </dl>
@@ -159,8 +159,8 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
             className="mt-4 block w-full rounded-2xl border border-line bg-black/30 p-3.5 text-left transition hover:border-line-strong"
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Nível {level.level}</span>
-              <span className="flex items-center gap-1 text-[11px] font-bold text-zinc-300">
+              <span className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Nível {level.level}</span>
+              <span className="flex items-center gap-1 text-xs font-bold text-zinc-300">
                 {level.next ? `Próximo: ${level.next.name}` : 'Nível máximo'}
                 <ChevronRight className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
               </span>
@@ -174,7 +174,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
                 transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.3 }}
               />
             </span>
-            <span className="mt-2 block text-[11px] text-zinc-400">
+            <span className="mt-2 block text-xs text-zinc-400">
               {level.next
                 ? `Faltam ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} para virar ${level.next.name}. Toque para ver a trilha.`
                 : 'Você é lenda do Team Jean. 👑'}

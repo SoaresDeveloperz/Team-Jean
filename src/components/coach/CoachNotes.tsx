@@ -138,7 +138,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
         />
         {formError && <Alert variant="error">{formError}</Alert>}
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] text-zinc-500">Só você vê estas notas.</p>
+          <p className="text-xs text-zinc-500">Só você vê estas notas.</p>
           <m.button
             type="submit"
             whileTap={{ scale: 0.96 }}
@@ -171,7 +171,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
               >
                 <p className="whitespace-pre-line break-words text-sm leading-relaxed text-zinc-100">{note.body}</p>
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-zinc-500">
                     {note.pinned && <Pin className="h-3 w-3 text-gold" aria-hidden="true" />}
                     {note.pinned ? 'Fixada · ' : ''}
                     {relativeDay(new Date(note.created_at))}

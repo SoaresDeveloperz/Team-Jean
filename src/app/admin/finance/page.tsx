@@ -298,20 +298,20 @@ export default function AdminFinancePage() {
                 <div className="min-w-0">
                   <Eyebrow icon={HandCoins}>Recebido</Eyebrow>
                   <p className="mt-1 font-display text-3xl font-bold leading-none text-brand">{formatBRL(totals.received)}</p>
-                  <p className="mt-1 text-[11px] text-zinc-400">de {formatBRL(totals.expected)} previstos</p>
+                  <p className="mt-1 text-xs text-zinc-400">de {formatBRL(totals.expected)} previstos</p>
                 </div>
               </Tile>
               <Tile className="p-4">
                 <Eyebrow icon={CircleDollarSign}>A receber</Eyebrow>
                 <p className="mt-2 font-display text-3xl font-bold leading-none">{formatBRL(totals.open)}</p>
-                <p className="mt-1 text-[11px] text-zinc-400">{plural(totals.openCount, 'mensalidade', 'mensalidades')}</p>
+                <p className="mt-1 text-xs text-zinc-400">{plural(totals.openCount, 'mensalidade', 'mensalidades')}</p>
               </Tile>
               <Tile className={cn('p-4', totals.overdueCount > 0 && 'border-danger/30')}>
                 <Eyebrow className={totals.overdueCount > 0 ? 'text-danger' : undefined}>Em atraso</Eyebrow>
                 <p className={cn('mt-2 font-display text-3xl font-bold leading-none', totals.overdueCount > 0 ? 'text-danger' : 'text-white')}>
                   {formatBRL(totals.overdue)}
                 </p>
-                <p className="mt-1 text-[11px] text-zinc-400">{plural(totals.overdueCount, 'aluno', 'alunos')}</p>
+                <p className="mt-1 text-xs text-zinc-400">{plural(totals.overdueCount, 'aluno', 'alunos')}</p>
               </Tile>
             </div>
 
@@ -324,7 +324,7 @@ export default function AdminFinancePage() {
                   aria-checked={filter === option.value}
                   onClick={() => setFilter(option.value)}
                   className={cn(
-                    'h-9 shrink-0 rounded-full border px-3.5 text-[11px] font-bold transition',
+                    'h-9 shrink-0 rounded-full border px-3.5 text-xs font-bold transition',
                     filter === option.value ? 'border-white bg-white text-black' : 'border-line bg-surface text-zinc-400 hover:text-white',
                   )}
                 >
@@ -354,7 +354,7 @@ export default function AdminFinancePage() {
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-bold text-white">{name}</p>
                               <p className="mt-1">
-                                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', STATUS_STYLE[row.status])}>{statusText(row, today)}</span>
+                                <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', STATUS_STYLE[row.status])}>{statusText(row, today)}</span>
                               </p>
                             </div>
                             <p className="shrink-0 text-right font-display text-xl font-bold tabular-nums text-white">
@@ -367,7 +367,7 @@ export default function AdminFinancePage() {
                                 type="button"
                                 whileTap={{ scale: 0.96 }}
                                 onClick={() => openPayment(row)}
-                                className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand text-[11px] font-black uppercase tracking-wider text-black"
+                                className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-brand text-xs font-black uppercase tracking-wider text-black"
                               >
                                 <HandCoins className="h-4 w-4" aria-hidden="true" /> Receber
                                 <span className="sr-only"> de {name}</span>
@@ -378,7 +378,7 @@ export default function AdminFinancePage() {
                                 type="button"
                                 onClick={() => void remind(row)}
                                 disabled={busy !== null}
-                                className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-line px-3 text-[11px] font-bold text-zinc-200 transition hover:text-white disabled:opacity-60"
+                                className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-line px-3 text-xs font-bold text-zinc-200 transition hover:text-white disabled:opacity-60"
                               >
                                 {busy === `remind-${row.student.id}` ? (
                                   <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -393,7 +393,7 @@ export default function AdminFinancePage() {
                               <button
                                 type="button"
                                 onClick={() => setUndoing(row)}
-                                className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line text-[11px] font-bold text-zinc-300 transition hover:text-white"
+                                className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-line text-xs font-bold text-zinc-300 transition hover:text-white"
                               >
                                 <Undo2 className="h-4 w-4" aria-hidden="true" /> Desfazer
                                 <span className="sr-only"> pagamento de {name}</span>
@@ -403,7 +403,7 @@ export default function AdminFinancePage() {
                               type="button"
                               onClick={() => openPlan(row)}
                               className={cn(
-                                'flex h-10 items-center justify-center gap-1.5 rounded-xl text-[11px] font-bold transition',
+                                'flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition',
                                 row.billing ? 'border border-line px-3 text-zinc-300 hover:text-white' : 'flex-1 bg-white text-black',
                               )}
                             >

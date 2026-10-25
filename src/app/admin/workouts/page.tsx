@@ -60,7 +60,7 @@ const TEMPLATE_SUMMARY_COLUMNS = 'id, template_id, sets_count, target_reps, plan
 
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const ease = [0.22, 1, 0.36, 1] as const
 
 const normalizeText = (text: string) =>
@@ -913,7 +913,7 @@ export default function AdminWorkoutsPage() {
                           <span className="block truncate text-sm font-bold text-white">
                             {student.full_name || student.email || 'Aluno sem nome'}
                           </span>
-                          <span className="block text-[11px] text-zinc-500">
+                          <span className="block text-xs text-zinc-500">
                             {plural(activeCount, 'treino ativo', 'treinos ativos')}
                             {archivedCount > 0 && ` · ${plural(archivedCount, 'arquivado', 'arquivados')}`}
                           </span>
@@ -969,20 +969,20 @@ export default function AdminWorkoutsPage() {
                                             {workout.name}
                                           </h3>
                                           {!workout.is_current && (
-                                            <span className="shrink-0 rounded-md border border-line-strong px-1.5 py-0.5 text-[9px] font-black uppercase text-zinc-400">
+                                            <span className="shrink-0 rounded-md border border-line-strong px-1.5 py-0.5 text-xs font-black uppercase text-zinc-400">
                                               Arquivado
                                             </span>
                                           )}
                                         </div>
-                                        <p className="mt-0.5 text-[11px] text-zinc-500">
+                                        <p className="mt-0.5 text-xs text-zinc-500">
                                           {summary ? summaryLine(summary) : 'Carregando resumo...'}
                                         </p>
                                         {summary && summary.focus.length > 0 && (
-                                          <p className="mt-1 truncate text-[11px] font-semibold text-brand">
+                                          <p className="mt-1 truncate text-xs font-semibold text-brand">
                                             {summary.focus.join(' · ')}
                                           </p>
                                         )}
-                                        <p className="mt-1 text-[10px] text-zinc-600">
+                                        <p className="mt-1 text-xs text-zinc-600">
                                           Criado em {new Date(workout.created_at).toLocaleDateString('pt-BR')}
                                         </p>
                                       </div>
@@ -992,7 +992,7 @@ export default function AdminWorkoutsPage() {
                                       <button
                                         type="button"
                                         onClick={() => handleOpenWorkoutHistory(workout)}
-                                        className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] px-2 text-[11px] font-bold text-zinc-200 transition hover:bg-white/10"
+                                        className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/[0.06] px-2 text-xs font-bold text-zinc-200 transition hover:bg-white/10"
                                       >
                                         <History className="h-4 w-4 shrink-0" aria-hidden="true" />
                                         <span className="truncate">Ver cargas registradas</span>
@@ -1087,11 +1087,11 @@ export default function AdminWorkoutsPage() {
                       <div className="flex gap-3.5">
                         <SummaryMap summary={summary} className="w-24" />
                         <div className="min-w-0 flex-1 py-0.5">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Modelo</p>
+                          <p className="text-xs font-black uppercase tracking-[0.1em] text-gold">Modelo</p>
                           <h3 className="mt-0.5 truncate text-base font-bold text-white">{template.name}</h3>
-                          <p className="mt-1 text-[11px] text-zinc-500">{summary ? summaryLine(summary) : 'Carregando resumo...'}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{summary ? summaryLine(summary) : 'Carregando resumo...'}</p>
                           {summary && summary.focus.length > 0 && (
-                            <p className="mt-1 truncate text-[11px] font-semibold text-brand">{summary.focus.join(' · ')}</p>
+                            <p className="mt-1 truncate text-xs font-semibold text-brand">{summary.focus.join(' · ')}</p>
                           )}
                         </div>
                       </div>
@@ -1203,7 +1203,7 @@ export default function AdminWorkoutsPage() {
                       setWorkoutName(suggestion)
                       nameInputRef.current?.focus()
                     }}
-                    className="h-8 shrink-0 rounded-full border border-line px-3 text-[11px] font-bold text-zinc-300 transition hover:border-line-strong hover:text-white"
+                    className="h-8 shrink-0 rounded-full border border-line px-3 text-xs font-bold text-zinc-300 transition hover:border-line-strong hover:text-white"
                   >
                     {suggestion}
                   </button>
@@ -1218,7 +1218,7 @@ export default function AdminWorkoutsPage() {
               <p className="mt-2 text-sm font-bold leading-snug text-white">
                 {builderSummary.focus.join(' · ') || 'Grupo muscular não identificado'}
               </p>
-              <p className="mt-1 text-[11px] text-zinc-500">Regiões mais trabalhadas, pelo número de séries.</p>
+              <p className="mt-1 text-xs text-zinc-500">Regiões mais trabalhadas, pelo número de séries.</p>
               {/* Cada exercício novo acende os músculos no corpo 3D. */}
               <Body3D
                 fills={builderSummary.fills}
@@ -1229,19 +1229,19 @@ export default function AdminWorkoutsPage() {
               />
               <dl className="mt-3 grid grid-cols-3 divide-x divide-line border-t border-line pt-3 text-center">
                 <div>
-                  <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Exercícios</dt>
+                  <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">Exercícios</dt>
                   <dd className="font-display text-3xl font-bold leading-tight">
                     <AnimatedNumber value={builderSummary.exercises} />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Séries</dt>
+                  <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">Séries</dt>
                   <dd className="font-display text-3xl font-bold leading-tight">
                     <AnimatedNumber value={builderSummary.sets} />
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Duração</dt>
+                  <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">Duração</dt>
                   <dd className="font-display text-3xl font-bold leading-tight text-zinc-300">
                     <AnimatedNumber value={builderSummary.minutes} format={(value) => `≈${Math.round(value)}`} />
                     <span className="ml-0.5 text-sm text-zinc-500">min</span>
@@ -1253,7 +1253,7 @@ export default function AdminWorkoutsPage() {
 
           <section aria-labelledby="builder-exercises-title" className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 id="builder-exercises-title" className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+              <h3 id="builder-exercises-title" className="text-xs font-black uppercase tracking-[0.1em] text-zinc-400">
                 Exercícios ({selectedExercises.length})
               </h3>
               <div className="flex gap-1.5">
@@ -1300,7 +1300,7 @@ export default function AdminWorkoutsPage() {
               </button>
             ) : reordering && selectedExercises.length > 1 ? (
               <>
-                <p className="text-[11px] text-zinc-500">Arraste pela alça ou use as setas para mudar a ordem.</p>
+                <p className="text-xs text-zinc-500">Arraste pela alça ou use as setas para mudar a ordem.</p>
                 <ReorderList items={selectedExercises} onReorder={setSelectedExercises} onMove={handleMoveExercise} />
               </>
             ) : (
@@ -1332,7 +1332,7 @@ export default function AdminWorkoutsPage() {
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-white">Avisar o aluno</p>
-                <p className="text-[11px] text-zinc-500">
+                <p className="text-xs text-zinc-500">
                   {builder.editingId ? 'Envia um aviso de treino atualizado.' : 'Envia um aviso de treino novo no app.'}
                 </p>
               </div>
@@ -1380,9 +1380,9 @@ export default function AdminWorkoutsPage() {
           <div className="flex items-center gap-3 rounded-2xl border border-line bg-black/30 p-3">
             <SummaryMap summary={assignSummary} className="w-16 p-1" />
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Modelo</p>
+              <p className="text-xs font-black uppercase tracking-[0.1em] text-gold">Modelo</p>
               <p className="truncate text-sm font-bold text-white">{templateToAssign?.name}</p>
-              {assignSummary && <p className="text-[11px] text-zinc-500">{summaryLine(assignSummary)}</p>}
+              {assignSummary && <p className="text-xs text-zinc-500">{summaryLine(assignSummary)}</p>}
             </div>
           </div>
 
@@ -1439,7 +1439,7 @@ export default function AdminWorkoutsPage() {
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5">
             <div className="min-w-0">
               <p className="text-sm font-bold text-white">Avisar o aluno</p>
-              <p className="text-[11px] text-zinc-500">Envia um aviso de treino novo no app.</p>
+              <p className="text-xs text-zinc-500">Envia um aviso de treino novo no app.</p>
             </div>
             <Switch checked={assignNotify} onChange={setAssignNotify} label="Avisar o aluno" />
           </div>

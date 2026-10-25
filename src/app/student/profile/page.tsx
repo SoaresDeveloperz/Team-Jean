@@ -229,7 +229,7 @@ export default function StudentProfilePage() {
                 Conquistas
               </Eyebrow>
             </h2>
-            <span className="text-[11px] font-bold text-zinc-500">
+            <span className="text-xs font-bold text-zinc-500">
               {unlockedCount} de {achievements.length}
             </span>
           </div>
@@ -266,10 +266,10 @@ export default function StudentProfilePage() {
                       <AchievementIcon icon={badge.icon} className="h-[18px] w-[18px]" />
                     </span>
                   </ProgressRing>
-                  <span className={cn('mt-2 text-[11px] font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
+                  <span className={cn('mt-2 text-xs font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
                     {badge.title}
                   </span>
-                  <span className="mt-0.5 text-[10px] tabular-nums text-zinc-500">
+                  <span className="mt-0.5 text-xs tabular-nums text-zinc-500">
                     {unlocked ? 'Conquistada' : `${Math.min(badge.value, badge.goal)}/${badge.goal}`}
                   </span>
                 </button>
@@ -291,7 +291,7 @@ export default function StudentProfilePage() {
             </span>
             <div>
               <p className="text-sm font-bold text-white">Meta semanal</p>
-              <p className="text-[11px] text-zinc-500">Treinos por semana</p>
+              <p className="text-xs text-zinc-500">Treinos por semana</p>
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border border-line bg-black/30 p-1" role="group" aria-label="Meta semanal">
@@ -326,7 +326,7 @@ export default function StudentProfilePage() {
             </span>
             <div>
               <p className="text-sm font-bold text-white">Descanso padrão</p>
-              <p className="text-[11px] text-zinc-500">Cronômetro entre as séries</p>
+              <p className="text-xs text-zinc-500">Cronômetro entre as séries</p>
             </div>
           </div>
           <SegmentedControl
@@ -344,7 +344,7 @@ export default function StudentProfilePage() {
             </span>
             <div>
               <p className="text-sm font-bold text-white">Vibração</p>
-              <p className="text-[11px] text-zinc-500">Ao marcar séries e no fim do descanso</p>
+              <p className="text-xs text-zinc-500">Ao marcar séries e no fim do descanso</p>
             </div>
           </div>
           <Switch
@@ -366,7 +366,7 @@ export default function StudentProfilePage() {
           </span>
           <span className="flex-1">
             <span className="block text-sm font-bold text-white">Avisos do treinador</span>
-            <span className="block text-[11px] text-zinc-500">
+            <span className="block text-xs text-zinc-500">
               {notices.length === 0 ? 'Nenhum aviso ainda' : `${plural(notices.length, 'aviso', 'avisos')} · ${plural(unseen.length, 'novo', 'novos')}`}
             </span>
           </span>
@@ -386,7 +386,7 @@ export default function StudentProfilePage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-white">Instale o app</p>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-xs text-zinc-500">
               {installState === 'ios' ? (
                 <>
                   Toque em <Share className="inline h-3 w-3" aria-label="Compartilhar" /> e depois em &quot;Adicionar à

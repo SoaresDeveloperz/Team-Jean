@@ -26,7 +26,7 @@ export function AppHeader({ badge, actions, homeHref = '/', className }: AppHead
         {(badge || actions) && (
           <div className="flex items-center gap-1.5">
             {badge && (
-              <span className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-brand">
+              <span className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em] text-brand">
                 {badge}
               </span>
             )}

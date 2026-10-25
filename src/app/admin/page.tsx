@@ -256,7 +256,7 @@ export default function AdminDashboardPage() {
               <ProgressRing value={derived.adherence} size={64} stroke={6} label={`${Math.round(derived.adherence * 100)}% dos alunos treinaram`}>
                 <span className="font-display text-xl font-bold">{Math.round(derived.adherence * 100)}%</span>
               </ProgressRing>
-              <p className="text-[11px] leading-snug text-zinc-400">
+              <p className="text-xs leading-snug text-zinc-400">
                 <span className="font-bold text-white">{derived.trainedThisWeek}</span> de {data.students.length} treinaram
               </p>
             </div>
@@ -285,7 +285,7 @@ export default function AdminDashboardPage() {
             <p className="mt-2 font-display text-5xl font-bold leading-none">
               <AnimatedNumber value={data.students.length} />
             </p>
-            <Link href="/admin/students?novo=1" className="mt-2 flex items-center gap-1 text-[11px] font-bold text-brand">
+            <Link href="/admin/students?novo=1" className="mt-2 flex items-center gap-1 text-xs font-bold text-brand">
               <UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> Cadastrar aluno
             </Link>
           </Tile>
@@ -296,7 +296,7 @@ export default function AdminDashboardPage() {
               {derived.averageReadiness === null ? '—' : <AnimatedNumber value={derived.averageReadiness} />}
               {derived.averageReadiness !== null && <span className="text-xl">%</span>}
             </p>
-            <p className="mt-2 text-[11px] text-zinc-500">Informada pelos alunos</p>
+            <p className="mt-2 text-xs text-zinc-500">Informada pelos alunos</p>
           </Tile>
         </div>
 
@@ -328,7 +328,7 @@ export default function AdminDashboardPage() {
             <Tile className="p-0">
               <div className="flex items-center justify-between px-5 pb-1 pt-5">
                 <Eyebrow>Atividade recente</Eyebrow>
-                <span className="text-[10px] font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
+                <span className="text-xs font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
               </div>
               {data.sessions.length === 0 ? (
                 <p className="px-5 pb-5 pt-2 text-sm text-zinc-500">Nenhum treino concluído no período.</p>
@@ -349,7 +349,7 @@ export default function AdminDashboardPage() {
                               <span className="font-bold text-white">{student?.full_name?.split(' ')[0] ?? 'Aluno'}</span> concluiu{' '}
                               <span className="font-semibold text-zinc-200">{session.assigned_workouts?.name ?? 'um treino'}</span>
                             </span>
-                            <span className="mt-0.5 block text-[11px] text-zinc-500">
+                            <span className="mt-0.5 block text-xs text-zinc-500">
                               {relativeDay(new Date(session.completed_at))}
                               {session.session_rpe != null && ` · RPE ${session.session_rpe}`}
                               {volume ? ` · ${formatKg(volume)} kg` : ''}
@@ -383,13 +383,13 @@ export default function AdminDashboardPage() {
                           <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold text-white">{student.full_name || student.email}</span>
-                            <span className="block text-[11px] text-zinc-500">
+                            <span className="block text-xs text-zinc-500">
                               {last ? `Último treino ${relativeDayPhrase(last)}` : `Sem treinos nos últimos ${WINDOW_DAYS} dias`}
                             </span>
                           </span>
                           <Link
                             href={`/admin/announcements?para=${student.id}`}
-                            className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-[11px] font-black uppercase text-black"
+                            className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-xs font-black uppercase text-black"
                           >
                             Avisar
                           </Link>
@@ -410,7 +410,7 @@ export default function AdminDashboardPage() {
                             href={`/admin/students?aluno=${student.id}`}
                             className="flex items-center gap-2 rounded-full border border-danger/30 bg-danger-soft py-1 pl-1 pr-3 text-xs font-semibold text-white"
                           >
-                            <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" className="h-7 w-7 rounded-full text-[10px]" />
+                            <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" className="h-7 w-7 rounded-full text-xs" />
                             {student.full_name?.split(' ')[0] ?? 'Aluno'}
                             <span className="font-bold text-danger">{student.readiness_score}%</span>
                           </Link>

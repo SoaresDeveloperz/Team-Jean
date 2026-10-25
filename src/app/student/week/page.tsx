@@ -176,21 +176,21 @@ export default function StudentWeekPage() {
                         {isNext && (
                           <span
                             className={cn(
-                              'rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider',
+                              'rounded-full px-2 py-0.5 text-xs font-black uppercase tracking-wider',
                               workout.inProgress ? 'bg-gold text-black' : 'bg-brand text-black',
                             )}
                           >
                             {workout.inProgress ? 'Em andamento' : 'Próximo'}
                           </span>
                         )}
-                        <span className="text-[11px] font-semibold text-zinc-500">
+                        <span className="text-xs font-semibold text-zinc-500">
                           {workout.lastDoneAt ? `Feito ${relativeDay(new Date(workout.lastDoneAt))}` : 'Ainda não feito'}
                         </span>
                       </span>
                       <span className="mt-1 block font-display text-2xl font-bold uppercase leading-[0.95] text-white">
                         {workout.name}
                       </span>
-                      <span className="mt-1.5 block truncate text-[11px] text-zinc-500">
+                      <span className="mt-1.5 block truncate text-xs text-zinc-500">
                         {workout.exerciseCount} {workout.exerciseCount === 1 ? 'exercício' : 'exercícios'}
                         {workout.muscles.length > 0 && ` · ${workout.muscles.slice(0, 3).join(', ')}`}
                       </span>

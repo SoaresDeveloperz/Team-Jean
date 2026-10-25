@@ -100,13 +100,13 @@ function ChallengeCard({
             <Confetti burst={burst} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">
+            <p className="text-xs font-black uppercase tracking-[0.1em] text-gold">
               Desafio da equipe{status === 'upcoming' ? ' · em breve' : ''}
             </p>
             <h3 id={`challenge-${challenge.id}`} className="mt-0.5 truncate font-display text-2xl font-bold uppercase leading-tight text-white">
               {challenge.title}
             </h3>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-400">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-zinc-400">
               <span className="inline-flex items-center gap-1">
                 <Target className="h-3 w-3" aria-hidden="true" /> {formatProgress(challenge.metric, challenge.goal)}
               </span>
@@ -174,7 +174,7 @@ function ChallengeCard({
               const isViewer = row.user_id === viewerId
               return (
                 <li key={row.user_id} className="flex items-center gap-2.5">
-                  <span className={cn('w-4 text-center text-[11px] font-black tabular-nums', index === 0 ? 'text-gold' : 'text-zinc-500')}>
+                  <span className={cn('w-4 text-center text-xs font-black tabular-nums', index === 0 ? 'text-gold' : 'text-zinc-500')}>
                     {index + 1}
                   </span>
                   <Avatar name={row.full_name} seed={row.user_id} src={publicImageUrl(row.avatar_path, row.user_id)} size="xs" />
@@ -321,7 +321,7 @@ export function ChallengesSection({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-white">{boards.length > 0 ? 'Novo desafio' : 'Crie um desafio para a equipe'}</span>
-            <span className="block text-[11px] text-zinc-400">Meta de treinos, dias ativos ou volume, com placar automático.</span>
+            <span className="block text-xs text-zinc-400">Meta de treinos, dias ativos ou volume, com placar automático.</span>
           </span>
         </m.button>
       )}

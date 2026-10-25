@@ -10,7 +10,7 @@ import { Modal } from '@/components/ui/modal'
 import { Switch } from '@/components/ui/switch'
 import { friendlyError } from '@/lib/errors'
 
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const fieldClassName = 'h-14 w-full rounded-2xl border border-line-strong bg-black/40 px-4 text-white focus:border-brand focus:outline-none'
 
 type PlanSheetProps = {
@@ -88,7 +88,7 @@ export function PlanSheet({ open, studentId, studentName, current, onClose, onSa
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
           <div>
             <p className="text-sm font-bold text-white">Plano ativo</p>
-            <p className="text-[11px] text-zinc-400">Pausado: o aluno não aparece como pendente.</p>
+            <p className="text-xs text-zinc-400">Pausado: o aluno não aparece como pendente.</p>
           </div>
           <Switch label="Plano ativo" checked={active} onChange={setActive} />
         </div>

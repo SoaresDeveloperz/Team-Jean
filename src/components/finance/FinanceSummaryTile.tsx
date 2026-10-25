@@ -65,7 +65,7 @@ export function FinanceSummaryTile({ students }: { students: Profile[] }) {
           <h2>
             <Eyebrow icon={Wallet}>Financeiro</Eyebrow>
           </h2>
-          <span className="flex items-center gap-1 text-[11px] font-bold text-zinc-400">
+          <span className="flex items-center gap-1 text-xs font-bold text-zinc-400">
             {monthTitle(month)} <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
         </div>
@@ -78,7 +78,7 @@ export function FinanceSummaryTile({ students }: { students: Profile[] }) {
         ) : (
           <>
             <p className="mt-3 font-display text-4xl font-bold leading-none text-brand">{formatBRL(summary.received)}</p>
-            <p className="mt-1 text-[11px] text-zinc-400">recebidos de {formatBRL(summary.expected)} previstos</p>
+            <p className="mt-1 text-xs text-zinc-400">recebidos de {formatBRL(summary.expected)} previstos</p>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.07]" aria-hidden="true">
               <m.div
                 className="h-full rounded-full bg-brand"
@@ -96,7 +96,7 @@ export function FinanceSummaryTile({ students }: { students: Profile[] }) {
                 : 'Ninguém em atraso. 👌'}
             </p>
             {summary.overdue.length === 0 && summary.nextDue && (
-              <p className="mt-1 text-[11px] text-zinc-500">Próximo vencimento: {shortDay(summary.nextDue)}</p>
+              <p className="mt-1 text-xs text-zinc-500">Próximo vencimento: {shortDay(summary.nextDue)}</p>
             )}
           </>
         )}

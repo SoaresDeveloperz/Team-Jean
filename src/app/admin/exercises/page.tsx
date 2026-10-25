@@ -26,7 +26,7 @@ const ALL = 'Todos'
 const GENERAL = 'Geral'
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 
 function normalizeName(name: string | null | undefined) {
   return String(name ?? '').trim().toLowerCase()
@@ -232,7 +232,7 @@ export default function AdminExercisesPage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-white">Catálogo base</p>
-            <p className="text-[11px] leading-snug text-zinc-300">
+            <p className="text-xs leading-snug text-zinc-300">
               {plural(missingCatalog.length, 'exercício pronto', 'exercícios prontos')} para completar a biblioteca, sem
               apagar os atuais.
             </p>
@@ -270,7 +270,7 @@ export default function AdminExercisesPage() {
               aria-checked={muscleFilter === muscle}
               onClick={() => setMuscleFilter(muscle)}
               className={cn(
-                'flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[11px] font-bold transition',
+                'flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-bold transition',
                 muscleFilter === muscle ? 'border-white bg-white text-black' : 'border-line bg-surface text-zinc-400 hover:text-white',
               )}
             >
@@ -331,7 +331,7 @@ export default function AdminExercisesPage() {
                     )}
                   </span>
                   <span className="mt-2.5 line-clamp-2 px-1 text-[13px] font-bold leading-snug text-white">{exercise.name}</span>
-                  <span className="mt-auto px-1 pb-0.5 pt-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+                  <span className="mt-auto px-1 pb-0.5 pt-1.5 text-xs font-black uppercase tracking-[0.12em] text-zinc-500">
                     {exercise.muscle_group || GENERAL}
                     {hasVideo && <span className="sr-only">, com vídeo</span>}
                   </span>
@@ -399,7 +399,7 @@ export default function AdminExercisesPage() {
                 {groupOptions.map((muscle) => (
                   <label
                     key={muscle}
-                    className="cursor-pointer rounded-full border border-line px-3 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand"
+                    className="cursor-pointer rounded-full border border-line px-3 py-1.5 text-xs font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand"
                   >
                     <input
                       type="radio"

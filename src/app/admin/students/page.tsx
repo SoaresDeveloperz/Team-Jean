@@ -25,6 +25,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { WhatsAppComeback } from '@/components/coach/WhatsAppComeback'
 import type { AssignedWorkout, Profile } from '@/lib/types'
 import { avatarUrlOf, goalInfo } from '@/lib/profile'
 import { relativeDay, relativeDayPhrase, startOfWeek } from '@/lib/stats'
@@ -376,11 +377,11 @@ export default function AdminStudentsPage() {
             const studentStats = statsOf(student.id)
             const readiness = readinessTone(student.readiness_score)
             return (
-              <m.div key={student.id} variants={tileVariants} layout className="h-full">
+              <m.div key={student.id} variants={tileVariants} layout className="flex h-full flex-col gap-1.5">
                 <button
                   type="button"
                   onClick={() => setDetailId(student.id)}
-                  className="flex h-full w-full items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
+                  className="flex w-full flex-1 items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
                 >
                   <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
                   <span className="min-w-0 flex-1">
@@ -412,6 +413,10 @@ export default function AdminStudentsPage() {
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
                 </button>
+                {/* Filtro "Sem treinar": chamar de volta pelo WhatsApp (fora do botão do cartão). */}
+                {filter === 'inactive' && (
+                  <WhatsAppComeback fullName={student.full_name} last={studentStats.last} className="self-end" />
+                )}
               </m.div>
             )
           })}

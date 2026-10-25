@@ -1,12 +1,14 @@
 'use client'
 
 import { memo, useState } from 'react'
-import { AnimatePresence, m } from 'framer-motion'
-import { ChevronDown, Info, Minus, Plus, Target, Trophy, Video } from 'lucide-react'
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
+import { ChevronDown, Flame, Info, Minus, Plus, Target, Trophy, Video } from 'lucide-react'
 import { SET_TYPES, formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
+import { canSuggestWarmup } from '@/lib/warmup'
 import { ExerciseMedia, getExerciseMedia } from '@/components/workout/ExerciseMedia'
 import { SetRow } from './SetRow'
+import { WarmupPanel } from './WarmupPanel'
 import type { ExerciseRow, PreviousSet, SetEntry } from './types'
 
 type ExerciseBlockProps = {
@@ -34,6 +36,10 @@ export const ExerciseBlock = memo(function ExerciseBlock({
   onRemoveExtra,
 }: ExerciseBlockProps) {
   const [showMedia, setShowMedia] = useState(false)
+  const [showWarmup, setShowWarmup] = useState(false)
+  const reduceMotion = useReducedMotion()
+  // Aquecimento sugerido: só sem aquecimento prescrito e com carga (WarmupPanel).
+  const warmupAvailable = canSuggestWarmup(entries)
   const exercise = row.exercises
   const hasMedia = Boolean(getExerciseMedia(exercise?.video_url) ?? getExerciseMedia(exercise?.image_url))
   const done = entries.filter((entry) => entry.completed).length
@@ -108,7 +114,38 @@ export const ExerciseBlock = memo(function ExerciseBlock({
             </m.span>
           </button>
         )}
+        {warmupAvailable && (
+          <button
+            type="button"
+            onClick={() => setShowWarmup((value) => !value)}
+            aria-expanded={showWarmup}
+            aria-controls={showWarmup ? `warmup-${row.id}` : undefined}
+            className={cn(
+              'flex h-11 shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-bold transition',
+              showWarmup ? 'bg-gold text-black' : 'bg-gold-soft text-gold hover:text-white',
+            )}
+          >
+            <Flame className="h-4 w-4" aria-hidden="true" /> Aquecer
+          </button>
+        )}
       </div>
+
+      <AnimatePresence initial={false}>
+        {warmupAvailable && showWarmup && (
+          <m.div
+            key="warmup"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-3">
+              <WarmupPanel id={`warmup-${row.id}`} exerciseName={exercise?.name ?? 'exercício'} entries={entries} />
+            </div>
+          </m.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence initial={false}>
         {showMedia && (

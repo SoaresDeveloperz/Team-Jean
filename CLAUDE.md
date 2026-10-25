@@ -9,7 +9,8 @@
   - ponta a ponta e acessibilidade: `pnpm test:build` e depois `pnpm test:e2e` (tudo, ~7 min) ou só o roteiro que cobre a mudança, com `node tests/run.mjs <roteiro>`:
     - `e2e` (`tests/e2e.cjs`): login, treino do aluno, perfil e medidas, comunidade, painel e ferramentas do treinador;
     - `gestao` (`tests/e2e-gestao.cjs`): esqueci minha senha, push, ficha de saúde, avaliação, treino sem internet, recados, carga-alvo, financeiro e o treinador no computador;
-    - `routes`, `admin`, `coach`, `community`, `profile` e `gestao-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
+    - `novidades` (`tests/contas-novidades.mjs` e `tests/e2e-novidades.cjs`): contas do aquecimento com anilhas e do link de WhatsApp, e as telas que os usam;
+    - `routes`, `admin`, `coach`, `community`, `profile`, `gestao-a11y` e `novidades-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
   - banco: `pnpm test:sql` (precisa de um Postgres; veja o README);
   - não rode dois `tests/run.mjs` ao mesmo tempo, nem `pnpm test:build` com um teste rodando: eles usam as mesmas portas (3200 e 54321) e a mesma pasta `.next`;
   - o CI do GitHub roda tudo isso a cada push e a cada PR.

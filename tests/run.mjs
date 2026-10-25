@@ -23,6 +23,8 @@ const ROUTES = {
 const SUITES = {
   e2e: ['tests/e2e.cjs'],
   gestao: ['tests/e2e-gestao.cjs'],
+  // Aquecimento com anilhas e WhatsApp para quem sumiu (contas puras + telas).
+  novidades: ['tests/contas-novidades.mjs', 'tests/e2e-novidades.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],
@@ -33,6 +35,7 @@ const SUITES = {
   community: ['tests/a11y/community-a11y.cjs'],
   profile: ['tests/a11y/profile-a11y.cjs'],
   'gestao-a11y': ['tests/a11y/gestao-a11y.cjs'],
+  'novidades-a11y': ['tests/a11y/novidades-a11y.cjs'],
 }
 
 const vapid = webpush.generateVAPIDKeys()

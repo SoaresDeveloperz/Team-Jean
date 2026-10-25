@@ -201,6 +201,9 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
   roda os roteiros de ponta a ponta (Playwright) e as auditorias de
   acessibilidade (axe, WCAG 2.1 AA). Use `node tests/run.mjs e2e gestao` para
   rodar só alguns.
+- `node tests/contas-novidades.mjs`: confere, sem navegador, as contas do
+  aquecimento e das anilhas (`src/lib/warmup.ts`) e a mensagem de WhatsApp
+  (`src/lib/whatsapp.ts`). Também roda no roteiro `novidades`.
 - `pnpm test:sql`: aplica os `supabase/*.sql` duas vezes, em duas ordens, num
   Postgres 16 e testa RLS, restrições e funções (`PGHOST`, `PGUSER` e
   `PGPASSWORD` apontando para o banco).

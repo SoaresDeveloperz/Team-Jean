@@ -10,10 +10,13 @@ const root = new URL('../../', import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
 const ORDERS = [
-  ['policies.sql', 'community.sql', 'profile.sql', 'coach.sql', 'gestao.sql'],
-  ['policies.sql', 'gestao.sql', 'coach.sql', 'profile.sql', 'community.sql'],
+  ['policies.sql', 'community.sql', 'profile.sql', 'coach.sql', 'gestao.sql', 'exercicios.sql', 'exercicios-casamento.sql'],
+  ['exercicios-casamento.sql', 'policies.sql', 'gestao.sql', 'coach.sql', 'exercicios.sql', 'profile.sql', 'community.sql'],
 ]
-const TESTS = ['rls-test.sql', 'rls-profile.sql', 'rls-coach.sql', 'rls-gestao.sql', 'rls-funcoes.sql']
+const TESTS = ['rls-test.sql', 'rls-profile.sql', 'rls-coach.sql', 'rls-gestao.sql', 'rls-funcoes.sql', 'rls-exercicios.sql']
+// Num teste, a linha "-- @incluir supabase/arquivo.sql" roda aquele arquivo ali
+// (ex.: reaplicar o casamento dos GIFs depois de cadastrar exercícios).
+const withIncludes = (sql) => sql.replace(/^--\s*@incluir\s+(\S+)\s*$/gm, (_, path) => `${read(path)}\n;`)
 
 function psql(database, sql) {
   const result = spawnSync('psql', ['-X', '-q', '-v', 'ON_ERROR_STOP=1', '-d', database], { input: sql, encoding: 'utf8' })
@@ -41,7 +44,7 @@ for (const [orderIndex, order] of ORDERS.entries()) {
       psql('postgres', `drop database if exists ${database};`)
       continue
     }
-    const run = psql(database, read(`tests/sql/${test}`))
+    const run = psql(database, withIncludes(read(`tests/sql/${test}`)))
     const notices = run.stderr
       .split('\n')
       .map((line) => line.replace(/^(psql:[^:]*:\d+: )?(NOTICE|ERROR):\s+/, ''))

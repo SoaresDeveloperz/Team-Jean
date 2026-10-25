@@ -27,14 +27,14 @@ export function WorkoutShareCard({ meta, className }: { meta: WorkoutMeta; class
     <div className={cn('overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-br from-brand-soft via-transparent to-transparent p-4', className)}>
       <div className="flex gap-3">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-brand">
+          <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.1em] text-brand">
             <Dumbbell className="h-3.5 w-3.5" aria-hidden="true" /> Treino concluído
           </p>
           <p className="mt-1.5 line-clamp-2 font-display text-2xl font-bold uppercase leading-[0.95] text-white">{meta.name}</p>
           <dl className="mt-3 grid grid-cols-3 gap-2">
             {stats.map((stat) => (
               <div key={stat.label}>
-                <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">{stat.label}</dt>
+                <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">{stat.label}</dt>
                 <dd className="font-display text-xl font-bold leading-tight text-white">
                   {stat.value}
                   {stat.unit && <span className="ml-0.5 text-xs text-zinc-500">{stat.unit}</span>}
@@ -76,7 +76,7 @@ export function AchievementShareCard({ meta, className }: { meta: AchievementMet
         <AchievementIcon icon={meta.icon} className="h-8 w-8" />
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-gold">Conquista desbloqueada</p>
+        <p className="text-xs font-black uppercase tracking-[0.1em] text-gold">Conquista desbloqueada</p>
         <p className="mt-1 font-display text-2xl font-bold uppercase leading-none text-white">{meta.title}</p>
         <p className="mt-1 text-xs text-zinc-300">{meta.description}</p>
       </div>

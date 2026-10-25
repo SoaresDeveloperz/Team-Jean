@@ -6,6 +6,7 @@ import { Check, ChevronDown, Dumbbell, Search, TrendingDown, TrendingUp, Trophy,
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import { formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -77,7 +78,11 @@ export default function StudentProgressPage() {
   const [metric, setMetric] = useState<Metric>('weight')
   const [loading, setLoading] = useState(true)
   const [loadingChart, setLoadingChart] = useState(false)
+  // listError: a lista de exercícios não carregou; errorMessage: o gráfico não carregou.
+  const [listError, setListError] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [chartAttempt, setChartAttempt] = useState(0)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState('')
   const requestId = useRef(0)
@@ -88,7 +93,12 @@ export default function StudentProgressPage() {
 
     const loadExercises = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setListError(friendlyError(MISSING_SESSION, 'Não foi possível carregar seus exercícios'))
+        setLoading(false)
+        return
+      }
 
       const [workoutsResult, sessionsResult] = await Promise.all([
         supabase.from('assigned_workouts').select('id').eq('student_id', user.id),
@@ -104,7 +114,7 @@ export default function StudentProgressPage() {
 
       const firstError = workoutsResult.error ?? sessionsResult.error
       if (firstError) {
-        setErrorMessage(`Não foi possível carregar seus exercícios: ${firstError.message}`)
+        setListError(friendlyError(firstError, 'Não foi possível carregar seus exercícios'))
         setLoading(false)
         return
       }
@@ -133,7 +143,7 @@ export default function StudentProgressPage() {
       if (!active) return
 
       if (exercisesResult.error) {
-        setErrorMessage(`Não foi possível carregar seus exercícios: ${exercisesResult.error.message}`)
+        setListError(friendlyError(exercisesResult.error, 'Não foi possível carregar seus exercícios'))
         setLoading(false)
         return
       }
@@ -145,6 +155,7 @@ export default function StudentProgressPage() {
       const options = [...unique.values()].sort((first, second) => first.name.localeCompare(second.name, 'pt-BR'))
 
       const lastExerciseId = (lastSetResult.data as { exercise_id: string } | null)?.exercise_id
+      setListError('')
       setCompletedSessions(sessions)
       setExercises(options)
       setSelectedExerciseId(options.find((option) => option.id === lastExerciseId)?.id ?? options[0]?.id ?? '')
@@ -155,7 +166,17 @@ export default function StudentProgressPage() {
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
+
+  const retryList = () => {
+    setListError('')
+    setLoading(true)
+    setAttempt((value) => value + 1)
+  }
+  const retryChart = () => {
+    setErrorMessage('')
+    setChartAttempt((value) => value + 1)
+  }
 
   useEffect(() => {
     if (!completedSessions || completedSessions.length === 0 || !selectedExerciseId) return
@@ -177,7 +198,8 @@ export default function StudentProgressPage() {
       if (currentRequest !== requestId.current) return
 
       if (error) {
-        setErrorMessage(`Não foi possível carregar sua evolução: ${error.message}`)
+        // Limpa o gráfico (podia ser de outro exercício) e avisa: a área diz que não carregou, sem fingir "nenhum registro".
+        setErrorMessage(friendlyError(error, 'Não foi possível carregar sua evolução'))
         setStats([])
       } else {
         const dateBySession = new Map(completedSessions.map((session) => [session.id, session.completed_at ?? '']))
@@ -188,7 +210,7 @@ export default function StudentProgressPage() {
     }
 
     void loadProgress()
-  }, [supabase, completedSessions, selectedExerciseId])
+  }, [supabase, completedSessions, selectedExerciseId, chartAttempt])
 
   const summary = useMemo(() => {
     if (stats.length === 0) return null
@@ -233,11 +255,14 @@ export default function StudentProgressPage() {
           </div>
           <Skeleton className="h-64 rounded-3xl" />
         </div>
+      ) : listError && exercises.length === 0 ? (
+        <Alert variant="error" onRetry={retryList}>
+          {listError}
+        </Alert>
       ) : exercises.length === 0 ? (
         <div className="space-y-3 rounded-3xl border border-line bg-surface p-8 text-center">
           <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
           <p className="text-sm font-semibold text-zinc-400">Seu treinador ainda não prescreveu exercícios.</p>
-          {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
         </div>
       ) : (
         <Stagger className="space-y-4">
@@ -252,7 +277,7 @@ export default function StudentProgressPage() {
               <Dumbbell className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Exercício</span>
+              <span className="block text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Exercício</span>
               <span className="block truncate text-base font-bold text-white">{selectedExercise?.name}</span>
             </span>
             <span className="flex items-center gap-1 text-xs font-bold text-zinc-400">
@@ -260,7 +285,11 @@ export default function StudentProgressPage() {
             </span>
           </m.button>
 
-          {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+          {errorMessage && (
+            <Alert variant="error" onRetry={retryChart}>
+              {errorMessage}
+            </Alert>
+          )}
 
           {summary && (
             <div className="grid grid-cols-2 gap-3">
@@ -272,7 +301,7 @@ export default function StudentProgressPage() {
                   {formatKg(summary.best.bestWeight)}
                   <span className="ml-1 text-base text-zinc-500">kg</span>
                 </p>
-                <p className="mt-1 text-[11px] text-zinc-500">× {summary.best.bestReps} repetições</p>
+                <p className="mt-1 text-xs text-zinc-500">× {summary.best.bestReps} repetições</p>
               </Tile>
               <Tile className="p-4">
                 <Eyebrow icon={Zap}>1RM estimado</Eyebrow>
@@ -280,7 +309,7 @@ export default function StudentProgressPage() {
                   {formatKg(Math.round(summary.bestOneRepMax))}
                   <span className="ml-1 text-base text-zinc-500">kg</span>
                 </p>
-                <p className="mt-1 text-[11px] text-zinc-500">Fórmula de Epley</p>
+                <p className="mt-1 text-xs text-zinc-500">Fórmula de Epley</p>
               </Tile>
             </div>
           )}
@@ -326,7 +355,11 @@ export default function StudentProgressPage() {
             <div className={cn('mt-3 transition-opacity', loadingChart && 'opacity-40')}>
               {stats.length === 0 ? (
                 <p className="py-10 text-center text-xs text-zinc-600">
-                  {loadingChart ? 'Carregando...' : 'Nenhum registro deste exercício ainda. Bora treinar!'}
+                  {loadingChart
+                    ? 'Carregando...'
+                    : errorMessage
+                      ? 'O gráfico não carregou.'
+                      : 'Nenhum registro deste exercício ainda. Bora treinar!'}
                 </p>
               ) : (
                 <LineChart
@@ -355,17 +388,17 @@ export default function StudentProgressPage() {
                   const isRecord = summary?.best.sessionId === stat.sessionId
                   return (
                     <li key={stat.sessionId} className="flex items-center gap-3 px-5 py-3">
-                      <span className="w-12 shrink-0 text-[11px] font-bold tabular-nums text-zinc-500">
+                      <span className="w-12 shrink-0 text-xs font-bold tabular-nums text-zinc-500">
                         {stat.date
                           ? new Date(stat.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                           : '--'}
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-400">
+                      <span className="min-w-0 flex-1 truncate text-xs text-zinc-400">
                         {stat.sets.map((set) => `${formatKg(set.weight)}×${set.reps}`).join('  ·  ')}
                       </span>
                       <span
                         className={cn(
-                          'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums',
+                          'flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-black tabular-nums',
                           isRecord ? 'bg-gold-soft text-gold' : 'bg-white/[0.06] text-white',
                         )}
                       >
@@ -397,7 +430,7 @@ export default function StudentProgressPage() {
           {groupedOptions.length === 0 && <p className="py-6 text-center text-xs text-zinc-500">Nenhum exercício encontrado.</p>}
           {groupedOptions.map(([muscle, options]) => (
             <div key={muscle}>
-              <p className="mb-1.5 px-1 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">{muscle}</p>
+              <p className="mb-1.5 px-1 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">{muscle}</p>
               <ul className="overflow-hidden rounded-2xl border border-line">
                 {options.map((exercise) => {
                   const selected = exercise.id === selectedExerciseId

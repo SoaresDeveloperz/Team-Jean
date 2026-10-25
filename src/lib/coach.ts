@@ -4,6 +4,7 @@ import type { createClient } from './supabase/client'
 import { formatKg } from './workouts'
 import { plural } from './text'
 import { requestPushDelivery } from './push/client'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -65,7 +66,7 @@ export class CoachError extends Error {
 }
 
 function fail(prefix: string, error: NonNullable<DbError>): never {
-  throw new CoachError(`${prefix}: ${error.message ?? 'erro desconhecido'}`, isCoachSetupMissing(error))
+  throw new CoachError(friendlyError(error, prefix), isCoachSetupMissing(error))
 }
 
 // ------------------------------------------------------------------ datas

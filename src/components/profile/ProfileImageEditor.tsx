@@ -10,6 +10,7 @@ import {
   type ProfileImageKind,
 } from '@/lib/profile'
 import { haptic } from '@/lib/haptics'
+import { friendlyError } from '@/lib/errors'
 import { useToast } from '@/components/ui/toast'
 import { ImageCropper } from './ImageCropper'
 import { PhotoActions } from './PhotoActions'
@@ -76,7 +77,7 @@ export function ProfileImageEditor({ userId, kind, open, currentPath, onClose, o
         tone: 'error',
         title: 'Não foi possível remover',
         description:
-          error instanceof ProfileError && error.missing ? PROFILE_SETUP_MESSAGE : error instanceof Error ? error.message : undefined,
+          error instanceof ProfileError && error.missing ? PROFILE_SETUP_MESSAGE : friendlyError(error),
       })
     } finally {
       onUploadingChange?.(null)

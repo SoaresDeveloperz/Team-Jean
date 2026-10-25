@@ -4,6 +4,7 @@
 // para reabrir o treino sem internet (academia com sinal ruim).
 import type { createClient } from './supabase/client'
 import type { AssignedWorkout, PrescribedExercise, Exercise } from './types'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 
@@ -36,7 +37,7 @@ type Result = { data: unknown; error: { message: string } | null; status: number
 
 function check(result: Result) {
   if (result.status === 0) throw new OfflineError(result.error?.message ?? 'sem conexão')
-  if (result.error) throw new Error(result.error.message)
+  if (result.error) throw new Error(friendlyError(result.error), { cause: result.error })
   return result.data
 }
 

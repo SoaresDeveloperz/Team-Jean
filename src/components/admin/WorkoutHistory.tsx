@@ -88,7 +88,7 @@ export function WorkoutHistory({ sessions, loading, error }: WorkoutHistoryProps
             <article key={session.id} className="rounded-3xl border border-line bg-surface p-4">
               <header className="flex items-start justify-between gap-3 border-b border-line pb-3">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Sessão concluída</p>
+                  <p className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Sessão concluída</p>
                   <p className="mt-1 text-sm font-bold text-white">
                     {session.completed_at
                       ? capitalize(
@@ -105,12 +105,12 @@ export function WorkoutHistory({ sessions, loading, error }: WorkoutHistoryProps
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {session.session_rpe != null && (
-                    <span className="rounded-full bg-gold-soft px-2.5 py-1 text-[10px] font-black text-gold">
+                    <span className="rounded-full bg-gold-soft px-2.5 py-1 text-xs font-black text-gold">
                       RPE {session.session_rpe}/10
                     </span>
                   )}
                   {session.volume > 0 && (
-                    <span className="text-[11px] font-semibold tabular-nums text-zinc-400">{formatKg(session.volume)} kg</span>
+                    <span className="text-xs font-semibold tabular-nums text-zinc-400">{formatKg(session.volume)} kg</span>
                   )}
                 </div>
               </header>
@@ -126,7 +126,7 @@ export function WorkoutHistory({ sessions, loading, error }: WorkoutHistoryProps
                         {group.sets.map((set) => (
                           <li
                             key={set.id}
-                            className="rounded-lg bg-white/[0.06] px-2 py-1 text-[11px] font-semibold tabular-nums text-zinc-200"
+                            className="rounded-lg bg-white/[0.06] px-2 py-1 text-xs font-semibold tabular-nums text-zinc-200"
                           >
                             <span className="text-brand">{formatKg(Number(set.weight_kg) || 0)} kg</span> × {set.reps ?? 0}
                             {set.rir !== null && <span className="text-zinc-500"> · RIR {set.rir}</span>}

@@ -1,7 +1,7 @@
 'use client'
 
 import { m } from 'framer-motion'
-import { BatteryCharging } from 'lucide-react'
+import { BatteryCharging, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Eyebrow, Tile } from '@/components/ui/tile'
 
@@ -24,6 +24,8 @@ type ReadinessCardProps = {
 export function ReadinessCard({ value, onChange, status }: ReadinessCardProps) {
   const level = readinessLevel(value)
   const filled = Math.round(value / 10)
+  // A alça fica no meio da última barra acesa.
+  const handlePosition = ((Math.max(1, filled) - 0.5) / SEGMENTS) * 100
 
   return (
     <Tile>
@@ -31,10 +33,11 @@ export function ReadinessCard({ value, onChange, status }: ReadinessCardProps) {
         <div>
           <Eyebrow icon={BatteryCharging}>Prontidão</Eyebrow>
           <p className="mt-1.5 text-sm text-zinc-300">Como está sua energia hoje?</p>
+          <p className="mt-0.5 text-xs text-zinc-400">Arraste a alça ou toque numa barra.</p>
         </div>
         <div className="text-right">
           <p className={cn('font-display text-4xl font-bold leading-none', level.className)}>{value}%</p>
-          <p className="mt-1 text-[11px] font-semibold text-zinc-400">{level.label}</p>
+          <p className="mt-1 text-xs font-semibold text-zinc-400">{level.label}</p>
         </div>
       </div>
 
@@ -57,6 +60,16 @@ export function ReadinessCard({ value, onChange, status }: ReadinessCardProps) {
             )
           })}
         </div>
+        {/* Alça visível: mostra que a barra é arrastável (o input invisível por cima faz o trabalho). */}
+        <div className="relative mt-2 h-7" aria-hidden="true">
+          <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/10" />
+          <span
+            className="absolute top-1/2 grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 bg-white text-black shadow-[0_2px_10px_rgba(0,0,0,0.5)] transition-[left] duration-200 motion-reduce:transition-none"
+            style={{ left: `${handlePosition}%`, borderColor: level.color }}
+          >
+            <GripVertical className="h-4 w-4" />
+          </span>
+        </div>
         <input
           type="range"
           min={10}
@@ -70,7 +83,7 @@ export function ReadinessCard({ value, onChange, status }: ReadinessCardProps) {
         />
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+      <div className="mt-2.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-zinc-600">
         <span>Fadigado</span>
         <span aria-live="polite" className="normal-case tracking-normal">
           {status === 'saving' && <span className="text-zinc-500">Salvando...</span>}

@@ -6,7 +6,9 @@ import { Check, ChevronDown, Copy, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   dueDate,
+  PIX_KEY_TYPES,
   formatBRL,
+  guessPixKeyType,
   loadMyBilling,
   methodLabel,
   monthOf,
@@ -59,11 +61,14 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
   const status = statusFor(billing, payment ?? undefined, month, today)
   if (status === 'paused' || status === 'not_started') return null
   const due = dueDate(billing.due_day, month)
+  // Mesmo nome que vai no código do PIX: o aluno confere no banco antes de pagar.
+  const pixName = settings?.pix_name?.trim() || 'Team Jean'
+  const pixKeyLabel = settings?.pix_key ? PIX_KEY_TYPES.find((item) => item.value === guessPixKeyType(settings.pix_key))?.label : null
   const pix =
     settings?.pix_key && status !== 'paid'
       ? pixPayload({
           key: settings.pix_key,
-          name: settings.pix_name ?? 'Team Jean',
+          name: pixName,
           city: settings.pix_city ?? 'Brasil',
           amount: billing.monthly_fee,
           txid: pixTxid(userId, month),
@@ -108,7 +113,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
           </div>
           <div className="text-right">
             <p className="font-display text-3xl font-bold leading-none text-white">{formatBRL(payment?.amount ?? billing.monthly_fee)}</p>
-            <p className={cn('mt-1 flex items-center justify-end gap-1 text-[11px] font-bold', tone)}>
+            <p className={cn('mt-1 flex items-center justify-end gap-1 text-xs font-bold', tone)}>
               {status === 'paid' && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
               {statusLabel}
             </p>
@@ -118,6 +123,13 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
         {status !== 'paid' &&
           (pix ? (
             <div className="mt-4 space-y-2">
+              <div className="rounded-2xl border border-line bg-black/20 p-3 text-xs leading-relaxed text-zinc-300">
+                <p>
+                  Para: <span className="font-bold text-white">{pixName}</span>
+                  {pixKeyLabel && <span className="text-zinc-400"> · chave {pixKeyLabel.toLowerCase()}</span>}
+                </p>
+                <p className="mt-0.5 text-zinc-400">Confira se o banco mostra este nome. Depois de pagar, seu treinador confirma aqui.</p>
+              </div>
               <m.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
@@ -138,7 +150,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
                 type="button"
                 onClick={() => setShowCode((value) => !value)}
                 aria-expanded={showCode}
-                className="flex w-full items-center justify-center gap-1 text-[11px] font-bold text-zinc-400 hover:text-white"
+                className="flex w-full items-center justify-center gap-1 text-xs font-bold text-zinc-400 hover:text-white"
               >
                 {showCode ? 'Esconder código' : 'Ver código'}
                 <m.span animate={{ rotate: showCode ? 180 : 0 }}>
@@ -152,7 +164,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="select-all overflow-hidden break-all rounded-2xl bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
+                    className="select-all overflow-hidden break-all rounded-2xl bg-black/40 p-3 font-mono text-xs leading-relaxed text-zinc-300"
                   >
                     {pix}
                   </m.p>

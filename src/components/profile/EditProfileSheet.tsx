@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal, SheetFooter } from '@/components/ui/modal'
+import { friendlyError } from '@/lib/errors'
 
 type EditableFields = Pick<ProfileDetails, 'full_name' | 'bio' | 'goal' | 'instagram'>
 
@@ -28,7 +29,7 @@ type EditProfileSheetProps = {
 
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 
 // Os campos começam com o perfil atual: o componente é montado de novo a
 // cada abertura (key no pai), então não precisa sincronizar estado.
@@ -65,7 +66,7 @@ export function EditProfileSheet({ open, profile, onClose, onSave }: EditProfile
       await onSave(patch)
     } catch (saveError) {
       if (saveError instanceof ProfileError && saveError.missing) setError(PROFILE_SETUP_MESSAGE)
-      else setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar.')
+      else setError(friendlyError(saveError, 'Não foi possível salvar'))
     } finally {
       setSaving(false)
     }
@@ -93,7 +94,7 @@ export function EditProfileSheet({ open, profile, onClose, onSave }: EditProfile
             <label htmlFor="profile-bio" className={cn(labelClassName, 'mb-0')}>
               Bio
             </label>
-            <span aria-hidden="true" className={cn('text-[10px] font-bold tabular-nums', bio.length > BIO_MAX * 0.9 ? 'text-gold' : 'text-zinc-500')}>
+            <span aria-hidden="true" className={cn('text-xs font-bold tabular-nums', bio.length > BIO_MAX * 0.9 ? 'text-gold' : 'text-zinc-500')}>
               {bio.length}/{BIO_MAX}
             </span>
           </div>

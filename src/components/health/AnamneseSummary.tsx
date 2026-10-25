@@ -47,7 +47,7 @@ export function AnamneseSummary({ anamnese }: { anamnese: Anamnese }) {
       {conditions.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Condições de saúde">
           {conditions.map((condition) => (
-            <li key={condition.key} className="rounded-full border border-gold/30 bg-gold-soft px-2.5 py-1 text-[11px] font-bold text-gold">
+            <li key={condition.key} className="rounded-full border border-gold/30 bg-gold-soft px-2.5 py-1 text-xs font-bold text-gold">
               {condition.label}
             </li>
           ))}
@@ -58,7 +58,7 @@ export function AnamneseSummary({ anamnese }: { anamnese: Anamnese }) {
         <dl className="space-y-2">
           {details.map((item) => (
             <div key={item.label} className="rounded-2xl bg-black/25 px-3.5 py-2.5">
-              <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">{item.label}</dt>
+              <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">{item.label}</dt>
               <dd className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-zinc-200">{item.value}</dd>
             </div>
           ))}
@@ -72,7 +72,7 @@ export function AnamneseSummary({ anamnese }: { anamnese: Anamnese }) {
           { label: 'Fuma', value: answers.smoker === null ? '—' : answers.smoker ? 'Sim' : 'Não' },
         ].map((item) => (
           <div key={item.label} className="rounded-2xl border border-line bg-black/20 px-2 py-2.5">
-            <dt className="text-[9px] font-black uppercase tracking-wider text-zinc-500">{item.label}</dt>
+            <dt className="text-xs font-black uppercase tracking-wider text-zinc-500">{item.label}</dt>
             <dd className="mt-0.5 text-sm font-bold text-white">{item.value}</dd>
           </div>
         ))}

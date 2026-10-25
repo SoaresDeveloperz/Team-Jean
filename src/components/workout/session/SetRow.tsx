@@ -33,7 +33,7 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
       animate={{ backgroundColor: entry.completed ? 'rgba(52, 211, 153, 0.10)' : 'rgba(0, 0, 0, 0)' }}
       transition={{ duration: 0.25 }}
       role="row"
-      className="grid grid-cols-[2.6rem_minmax(0,1fr)_4.4rem_4.4rem_2.9rem] items-center gap-2 rounded-2xl px-2 py-1.5"
+      className="grid grid-cols-[3rem_minmax(0,1fr)_4.4rem_4.4rem_2.9rem] items-center gap-2 rounded-2xl px-2 py-1.5"
     >
       <div role="cell" className="flex flex-col items-center leading-none">
         {entry.isPR && entry.completed ? (
@@ -61,7 +61,17 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
           </span>
         )}
         {entry.targetRir !== null && (
-          <span className="mt-0.5 text-[9px] font-bold text-zinc-500">RIR {entry.targetRir}</span>
+          // RIR em português: quantas repetições sobram "na reserva" (0 = até a falha).
+          <span
+            className="mt-0.5 text-center text-xs font-semibold leading-tight text-zinc-400"
+            title={
+              entry.targetRir === 0
+                ? 'Vá até não conseguir fazer mais nenhuma repetição'
+                : `Pare quando ainda conseguir fazer mais ${entry.targetRir} ${entry.targetRir === 1 ? 'repetição' : 'repetições'}`
+            }
+          >
+            {entry.targetRir === 0 ? 'até a falha' : `${entry.targetRir} na reserva`}
+          </span>
         )}
       </div>
 

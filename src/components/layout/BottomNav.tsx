@@ -59,7 +59,7 @@ export function BottomNav({ items, label, className }: { items: NavItem[]; label
                 </span>
                 <span
                   className={cn(
-                    'max-w-full truncate px-0.5 text-[10px] font-semibold tracking-wide transition-colors',
+                    'max-w-full truncate px-0.5 text-xs font-semibold tracking-wide transition-colors',
                     active ? 'text-white' : 'text-zinc-500',
                   )}
                 >

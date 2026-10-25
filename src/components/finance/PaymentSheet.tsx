@@ -7,8 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import { PAYMENT_METHODS, formatBRL, monthLabel, parseMoney, recordPayment, todaySP, type Payment, type PaymentMethod } from '@/lib/finance'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
+import { friendlyError } from '@/lib/errors'
 
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const chipClassName =
   'flex h-10 cursor-pointer items-center justify-center rounded-full border border-line px-3.5 text-xs font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
 
@@ -41,7 +42,7 @@ export function PaymentSheet({ open, studentId, studentName, month, suggested, o
     try {
       onSaved(await recordPayment(supabase, { student_id: studentId, reference_month: month, amount: value, method, paid_on: paidOn }))
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Não foi possível registrar.')
+      setError(friendlyError(saveError, 'Não foi possível registrar'))
     } finally {
       setSaving(false)
     }

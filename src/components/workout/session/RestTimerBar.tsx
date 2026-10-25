@@ -65,7 +65,7 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
               <span className="font-display text-lg font-bold">{formatDuration(remaining)}</span>
             </ProgressRing>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand">{running ? 'Descanso' : 'Pausado'}</p>
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-brand">{running ? 'Descanso' : 'Pausado'}</p>
               <p className="text-xs font-semibold text-zinc-300">Respire e se prepare</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -81,7 +81,7 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
                 type="button"
                 onClick={() => onAdjust(30, remaining)}
                 aria-label="Mais 30 segundos"
-                className="flex h-10 items-center gap-0.5 rounded-xl bg-white/[0.06] px-2 text-[11px] font-bold text-zinc-300"
+                className="flex h-10 items-center gap-0.5 rounded-xl bg-white/[0.06] px-2 text-xs font-bold text-zinc-300"
               >
                 <Plus className="h-3 w-3" aria-hidden="true" />
                 30
@@ -104,7 +104,7 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
               </button>
             </div>
           </div>
-          {nextHint && <p className="mt-2 truncate border-t border-line pt-2 text-[11px] text-zinc-400">{nextHint}</p>}
+          {nextHint && <p className="mt-2 truncate border-t border-line pt-2 text-xs text-zinc-400">{nextHint}</p>}
         </m.div>
       )}
     </AnimatePresence>

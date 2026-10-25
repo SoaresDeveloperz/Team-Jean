@@ -3,6 +3,7 @@
 // Tabelas e colunas em supabase/gestao.sql.
 import type { createClient } from './supabase/client'
 import { requestPushDelivery } from './push/client'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -96,7 +97,7 @@ export const HEALTH_SETUP_MESSAGE = 'Para usar a ficha de saúde e a avaliação
 
 function fail(prefix: string, error: NonNullable<DbError>): never {
   const missing = isHealthSetupMissing(error)
-  throw new HealthError(missing ? HEALTH_SETUP_MESSAGE : `${prefix}: ${error.message ?? 'erro desconhecido'}`, missing)
+  throw new HealthError(missing ? HEALTH_SETUP_MESSAGE : friendlyError(error, prefix), missing)
 }
 
 function normalize(raw: unknown): AnamneseAnswers {

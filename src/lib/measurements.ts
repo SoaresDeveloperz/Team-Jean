@@ -3,6 +3,7 @@
 import { compressImage } from './images'
 import { ProfileError, isProfileSetupMissing } from './profile'
 import type { createClient } from './supabase/client'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -53,7 +54,7 @@ const toNumber = (value: unknown) => {
 }
 
 function fail(prefix: string, error: NonNullable<DbError>): never {
-  throw new ProfileError(`${prefix}: ${error.message ?? 'erro desconhecido'}`, isProfileSetupMissing(error))
+  throw new ProfileError(friendlyError(error, prefix), isProfileSetupMissing(error))
 }
 
 // "72,4" ou "72.4" → 72.4; vazio → null.

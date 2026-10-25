@@ -109,7 +109,7 @@ export function AnamneseCard({ studentId, studentName, autoOpen = false }: Anamn
               {studentName} ainda não respondeu a ficha de saúde.
             </p>
           )}
-          {status === 'ready' && updated && <p className="mt-1 text-[11px] text-zinc-500">Atualizada em {updated}</p>}
+          {status === 'ready' && updated && <p className="mt-1 text-xs text-zinc-500">Atualizada em {updated}</p>}
           {body}
         </section>
       ) : (
@@ -130,7 +130,7 @@ export function AnamneseCard({ studentId, studentName, autoOpen = false }: Anamn
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold text-white">Ficha de saúde (PAR-Q)</span>
-              <span className="block text-[11px] text-zinc-400">
+              <span className="block text-xs text-zinc-400">
                 {status === 'loading'
                   ? 'Carregando…'
                   : status === 'missing'

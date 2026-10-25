@@ -5,6 +5,7 @@ import { m } from 'framer-motion'
 import { LoaderCircle, Minus, Plus } from 'lucide-react'
 import { cropImage, loadImage } from '@/lib/images'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Modal, SheetFooter } from '@/components/ui/modal'
 
@@ -163,7 +164,7 @@ export function ImageCropper({ open, file, title, aspect, shape, output, onCance
       const blob = await cropImage(current.image, region, output.width, output.height)
       await onConfirm(blob)
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar a foto.')
+      setSaveError(friendlyError(error, 'Não foi possível salvar a foto'))
     } finally {
       setSaving(false)
     }

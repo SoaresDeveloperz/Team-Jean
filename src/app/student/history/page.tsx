@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
 
 type HistorySession = WorkoutSession & { completed_at: string; assigned_workouts: { name: string | null } | null }
@@ -47,6 +48,7 @@ export default function StudentHistoryPage() {
   const [supabase] = useState(() => createClient())
   const [sessions, setSessions] = useState<HistorySession[] | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const [month, setMonth] = useState(() => {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
@@ -61,7 +63,11 @@ export default function StudentHistoryPage() {
 
     const load = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setLoadError(friendlyError(MISSING_SESSION, 'Não foi possível carregar o histórico'))
+        return
+      }
 
       const { data, error } = await supabase
         .from('workout_sessions')
@@ -72,7 +78,12 @@ export default function StudentHistoryPage() {
         .limit(300)
       if (!active) return
 
-      if (error) setLoadError(`Não foi possível carregar o histórico: ${error.message}`)
+      // Com erro, o que já estava na tela fica (nada de "0 treinos" falso).
+      if (error) {
+        setLoadError(friendlyError(error, 'Não foi possível carregar o histórico'))
+        return
+      }
+      setLoadError('')
       setSessions(((data ?? []) as HistorySession[]).filter((session) => session.completed_at))
     }
 
@@ -80,7 +91,12 @@ export default function StudentHistoryPage() {
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
+
+  const retry = () => {
+    setLoadError('')
+    setAttempt((value) => value + 1)
+  }
 
   const stats = useMemo(() => {
     const dates = (sessions ?? []).map((session) => new Date(session.completed_at))
@@ -165,17 +181,23 @@ export default function StudentHistoryPage() {
         <h1 className="mt-1 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">Histórico</h1>
       </div>
 
-      {loadError && <Alert variant="error">{loadError}</Alert>}
+      {loadError && (
+        <Alert variant="error" onRetry={retry}>
+          {loadError}
+        </Alert>
+      )}
 
       {sessions === null ? (
-        <div className="space-y-3" role="status" aria-label="Carregando histórico">
-          <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2].map((item) => (
-              <Skeleton key={item} className="h-24 rounded-3xl" />
-            ))}
+        loadError ? null : (
+          <div className="space-y-3" role="status" aria-label="Carregando histórico">
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((item) => (
+                <Skeleton key={item} className="h-24 rounded-3xl" />
+              ))}
+            </div>
+            <Skeleton className="h-80 rounded-3xl" />
           </div>
-          <Skeleton className="h-80 rounded-3xl" />
-        </div>
+        )
       ) : (
         <Stagger className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
@@ -189,7 +211,7 @@ export default function StudentHistoryPage() {
                 <p className="mt-2 font-display text-4xl font-bold leading-none">
                   <AnimatedNumber value={stat.value} />
                 </p>
-                {stat.hint && <p className="text-[10px] text-zinc-500">{stat.hint}</p>}
+                {stat.hint && <p className="text-xs text-zinc-500">{stat.hint}</p>}
               </Tile>
             ))}
           </div>
@@ -221,7 +243,7 @@ export default function StudentHistoryPage() {
 
             <div className="mt-3 grid grid-cols-7 gap-1.5 text-center" aria-hidden="true">
               {WEEKDAY_INITIALS.map((initial, index) => (
-                <span key={index} className="text-[10px] font-black text-zinc-600">
+                <span key={index} className="text-xs font-black text-zinc-600">
                   {initial}
                 </span>
               ))}
@@ -277,7 +299,7 @@ export default function StudentHistoryPage() {
           {/* Lista */}
           <section aria-labelledby="sessions-title" className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
-              <h2 id="sessions-title" className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+              <h2 id="sessions-title" className="text-xs font-black uppercase tracking-[0.12em] text-zinc-500">
                 {selectedDay
                   ? selectedDay.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
                   : `${visibleSessions.length} ${visibleSessions.length === 1 ? 'treino' : 'treinos'} em ${monthTitle(month).split(' ')[0].toLowerCase()}`}
@@ -286,7 +308,7 @@ export default function StudentHistoryPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedDay(null)}
-                  className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold text-zinc-300"
+                  className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-xs font-bold text-zinc-300"
                 >
                   <X className="h-3 w-3" aria-hidden="true" /> Ver mês
                 </button>
@@ -319,7 +341,7 @@ export default function StudentHistoryPage() {
                         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/[0.05] text-center">
                           <span>
                             <span className="block font-display text-2xl font-bold leading-none">{date.getDate()}</span>
-                            <span className="block text-[9px] font-black uppercase tracking-wider text-zinc-500">
+                            <span className="block text-xs font-black uppercase tracking-wider text-zinc-500">
                               {date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
                             </span>
                           </span>
@@ -329,21 +351,21 @@ export default function StudentHistoryPage() {
                             {session.assigned_workouts?.name || 'Treino concluído'}
                           </span>
                           <span className="mt-1.5 flex flex-wrap gap-1.5">
-                            <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                            <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
                               <Gauge className="h-3 w-3" aria-hidden="true" /> RPE {session.session_rpe ?? '–'}/10
                             </span>
                             {duration && (
-                              <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                              <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
                                 <Clock className="h-3 w-3" aria-hidden="true" /> {duration} min
                               </span>
                             )}
                             {session.coach_reply ? (
-                              <span className="flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-bold text-brand">
+                              <span className="flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-bold text-brand">
                                 <MessageSquareText className="h-3 w-3" aria-hidden="true" /> Treinador respondeu
                               </span>
                             ) : (
                               hasFeedback(session) && (
-                                <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                                <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
                                   <MessageSquareText className="h-3 w-3" aria-hidden="true" /> Recado enviado
                                 </span>
                               )
@@ -368,13 +390,13 @@ export default function StudentHistoryPage() {
                             <div className="space-y-2 border-t border-line p-4">
                               {hasFeedback(session) && (
                                 <div className="space-y-2 rounded-2xl border border-line bg-black/20 p-3">
-                                  <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Seu recado</p>
+                                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Seu recado</p>
                                   {(session.feedback_tags?.length ?? 0) > 0 && (
                                     <ul className="flex flex-wrap gap-1" aria-label="Como foi o treino">
                                       {session.feedback_tags?.map((tag) => {
                                         const info = tagInfo(tag)
                                         return (
-                                          <li key={tag} className={cn('rounded-full border px-2 py-0.5 text-[10px] font-bold', TAG_TONES[info.tone])}>
+                                          <li key={tag} className={cn('rounded-full border px-2 py-0.5 text-xs font-bold', TAG_TONES[info.tone])}>
                                             <span aria-hidden="true">{info.emoji}</span> {tag}
                                           </li>
                                         )
@@ -405,11 +427,11 @@ export default function StudentHistoryPage() {
                                 <>
                                   <div className="grid grid-cols-2 gap-2">
                                     <div className="rounded-2xl bg-white/[0.03] px-3 py-2">
-                                      <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Volume</p>
+                                      <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Volume</p>
                                       <p className="font-display text-xl font-bold">{formatKg(detail.volume)} kg</p>
                                     </div>
                                     <div className="rounded-2xl bg-white/[0.03] px-3 py-2">
-                                      <p className="text-[9px] font-black uppercase tracking-wider text-zinc-500">Séries</p>
+                                      <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Séries</p>
                                       <p className="font-display text-xl font-bold">{detail.sets}</p>
                                     </div>
                                   </div>
@@ -422,7 +444,7 @@ export default function StudentHistoryPage() {
                                         {group.sets.map((set, index) => (
                                           <li
                                             key={index}
-                                            className="rounded-lg bg-white/[0.05] px-2 py-1 text-[11px] font-semibold tabular-nums text-zinc-300"
+                                            className="rounded-lg bg-white/[0.05] px-2 py-1 text-xs font-semibold tabular-nums text-zinc-300"
                                           >
                                             {formatKg(set.weight)}kg × {set.reps}
                                           </li>

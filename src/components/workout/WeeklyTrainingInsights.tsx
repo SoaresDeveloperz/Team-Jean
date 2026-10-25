@@ -8,6 +8,7 @@ import { REGION_LABELS, loadFill, muscleLoad, regionsForExercise, splitSecondary
 import { WEEKDAY_SHORT, startOfWeek } from '@/lib/stats'
 import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -196,7 +197,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         setErrorMessage('')
       } catch (error) {
         if (!active) return
-        setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar o resumo semanal.')
+        setErrorMessage(friendlyError(error, 'Não foi possível carregar o resumo semanal'))
         setInsights(null)
       } finally {
         if (active) setLoading(false)
@@ -252,7 +253,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             <button
               type="button"
               onClick={() => changeWeek(0)}
-              className="rounded-xl px-2 py-2 text-[11px] font-bold text-brand hover:bg-white/5"
+              className="rounded-xl px-2 py-2 text-xs font-bold text-brand hover:bg-white/5"
             >
               Hoje
             </button>
@@ -343,7 +344,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
 
             {insights.studentsWithoutTraining.length > 0 && weekOffset === 0 && (
               <div className="rounded-3xl border border-gold/25 bg-gold-soft p-4">
-                <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-gold">
+                <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.1em] text-gold">
                   <CircleAlert className="h-3.5 w-3.5" aria-hidden="true" />
                   Sem treino nesta semana ({insights.studentsWithoutTraining.length})
                 </p>
@@ -386,7 +387,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                       onClick={() => setSelectedDay(index)}
                       className="flex min-w-0 flex-col items-center gap-1.5 rounded-xl py-1 transition hover:bg-white/[0.03]"
                     >
-                      <span className="h-3.5 text-[10px] font-bold text-zinc-400" aria-hidden="true">
+                      <span className="h-3.5 text-xs font-bold text-zinc-400" aria-hidden="true">
                         {value > 0 ? (chartMode === 'sets' ? value : `${(value / 1000).toFixed(1).replace('.', ',')}k`) : ''}
                       </span>
                       <span className="flex h-24 w-full items-end justify-center">
@@ -400,7 +401,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                           transition={{ type: 'spring', stiffness: 220, damping: 26, delay: index * 0.03 }}
                         />
                       </span>
-                      <span className={cn('text-[10px] font-bold', selected ? 'text-brand' : 'text-zinc-500')}>
+                      <span className={cn('text-xs font-bold', selected ? 'text-brand' : 'text-zinc-500')}>
                         {WEEKDAY_SHORT[index]}
                         <span className="sr-only">
                           : {day.sets} séries, {formatKg(day.volume)} kg
@@ -412,7 +413,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
               </div>
 
               <div className="mt-3 border-t border-line pt-3">
-                <p className="text-[11px] font-semibold text-zinc-400">
+                <p className="text-xs font-semibold text-zinc-400">
                   {capitalize(selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' }))}
                   <span className="text-zinc-600">
                     {' '}
@@ -433,7 +434,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                             <span className="truncate">{session.workoutName}</span>
                           </span>
                           {mode === 'admin' && (
-                            <span className="shrink-0 text-[11px] text-zinc-500">
+                            <span className="shrink-0 text-xs text-zinc-500">
                               {student?.full_name || student?.email || 'Atleta'}
                             </span>
                           )}
@@ -481,7 +482,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                 </div>
               )}
               {insights.ranking.length > 0 && (
-                <p className="mt-3 border-t border-line pt-2.5 text-[11px] text-zinc-500">
+                <p className="mt-3 border-t border-line pt-2.5 text-xs text-zinc-500">
                   Maior foco: <span className="font-bold text-brand">{REGION_LABELS[insights.ranking[0].region]}</span> · série
                   principal = 1, músculo secundário = 0,5.
                 </p>

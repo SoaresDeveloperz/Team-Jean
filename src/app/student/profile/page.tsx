@@ -29,6 +29,7 @@ import { promptInstall, useInstallState } from '@/lib/install-prompt'
 import { openNotifications, useNotifications } from '@/lib/notifications'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
 import { PageSkeleton } from '@/components/ui/skeleton'
@@ -53,10 +54,11 @@ import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
 type ProfileData = {
   userId: string
   // select('*'): as colunas do profile.sql vêm quando existirem.
-  profile: Profile
+  // null = ainda não carregou (sem internet): a tela não inventa "Atleta" nem 0 treinos.
+  profile: Profile | null
   email: string | null
-  completedCount: number
-  dates: Date[]
+  completedCount: number | null
+  dates: Date[] | null
 }
 
 const REST_OPTIONS = [
@@ -76,6 +78,7 @@ export default function StudentProfilePage() {
   const toast = useToast()
   const [data, setData] = useState<ProfileData | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const [selectedBadge, setSelectedBadge] = useState<Achievement | null>(null)
   const [shareDraft, setShareDraft] = useState<PostDraft | null>(null)
   // O tipo fica guardado depois de fechar (a folha não muda durante a saída).
@@ -94,7 +97,11 @@ export default function StudentProfilePage() {
 
     const load = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setLoadError(friendlyError(MISSING_SESSION, 'Não foi possível carregar seu perfil'))
+        return
+      }
 
       const [profileResult, countResult, datesResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
@@ -114,26 +121,40 @@ export default function StudentProfilePage() {
       if (!active) return
 
       const error = profileResult.error ?? countResult.error ?? datesResult.error
-      if (error) setLoadError(`Algumas informações não carregaram: ${error.message}`)
+      setLoadError(error ? friendlyError(error, 'Algumas informações do perfil não carregaram') : '')
 
-      setData({
+      // O que falhou mantém o valor que já estava na tela (ou fica "não carregado").
+      setData((current) => ({
         userId: user.id,
-        profile: { id: user.id, full_name: null, email: null, role: null, ...(profileResult.data as Partial<Profile> | null) },
+        profile: profileResult.error
+          ? (current?.profile ?? null)
+          : { id: user.id, full_name: null, email: null, role: null, ...(profileResult.data as Partial<Profile> | null) },
         email: user.email ?? null,
-        completedCount: countResult.count ?? 0,
-        dates: ((datesResult.data ?? []) as { completed_at: string | null }[])
-          .filter((row) => row.completed_at)
-          .map((row) => new Date(row.completed_at as string)),
-      })
+        completedCount: countResult.error ? (current?.completedCount ?? null) : (countResult.count ?? 0),
+        dates: datesResult.error
+          ? (current?.dates ?? null)
+          : ((datesResult.data ?? []) as { completed_at: string | null }[])
+              .filter((row) => row.completed_at)
+              .map((row) => new Date(row.completed_at as string)),
+      }))
     }
 
     void load()
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
 
-  const achievements = useMemo(() => (data ? buildAchievements(data.completedCount, data.dates) : []), [data])
+  const retry = () => {
+    setLoadError('')
+    setAttempt((value) => value + 1)
+  }
+
+  const statsLoaded = data !== null && data.completedCount !== null && data.dates !== null
+  const achievements = useMemo(
+    () => (data && data.completedCount !== null && data.dates !== null ? buildAchievements(data.completedCount, data.dates) : []),
+    [data],
+  )
   const closeBadge = useCallback(() => setSelectedBadge(null), [])
   const closeShare = useCallback(() => setShareDraft(null), [])
   const closePhotoMenu = useCallback(() => setPhotoMenuOpen(false), [])
@@ -141,7 +162,7 @@ export default function StudentProfilePage() {
   const closeLevels = useCallback(() => setLevelsOpen(false), [])
 
   const patchProfile = (patch: Partial<ProfileDetails>) =>
-    setData((current) => (current ? { ...current, profile: { ...current.profile, ...patch } } : current))
+    setData((current) => (current?.profile ? { ...current, profile: { ...current.profile, ...patch } } : current))
 
   const openPhotoMenu = (kind: ProfileImageKind) => {
     setPhotoKind(kind)
@@ -152,71 +173,82 @@ export default function StudentProfilePage() {
     patchProfile(kind === 'avatar' ? { avatar_path: path } : { cover_path: path })
 
   const saveDetails = async (patch: Partial<ProfileDetails>) => {
-    if (!data) return
+    if (!data?.profile) return
     await updateProfileDetails(supabase, data.userId, patch)
     patchProfile(patch)
     setEditOpen(false)
     toast({ tone: 'success', title: 'Perfil atualizado' })
   }
 
-  if (!data) return <PageSkeleton label="Carregando perfil" />
+  const errorAlert = loadError ? (
+    <Alert variant="error" onRetry={retry}>
+      {loadError}
+    </Alert>
+  ) : null
+  if (!data) return errorAlert ?? <PageSkeleton label="Carregando perfil" />
 
+  const profile = data.profile
   const unlockedCount = achievements.filter((item) => item.value >= item.goal).length
-  const streak = weekStreak(data.dates)
+  const stats = statsLoaded
+    ? { workouts: data.completedCount ?? 0, streak: weekStreak(data.dates ?? []), unlocked: unlockedCount, achievements: achievements.length }
+    : null
 
   return (
     <Stagger className="space-y-4">
-      {loadError && <Alert variant="error">{loadError}</Alert>}
+      {errorAlert}
 
-      {/* Cartão do atleta */}
-      <AthleteCard
-        profile={data.profile}
-        email={data.email}
-        stats={{ workouts: data.completedCount, streak, unlocked: unlockedCount, achievements: achievements.length }}
-        uploading={uploading}
-        onEditImage={openPhotoMenu}
-        onEditProfile={() => {
-          setEditKey((key) => key + 1)
-          setEditOpen(true)
-        }}
-        onOpenLevels={() => setLevelsOpen(true)}
-      />
+      {/* Cartão do atleta (só com o perfil carregado: nada de "Atleta" no lugar do nome) */}
+      {profile && (
+        <AthleteCard
+          profile={profile}
+          email={data.email}
+          stats={stats}
+          uploading={uploading}
+          onEditImage={openPhotoMenu}
+          onEditProfile={() => {
+            setEditKey((key) => key + 1)
+            setEditOpen(true)
+          }}
+          onOpenLevels={() => setLevelsOpen(true)}
+        />
+      )}
 
       {/* Medidas e fotos de evolução */}
-      <MeasurementsCard userId={data.userId} goal={data.profile.goal} profile={data.profile} />
+      {profile && <MeasurementsCard userId={data.userId} goal={profile.goal} profile={profile} />}
 
       <BillingCard userId={data.userId} highlight={highlightBilling} />
 
       <AnamneseCard studentId={data.userId} autoOpen={openAnamnese} />
 
-      {/* Conquistas */}
-      <m.section variants={tileVariants} aria-labelledby="achievements-title">
-        <div className="mb-2.5 flex items-center justify-between px-1">
-          <h2 id="achievements-title">
-            <Eyebrow icon={Trophy} className="text-gold/80">
-              Conquistas
-            </Eyebrow>
-          </h2>
-          <span className="text-[11px] font-bold text-zinc-500">
-            {unlockedCount} de {achievements.length}
-          </span>
-        </div>
-        <ul className="grid grid-cols-3 gap-2.5">
-          {achievements.map((badge, index) => {
-            const unlocked = badge.value >= badge.goal
-            return (
-              <m.li
-                key={badge.title}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.15 + index * 0.04 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setSelectedBadge(badge)}
-                  className={cn(
-                    'flex h-full w-full flex-col items-center rounded-3xl border px-2 py-3.5 text-center transition',
-                    unlocked ? 'border-gold/25 bg-gold-soft/40' : 'border-line bg-surface',
+      {/* Conquistas (sem os treinos carregados, não mostra progresso zerado) */}
+      {statsLoaded && (
+        <m.section variants={tileVariants} aria-labelledby="achievements-title">
+          <div className="mb-2.5 flex items-center justify-between px-1">
+            <h2 id="achievements-title">
+              <Eyebrow icon={Trophy} className="text-gold/80">
+                Conquistas
+              </Eyebrow>
+            </h2>
+            <span className="text-xs font-bold text-zinc-500">
+              {unlockedCount} de {achievements.length}
+            </span>
+          </div>
+          <ul className="grid grid-cols-3 gap-2.5">
+            {achievements.map((badge, index) => {
+              const unlocked = badge.value >= badge.goal
+              return (
+                <m.li
+                  key={badge.title}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.15 + index * 0.04 }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBadge(badge)}
+                    className={cn(
+                      'flex h-full w-full flex-col items-center rounded-3xl border px-2 py-3.5 text-center transition',
+                      unlocked ? 'border-gold/25 bg-gold-soft/40' : 'border-line bg-surface',
                   )}
                 >
                   <ProgressRing
@@ -234,10 +266,10 @@ export default function StudentProfilePage() {
                       <AchievementIcon icon={badge.icon} className="h-[18px] w-[18px]" />
                     </span>
                   </ProgressRing>
-                  <span className={cn('mt-2 text-[11px] font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
+                  <span className={cn('mt-2 text-xs font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
                     {badge.title}
                   </span>
-                  <span className="mt-0.5 text-[10px] tabular-nums text-zinc-500">
+                  <span className="mt-0.5 text-xs tabular-nums text-zinc-500">
                     {unlocked ? 'Conquistada' : `${Math.min(badge.value, badge.goal)}/${badge.goal}`}
                   </span>
                 </button>
@@ -246,6 +278,7 @@ export default function StudentProfilePage() {
           })}
         </ul>
       </m.section>
+      )}
 
       {/* Preferências */}
       <Tile className="space-y-5">
@@ -258,7 +291,7 @@ export default function StudentProfilePage() {
             </span>
             <div>
               <p className="text-sm font-bold text-white">Meta semanal</p>
-              <p className="text-[11px] text-zinc-500">Treinos por semana</p>
+              <p className="text-xs text-zinc-500">Treinos por semana</p>
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border border-line bg-black/30 p-1" role="group" aria-label="Meta semanal">
@@ -293,7 +326,7 @@ export default function StudentProfilePage() {
             </span>
             <div>
               <p className="text-sm font-bold text-white">Descanso padrão</p>
-              <p className="text-[11px] text-zinc-500">Cronômetro entre as séries</p>
+              <p className="text-xs text-zinc-500">Cronômetro entre as séries</p>
             </div>
           </div>
           <SegmentedControl
@@ -311,7 +344,7 @@ export default function StudentProfilePage() {
             </span>
             <div>
               <p className="text-sm font-bold text-white">Vibração</p>
-              <p className="text-[11px] text-zinc-500">Ao marcar séries e no fim do descanso</p>
+              <p className="text-xs text-zinc-500">Ao marcar séries e no fim do descanso</p>
             </div>
           </div>
           <Switch
@@ -333,7 +366,7 @@ export default function StudentProfilePage() {
           </span>
           <span className="flex-1">
             <span className="block text-sm font-bold text-white">Avisos do treinador</span>
-            <span className="block text-[11px] text-zinc-500">
+            <span className="block text-xs text-zinc-500">
               {notices.length === 0 ? 'Nenhum aviso ainda' : `${plural(notices.length, 'aviso', 'avisos')} · ${plural(unseen.length, 'novo', 'novos')}`}
             </span>
           </span>
@@ -353,7 +386,7 @@ export default function StudentProfilePage() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-white">Instale o app</p>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-xs text-zinc-500">
               {installState === 'ios' ? (
                 <>
                   Toque em <Share className="inline h-3 w-3" aria-label="Compartilhar" /> e depois em &quot;Adicionar à
@@ -442,13 +475,13 @@ export default function StudentProfilePage() {
         userId={data.userId}
         kind={photoKind}
         open={photoMenuOpen}
-        currentPath={photoKind === 'cover' ? data.profile.cover_path : data.profile.avatar_path}
+        currentPath={photoKind === 'cover' ? profile?.cover_path : profile?.avatar_path}
         onClose={closePhotoMenu}
         onChange={handleImageChange}
         onUploadingChange={setUploading}
       />
-      <EditProfileSheet key={editKey} open={editOpen} profile={data.profile} onClose={closeEdit} onSave={saveDetails} />
-      <LevelTrail open={levelsOpen} workouts={data.completedCount} onClose={closeLevels} />
+      {profile && <EditProfileSheet key={editKey} open={editOpen} profile={profile} onClose={closeEdit} onSave={saveDetails} />}
+      {data.completedCount !== null && <LevelTrail open={levelsOpen} workouts={data.completedCount} onClose={closeLevels} />}
 
       <Composer
         open={shareDraft !== null}

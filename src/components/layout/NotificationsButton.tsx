@@ -82,7 +82,7 @@ export function NotificationsButton({ audience = 'student' }: { audience?: 'stud
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
-              className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[10px] font-black text-black ring-2 ring-black"
+              className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-xs font-black text-black ring-2 ring-black"
             >
               {unseenCount > 9 ? '9+' : unseenCount}
             </m.span>
@@ -132,14 +132,14 @@ export function NotificationsButton({ audience = 'student' }: { audience?: 'stud
                     <div className="flex items-center gap-2">
                       <h3 className="truncate text-sm font-bold text-white">{item.title}</h3>
                       {isNew && (
-                        <span className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-[9px] font-black uppercase text-black">
+                        <span className="shrink-0 rounded-full bg-brand px-1.5 py-0.5 text-xs font-black uppercase text-black">
                           Novo
                         </span>
                       )}
                     </div>
                     <p className="mt-1 whitespace-pre-line text-[13px] leading-relaxed text-zinc-300">{item.message}</p>
                     {item.created_at && (
-                      <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                      <p className="mt-2 text-xs font-bold uppercase tracking-wider text-zinc-500">
                         {new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
                       </p>
                     )}

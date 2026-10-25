@@ -82,7 +82,7 @@ export function FinishSheet({
             { label: 'Volume', icon: Weight, value: `${formatKg(volume)}` },
           ].map((stat) => (
             <div key={stat.label} className="rounded-2xl border border-line bg-black/30 px-3 py-2.5 text-center">
-              <dt className="flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-wider text-zinc-500">
+              <dt className="flex items-center justify-center gap-1 text-xs font-black uppercase tracking-wider text-zinc-500">
                 <stat.icon className="h-3 w-3" aria-hidden="true" />
                 {stat.label}
               </dt>
@@ -104,7 +104,7 @@ export function FinishSheet({
               <span className="font-display text-3xl font-bold leading-none" style={{ color: rpeColor(rpe) }}>
                 {rpe}
               </span>
-              <span className="block text-[10px] font-semibold text-zinc-400">{RPE_LABELS[rpe]}</span>
+              <span className="block text-xs font-semibold text-zinc-400">{RPE_LABELS[rpe]}</span>
             </span>
           </legend>
           <div className="grid grid-cols-10 items-end gap-1" role="radiogroup" aria-label="Esforço de 1 a 10">
@@ -123,7 +123,7 @@ export function FinishSheet({
                   whileTap={{ scale: 0.88 }}
                   animate={{ backgroundColor: filled ? rpeColor(value) : 'rgba(255,255,255,0.06)', y: selected ? -3 : 0 }}
                   className={cn(
-                    'flex items-end justify-center rounded-lg pb-1 text-[11px] font-black',
+                    'flex items-end justify-center rounded-lg pb-1 text-xs font-black',
                     filled ? 'text-black' : 'text-zinc-500',
                   )}
                   style={{ height: `${28 + value * 2.4}px` }}
@@ -133,7 +133,7 @@ export function FinishSheet({
               )
             })}
           </div>
-          <div className="mt-2 flex justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+          <div className="mt-2 flex justify-between text-xs font-bold uppercase tracking-wider text-zinc-600">
             <span>Leve</span>
             <span>Máximo</span>
           </div>
@@ -168,11 +168,11 @@ export function FinishSheet({
 
         <div>
           <div className="mb-1.5 flex items-end justify-between gap-2">
-            <label htmlFor={feedbackId} className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+            <label htmlFor={feedbackId} className="text-xs font-black uppercase tracking-[0.1em] text-zinc-400">
               Recado para o treinador
             </label>
             <span
-              className={cn('text-[10px] font-bold tabular-nums', feedback.length > FEEDBACK_MAX * 0.9 ? 'text-gold' : 'text-zinc-500')}
+              className={cn('text-xs font-bold tabular-nums', feedback.length > FEEDBACK_MAX * 0.9 ? 'text-gold' : 'text-zinc-500')}
               aria-hidden="true"
             >
               {feedback.length}/{FEEDBACK_MAX}

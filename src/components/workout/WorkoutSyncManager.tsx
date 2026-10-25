@@ -50,7 +50,7 @@ export function WorkoutSyncManager() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12 }}
           className={cn(
-            'pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-bold shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur',
+            'pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur',
             sync.offline ? 'border-gold/30 bg-black/90 text-gold' : 'border-line-strong bg-black/90 text-zinc-200',
           )}
         >

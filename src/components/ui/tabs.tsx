@@ -61,7 +61,7 @@ export function Tabs<T extends string>({ id: baseId, items, value, onChange, lab
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={cn(
-              'relative flex h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-[11px] font-bold transition-colors',
+              'relative flex h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors',
               selected ? 'text-black' : 'text-zinc-400 hover:text-white',
             )}
           >
@@ -77,7 +77,7 @@ export function Tabs<T extends string>({ id: baseId, items, value, onChange, lab
             {item.badge !== undefined && item.badge > 0 && (
               <span
                 className={cn(
-                  'relative grid h-4 min-w-4 place-items-center rounded-full px-1 text-[9px] font-black tabular-nums',
+                  'relative grid h-5 min-w-5 place-items-center rounded-full px-1 text-xs font-black leading-none tabular-nums',
                   selected ? 'bg-black text-white' : 'bg-brand text-black',
                 )}
               >

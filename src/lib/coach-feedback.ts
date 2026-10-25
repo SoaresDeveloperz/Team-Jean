@@ -4,6 +4,7 @@ import type { createClient } from './supabase/client'
 import type { Profile, WorkoutSession } from './types'
 import { hasFeedback } from './feedback'
 import { notifyStudents } from './coach'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 
@@ -46,7 +47,7 @@ export async function loadFeedback(supabase: Supabase, students: Pick<Profile, '
     .gte('completed_at', since)
     .order('completed_at', { ascending: false })
     .limit(300)
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(friendlyError(error, 'Não foi possível carregar os recados'), { cause: error })
   const ids = new Set(students.map((student) => student.id))
   return ((data ?? []) as SessionRow[])
     .filter((row) => ids.has(row.student_id) && row.completed_at && hasFeedback(row))
@@ -64,7 +65,7 @@ export async function replyToFeedback(supabase: Supabase, item: FeedbackItem, te
     .select('id')
   if (error) {
     if (error.code === 'PGRST204') throw new Error('Para responder recados, rode o arquivo supabase/gestao.sql no Supabase.')
-    throw new Error(`Não foi possível salvar a resposta: ${error.message}`)
+    throw new Error(friendlyError(error, 'Não foi possível salvar a resposta'), { cause: error })
   }
   if (!data?.length) throw new Error('O treino não foi encontrado.')
   let notified = true

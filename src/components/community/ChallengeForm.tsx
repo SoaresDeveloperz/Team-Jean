@@ -20,9 +20,9 @@ const PERIODS = [
 
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const chipClassName =
-  'cursor-pointer rounded-full border border-line px-3.5 py-2 text-[11px] font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
+  'cursor-pointer rounded-full border border-line px-3.5 py-2 text-xs font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
 
 function periodEnd(start: Date, period: string) {
   if (period === 'month') return new Date(start.getFullYear(), start.getMonth() + 1, 0, 12)
@@ -133,7 +133,7 @@ export function ChallengeForm({ open, studentIds, onClose, onCreated }: Challeng
               </label>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">{metricInfo(metric).hint}.</p>
+          <p className="mt-2 text-xs text-zinc-500">{metricInfo(metric).hint}.</p>
         </fieldset>
 
         <div>
@@ -169,7 +169,7 @@ export function ChallengeForm({ open, studentIds, onClose, onCreated }: Challeng
               </label>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">
+          <p className="mt-2 text-xs text-zinc-500">
             De {short(start)} a {short(end)}.
           </p>
         </fieldset>
@@ -192,7 +192,7 @@ export function ChallengeForm({ open, studentIds, onClose, onCreated }: Challeng
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5">
           <div>
             <p className="text-sm font-bold text-white">Avisar os alunos</p>
-            <p className="text-[11px] text-zinc-500">Manda um aviso no sino de cada aluno.</p>
+            <p className="text-xs text-zinc-500">Manda um aviso no sino de cada aluno.</p>
           </div>
           <Switch label="Avisar os alunos" checked={notify} onChange={setNotify} />
         </div>

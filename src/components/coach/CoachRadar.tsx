@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Tile } from '@/components/ui/tile'
+import { friendlyError } from '@/lib/errors'
 
 type RadarTab = 'feedback' | 'records' | 'progressions' | 'alerts'
 type ListTab = Exclude<RadarTab, 'feedback'>
@@ -150,7 +151,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
         if (firstWithItems) setTab(firstWithItems)
         if (fromPush) sectionRef.current?.scrollIntoView({ block: 'start' })
       } catch (loadError) {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Não foi possível montar o radar.')
+        if (active) setError(friendlyError(loadError, 'Não foi possível montar o radar'))
       }
     }
     void load()
@@ -180,7 +181,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
           : `${student?.full_name ?? 'Aluno'} vai ver no sino de avisos.`,
       })
     } catch (sendError) {
-      toast({ tone: 'error', title: 'Não foi possível enviar', description: sendError instanceof Error ? sendError.message : undefined })
+      toast({ tone: 'error', title: 'Não foi possível enviar', description: friendlyError(sendError) })
     } finally {
       setSending(null)
     }
@@ -275,7 +276,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
                           </Link>
                           <span className="min-w-0 flex-1">
                             <span className="block text-sm font-bold leading-snug text-white">{item.title}</span>
-                            <span className="mt-0.5 block text-[11px] leading-snug text-zinc-400">
+                            <span className="mt-0.5 block text-xs leading-snug text-zinc-400">
                               {item.detail}
                               {item.when && <span className="text-zinc-500"> · {item.when}</span>}
                             </span>
@@ -286,7 +287,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
                                 key="done"
                                 initial={{ scale: 0.6, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
-                                className="flex h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[11px] font-bold text-brand"
+                                className="flex h-9 shrink-0 items-center gap-1 rounded-xl px-2.5 text-xs font-bold text-brand"
                               >
                                 <Check className="h-4 w-4" aria-hidden="true" /> Enviado
                               </m.span>
@@ -298,7 +299,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
                                 onClick={() => send(item)}
                                 disabled={sending !== null}
                                 className={cn(
-                                  'flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[11px] font-black disabled:opacity-60',
+                                  'flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-black disabled:opacity-60',
                                   TONES[item.action.tone],
                                 )}
                               >

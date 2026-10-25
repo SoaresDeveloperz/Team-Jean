@@ -3,6 +3,7 @@
 import { REGION_LABELS, type MuscleRegion } from './muscles'
 import type { createClient } from './supabase/client'
 import { requestPushDelivery } from './push/client'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -89,7 +90,7 @@ export class CommunityError extends Error {
 }
 
 function fail(prefix: string, error: NonNullable<DbError>): never {
-  throw new CommunityError(`${prefix}: ${error.message ?? 'erro desconhecido'}`, isCommunityMissing(error))
+  throw new CommunityError(friendlyError(error, prefix), isCommunityMissing(error))
 }
 
 export const isAdminRole = (role: string | null | undefined) => (role ?? '').trim().toLowerCase() === 'admin'

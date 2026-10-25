@@ -364,6 +364,30 @@ export default function StudentTodayPage() {
         </Tile>
       )}
 
+      {/* Recado do treinador: logo abaixo do treino do dia */}
+      {latestNotice && (
+        <Tile className="p-0">
+          <button type="button" onClick={openNotifications} className="flex w-full items-start gap-3 p-5 text-left">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-black">
+              <Megaphone className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <Eyebrow>Recado do treinador</Eyebrow>
+                {unseen.length > 0 && (
+                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-black uppercase text-black">
+                    {unseen.length} novo{unseen.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 block truncate text-sm font-bold text-white">{latestNotice.title}</span>
+              <span className="mt-0.5 line-clamp-2 block text-xs text-zinc-400">{latestNotice.message}</span>
+            </span>
+            <ChevronRight className="mt-3 h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+          </button>
+        </Tile>
+      )}
+
       {/* Bento: sequência + meta semanal */}
       <div className="grid grid-cols-2 gap-3">
         <Tile className="flex flex-col justify-between">
@@ -484,30 +508,6 @@ export default function StudentTodayPage() {
         )}
       </Tile>
 
-      {/* Recado do treinador */}
-      {latestNotice && (
-        <Tile className="p-0">
-          <button type="button" onClick={openNotifications} className="flex w-full items-start gap-3 p-5 text-left">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-black">
-              <Megaphone className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2">
-                <Eyebrow>Recado do treinador</Eyebrow>
-                {unseen.length > 0 && (
-                  <span className="rounded-full bg-brand px-1.5 py-0.5 text-xs font-black uppercase text-black">
-                    {unseen.length} novo{unseen.length > 1 ? 's' : ''}
-                  </span>
-                )}
-              </span>
-              <span className="mt-1 block truncate text-sm font-bold text-white">{latestNotice.title}</span>
-              <span className="mt-0.5 line-clamp-2 block text-xs text-zinc-400">{latestNotice.message}</span>
-            </span>
-            <ChevronRight className="mt-3 h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
-          </button>
-        </Tile>
-      )}
-
       {/* Exercícios do próximo treino */}
       {next && data.exercises.length > 0 && (
         <Tile className="p-0">
@@ -551,7 +551,7 @@ export default function StudentTodayPage() {
               Ver semana
             </Link>
           </div>
-          <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+          <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
             {data.workouts.map((workout, index) => {
               const isNext = workout.id === next?.id
               const done = data.lastDoneByWorkout.get(workout.id)

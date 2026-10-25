@@ -444,6 +444,10 @@ function profileViolation(row) {
   return null
 }
 
+// paths_in_folder() do community.sql/profile.sql: cada foto na pasta do dono.
+const pathsInFolder = (paths, folder) =>
+  (paths ?? []).every((path) => typeof path === 'string' && path.startsWith(`${folder}/`) && path.length > String(folder).length + 1 && !path.includes('..'))
+
 function measurementViolation(row) {
   const between = (value, min, max) => value === null || (Number(value) >= min && Number(value) <= max)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(row.measured_on))) return 'measured_on'
@@ -451,6 +455,7 @@ function measurementViolation(row) {
   if (!between(row.body_fat, 2, 70)) return 'body_measurements_body_fat_check'
   if (!between(row.waist_cm, 30, 250)) return 'body_measurements_waist_cm_check'
   if (!Array.isArray(row.photos) || row.photos.length > 3) return 'body_measurements_photos_check'
+  if (!pathsInFolder(row.photos, row.user_id)) return 'body_measurements_photos_folder_check'
   if (row.note != null && chars(row.note) > 280) return 'body_measurements_note_check'
   const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
   if (row.perimeters != null && !isObject(row.perimeters)) return 'body_measurements_perimeters_check'
@@ -603,6 +608,26 @@ http
       return send(res, 201, {})
     }
     if (url.pathname === '/__pushes') return send(res, 200, pushes.splice(0))
+    // Aparelhos de push semeados pelos testes (outro celular, limite de aparelhos).
+    if (url.pathname === '/__push_subscriptions' && req.method === 'POST') {
+      const body = await readBody(req)
+      for (const item of Array.isArray(body) ? body : [body]) {
+        push_subscriptions.push({ id: crypto.randomUUID(), user_agent: null, created_at: new Date().toISOString(), ...item })
+      }
+      return send(res, 201, push_subscriptions)
+    }
+    // Aviso gravado direto no banco (ex.: banco antigo que gravava tudo como 'announcement').
+    if (url.pathname === '/__notifications' && req.method === 'POST') {
+      return send(res, 201, pushNotification(await readBody(req)))
+    }
+    if (url.pathname === '/__push_subscriptions/clear' && req.method === 'POST') {
+      const body = await readBody(req)
+      const prefix = String(body?.prefix ?? '')
+      for (let index = push_subscriptions.length - 1; index >= 0; index -= 1) {
+        if (push_subscriptions[index].endpoint.startsWith(prefix)) push_subscriptions.splice(index, 1)
+      }
+      return send(res, 200, push_subscriptions)
+    }
     if (url.pathname === '/__recoveries') return send(res, 200, recoveries)
     if (url.pathname === '/__gestao/off') {
       gestaoEnabled = false
@@ -984,6 +1009,9 @@ http
           item.kind = item.kind ?? 'post'
           item.photos = item.photos ?? []
           item.pinned = Boolean(item.pinned)
+          if (!pathsInFolder(item.photos, item.author_id)) {
+            return send(res, 400, { code: '23514', message: 'new row for relation "community_posts" violates check constraint "community_posts_photos_folder_check"' })
+          }
         }
         if (table === 'community_comments') {
           if (!String(item.body ?? '').trim()) return send(res, 400, { code: '23514', message: 'new row violates check constraint "community_comments_body_check"' })

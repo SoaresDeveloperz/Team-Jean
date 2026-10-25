@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { LoaderCircle, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { resetNotifications } from '@/lib/notifications'
+import { cancelPushOnLogout } from '@/lib/push/client'
 import { cn } from '@/lib/cn'
 
 export function LogoutButton({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
@@ -13,6 +14,9 @@ export function LogoutButton({ className, showLabel = false }: { className?: str
 
   const handleLogout = async () => {
     setLoading(true)
+    // Primeiro cancela o push deste aparelho (o servidor só apaga o aparelho
+    // de quem ainda está logado); depois sai. Se falhar, sai do mesmo jeito.
+    await cancelPushOnLogout()
     await createClient().auth.signOut()
     resetNotifications()
     // As telas guardadas para uso offline eram desta conta.

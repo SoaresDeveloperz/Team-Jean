@@ -16,6 +16,7 @@
 --     dobras cutâneas e fotos de evolução). Só o aluno e o treinador veem; o
 --     treinador também registra.
 --   - Bucket privado "progress" para as fotos de evolução (aluno e treinador).
+--     As fotos de cada medida só podem ser da pasta do aluno dono dela.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -99,6 +100,40 @@ create table if not exists public.body_measurements (
 
 create index if not exists body_measurements_user_idx
   on public.body_measurements (user_id, measured_on desc, created_at desc);
+
+-- -----------------------------------------------------------------------------
+-- Fotos só da pasta do dono: cada caminho em photos começa com "<id do dono>/"
+-- (mesma definição no community.sql e no profile.sql, para rodarem em qualquer
+-- ordem). As restrições usam "not valid": linhas antigas não travam o script,
+-- só o que for gravado daqui em diante é conferido.
+-- -----------------------------------------------------------------------------
+create or replace function public.paths_in_folder(paths text[], folder uuid)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(bool_and(
+    starts_with(p, folder::text || '/')
+    and char_length(p) > char_length(folder::text) + 1
+    and position('..' in p) = 0
+  ), true)
+  from unnest(coalesce(paths, '{}'::text[])) as p;
+$$;
+
+revoke all on function public.paths_in_folder(text[], uuid) from public, anon;
+grant execute on function public.paths_in_folder(text[], uuid) to authenticated;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.paths_in_folder(text[], uuid) to service_role;
+  end if;
+end $$;
+
+-- Fotos de evolução só da pasta do aluno dono da medida (bucket "progress"),
+-- como a foto de perfil e a capa acima.
+alter table public.body_measurements drop constraint if exists body_measurements_photos_folder_check;
+alter table public.body_measurements add constraint body_measurements_photos_folder_check
+  check (public.paths_in_folder(photos, user_id)) not valid;
 
 -- Avaliação física completa: perímetros, dobras cutâneas e protocolo do %
 -- de gordura (mesma definição do gestao.sql, para rodarem em qualquer ordem).

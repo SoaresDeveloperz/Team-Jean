@@ -36,6 +36,18 @@ async function waitForPushes(count, timeout = 15000) {
   }
   return list
 }
+// Pushes que chegaram num aparelho (o serviço falso entrega a lista de todos e a esvazia).
+async function waitForPushesTo(device, count, timeout = 15000) {
+  const until = Date.now() + timeout
+  const list = []
+  while (Date.now() < until && list.length < count) {
+    list.push(...(await pushes()).filter((item) => item.endpoint.endsWith(`/__push/${device}`)))
+    if (list.length >= count) break
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return list
+}
+const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 async function shot(page, name) {
   await page.waitForTimeout(400)
   await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true })
@@ -111,6 +123,24 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
     if (!expected) problems.push(`console @ ${page.url()}: ${text}`)
   })
 
+  // ------------------------------------------- cabeçalhos de segurança
+  const expectedHeaders = {
+    'x-frame-options': 'DENY',
+    'content-security-policy': "frame-ancestors 'none'",
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'strict-origin-when-cross-origin',
+    'permissions-policy': 'camera=(self), microphone=(), geolocation=()',
+  }
+  for (const route of ['/login', '/student/today', '/auth/confirm', '/sw.js', '/manifest.json']) {
+    const response = await fetch(`${BASE}${route}`, { redirect: 'manual' })
+    const missing = Object.entries(expectedHeaders).filter(([key, value]) => response.headers.get(key) !== value).map(([key]) => key)
+    check(`cabeçalhos de segurança em ${route}${missing.length ? ` (faltam: ${missing.join(', ')})` : ''}`, missing.length === 0)
+  }
+  const swResponse = await fetch(`${BASE}/sw.js`)
+  const manifestResponse = await fetch(`${BASE}/manifest.json`)
+  check('service worker continua servido como JavaScript', swResponse.status === 200 && /javascript/.test(swResponse.headers.get('content-type') ?? '') && (await swResponse.text()).length > 0)
+  check('manifest continua servido como JSON', manifestResponse.status === 200 && Boolean((await manifestResponse.json()).name))
+
   // ------------------------------------------------ esqueci minha senha
   await page.goto(`${BASE}/login`)
   await page.click('a:has-text("Esqueci minha senha")')
@@ -148,9 +178,24 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   await page.goto(`${BASE}/auth/confirm?token_hash=vencido&type=recovery&next=/redefinir-senha`)
   await page.waitForURL('**/login?erro=link')
   check('link vencido volta ao login com aviso', (await page.textContent('main')).includes('expirou'))
+  // Só o link de nova senha: outro type volta ao login, mesmo com um token válido.
+  for (const type of ['signup', 'magiclink', 'email']) {
+    await page.goto(`${BASE}/auth/confirm?token_hash=recovery-u-student&type=${type}&next=/redefinir-senha`)
+    await page.waitForURL('**/login?erro=link')
+  }
+  check('/auth/confirm recusa type diferente de recovery (volta ao login)', new URL(page.url()).searchParams.get('erro') === 'link')
+  await page.goto(`${BASE}/auth/confirm?token_hash=recovery-u-student&next=/redefinir-senha`)
+  await page.waitForURL('**/login?erro=link')
+  check('/auth/confirm com token e sem type volta ao login', true)
   await page.goto(`${BASE}/redefinir-senha`)
   await page.waitForSelector('text=Link expirado')
   check('nova senha sem o link mostra "Link expirado"', true)
+  // ?next= fora do esperado (outra tela ou outro site) vai sempre para a tela de nova senha.
+  for (const next of ['/student/today', '/admin', '//evil.example/x', 'https://evil.example/']) {
+    const response = await fetch(`${BASE}/auth/confirm?token_hash=recovery-u-student&type=recovery&next=${encodeURIComponent(next)}`, { redirect: 'manual' })
+    const location = new URL(response.headers.get('location') ?? '/', BASE)
+    check(`/auth/confirm ignora next=${next} e segue para /redefinir-senha`, response.status >= 300 && response.status < 400 && location.origin === new URL(BASE).origin && location.pathname === '/redefinir-senha')
+  }
   await page.goto(`${BASE}/auth/confirm?token_hash=recovery-u-student&type=recovery&next=/redefinir-senha`)
   await page.waitForURL('**/redefinir-senha')
   await page.waitForSelector('text=Crie sua senha nova')
@@ -166,12 +211,35 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   check('senha nova salva e a aluna entra no app', (await state()).passwords['u-student'] === 'NovaSenha2026')
 
   // ------------------------------------------------------- push (aluna)
+  // Limite de 10 aparelhos: com 10 outros já salvos, o 11º é recusado.
+  const MARIA_ENDPOINT = `${MOCK}/__push/maria-celular`
+  const oldDevice = (index) => {
+    const device = createDevice()
+    return { user_id: 'u-student', endpoint: `${MOCK}/__push/velho-${index}`, p256dh: device.p256dh, auth: device.authKey }
+  }
+  await post(`${MOCK}/__push_subscriptions`, Array.from({ length: 10 }, (_, index) => oldDevice(index)))
   await page.goto(`${BASE}/student/profile`)
   await page.waitForSelector('button[role=switch][aria-label="Notificações no celular"]', { timeout: 30000 })
   await page.click('button[role=switch][aria-label="Notificações no celular"]')
+  await page.waitForSelector('text=Não foi possível ativar')
+  check('11º aparelho recusado com mensagem clara', (await page.textContent('body')).includes('Você já tem 10 aparelhos com notificações'))
+  let current = await state()
+  check('11º aparelho não foi salvo no servidor', !current.push_subscriptions.some((row) => row.endpoint === MARIA_ENDPOINT) && current.push_subscriptions.filter((row) => row.user_id === 'u-student').length === 10)
+  // Com 10 aparelhos, reenviar um que já é dela (mesmo endpoint) continua valendo.
+  const staleKeys = createDevice()
+  await post(`${MOCK}/__push_subscriptions/clear`, { prefix: `${MOCK}/__push/velho-` })
+  await post(`${MOCK}/__push_subscriptions`, [...Array.from({ length: 9 }, (_, index) => oldDevice(index)), { user_id: 'u-student', endpoint: MARIA_ENDPOINT, p256dh: staleKeys.p256dh, auth: staleKeys.authKey }])
+  await page.waitForSelector('button[role=switch][aria-label="Notificações no celular"]')
+  await page.click('button[role=switch][aria-label="Notificações no celular"]')
   await page.waitForSelector('text=Notificações ativadas')
-  let current = await waitForState((value) => value.push_subscriptions.length > 0)
-  const subscription = current.push_subscriptions[0]
+  current = await waitForState((value) => value.push_subscriptions.some((row) => row.endpoint === MARIA_ENDPOINT && row.p256dh === maria.p256dh))
+  check(
+    'com 10 aparelhos, o mesmo aparelho pode ser salvo de novo',
+    current.push_subscriptions.filter((row) => row.user_id === 'u-student').length === 10 && current.push_subscriptions.some((row) => row.endpoint === MARIA_ENDPOINT && row.p256dh === maria.p256dh),
+  )
+  await post(`${MOCK}/__push_subscriptions/clear`, { prefix: `${MOCK}/__push/velho-` })
+  current = await state()
+  const subscription = current.push_subscriptions.find((row) => row.endpoint === MARIA_ENDPOINT)
   check('aparelho salvo no servidor com as chaves', subscription?.user_id === 'u-student' && subscription?.p256dh === maria.p256dh && subscription?.auth === maria.authKey)
   await page.click('button:has-text("Enviar notificação de teste")')
   await page.waitForSelector('text=Teste enviado')
@@ -179,6 +247,10 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   let message = delivered[0] ? decrypt(maria, delivered[0].body) : null
   check('push de teste chega cifrado (aes128gcm) e assinado (VAPID)', delivered[0]?.headers.encoding === 'aes128gcm' && /^vapid t=/.test(delivered[0]?.headers.authorization ?? ''))
   check('push decifrado tem o título certo', message?.title === 'Notificações ativadas ✅' && message?.url === '/student/today')
+  // Celular do treinador (para conferir o texto genérico dos pushes dele).
+  const jean = createDevice()
+  await post(`${MOCK}/__push_subscriptions`, { user_id: 'u-admin', endpoint: `${MOCK}/__push/jean-celular`, p256dh: jean.p256dh, auth: jean.authKey })
+  const sensitive = (item) => /Maria|PAR-Q|joelho|ombro|Senti|dor\b/i.test(`${item?.title} ${item?.body}`)
 
   // ---------------------------------------------------- anamnese (aluna)
   await page.goto(`${BASE}/student/today`)
@@ -207,6 +279,12 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   check('ficha salva com PAR-Q positivo calculado no banco', anamnese?.parq_positive === true && anamnese?.answers.injuries.includes('joelho'))
   check('condições e hábitos salvos', anamnese?.answers.conditions.includes('hipertensao') && anamnese?.answers.activity === 'moderado' && anamnese?.answers.sleep === 7)
   check('treinador recebe o alerta do PAR-Q', current.notifications.some((note) => note.recipient_id === 'u-admin' && note.title === 'PAR-Q com alerta: Maria Souza'))
+  let coachPushes = (await waitForPushesTo('jean-celular', 1)).map((item) => decrypt(jean, item.body))
+  message = coachPushes.find((item) => item.body === 'Você tem um aviso novo sobre um aluno. Abra o app para ver.')
+  check(
+    'push de saúde para o treinador sai genérico (sem nome nem PAR-Q)',
+    message?.title === 'Team Jean' && message?.url === '/admin' && coachPushes.every((item) => !sensitive(item)),
+  )
   await page.waitForSelector('text=Com alerta')
   check('Perfil mostra a ficha com alerta', true)
 
@@ -300,6 +378,12 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
     'treinador recebe o recado no sino',
     current.notifications.some((note) => note.recipient_id === 'u-admin' && note.title === 'Recado de Maria Souza' && note.message.includes('Senti dor')),
   )
+  coachPushes = (await waitForPushesTo('jean-celular', 1)).map((item) => decrypt(jean, item.body))
+  message = coachPushes.find((item) => item.url === '/admin?radar=recados')
+  check(
+    'push do recado para o treinador sai genérico (sem nome nem texto do recado)',
+    message?.title === 'Team Jean' && message?.body === 'Você tem um recado novo de um aluno. Abra o app para ver.' && coachPushes.every((item) => !sensitive(item)),
+  )
 
   // ----------------------------------------------------------- treinador
   await logout(page, context)
@@ -323,7 +407,7 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   current = await state()
   check('resposta salva no treino', current.workout_sessions.find((session) => session.id === offlineSession?.id)?.coach_reply === 'Vou ajustar seu treino.')
   check('aluna avisada da resposta', current.notifications.some((note) => note.recipient_id === 'u-student' && note.title === 'Resposta do treinador 💬'))
-  delivered = await waitForPushes(1)
+  delivered = await waitForPushesTo('maria-celular', 1)
   message = delivered.map((item) => decrypt(maria, item.body)).find((item) => item.title === 'Resposta do treinador 💬')
   check('resposta chega no celular da aluna por push', Boolean(message) && message.url === '/student/today?avisos=1')
 
@@ -426,10 +510,18 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   const mariaDue = `${month.slice(0, 8)}${String(Math.min(mariaBilling.due_day, lastDay)).padStart(2, '0')}`
   const mariaOffset = Math.round((Date.parse(`${todayIso()}T12:00:00Z`) - Date.parse(`${mariaDue}T12:00:00Z`)) / 86_400_000)
   const expectedReminders = 1 + ([-3, 0, 3].includes(mariaOffset) ? 1 : 0)
+  // Banco antigo: o recado chegou ao treinador como 'announcement'. O push sai genérico do mesmo jeito.
+  await pushes()
+  await post(`${MOCK}/__notifications`, { recipient_id: 'u-admin', type: 'announcement', title: 'Recado de Maria Souza', message: 'Senti dor no ombro' })
   const cron = await (await fetch(`${BASE}/api/cron/billing`, { headers: { Authorization: 'Bearer cron-teste' } })).json()
   check('cron lembra quem vence hoje (Carlos)', cron.ok === true && cron.reminders === expectedReminders)
   const again = await (await fetch(`${BASE}/api/cron/billing`, { headers: { Authorization: 'Bearer cron-teste' } })).json()
   check('cron não repete o lembrete no mesmo dia', again.reminders === 0)
+  coachPushes = (await waitForPushesTo('jean-celular', 1)).map((item) => decrypt(jean, item.body))
+  check(
+    'banco antigo (announcement): push para o treinador sai genérico',
+    coachPushes.length > 0 && coachPushes.every((item) => item.title === 'Team Jean' && item.body === 'Você tem um recado novo de um aluno. Abra o app para ver.' && !sensitive(item)),
+  )
 
   // ------------------------------------------------ treinador no computador
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -507,6 +599,27 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   check('sem o gestao.sql, a aba Saúde explica como ativar', true)
   await fetch(`${MOCK}/__gestao/on`)
   gestaoOff = false
+
+  // ------------------------------------------- sair da conta tira o push
+  await logout(page, context)
+  await login(page, 'maria@teste.com', 'NovaSenha2026')
+  await page.goto(`${BASE}/student/profile`)
+  const pushSwitch = 'button[role=switch][aria-label="Notificações no celular"]'
+  await page.waitForSelector(pushSwitch, { timeout: 30000 })
+  if ((await page.getAttribute(pushSwitch, 'aria-checked')) !== 'true') {
+    await page.click(pushSwitch)
+    await page.waitForSelector('text=Notificações ativadas')
+  }
+  current = await waitForState((value) => value.push_subscriptions.some((row) => row.endpoint === MARIA_ENDPOINT && row.user_id === 'u-student'))
+  check('antes de sair: o aparelho da aluna está no servidor', current.push_subscriptions.some((row) => row.endpoint === MARIA_ENDPOINT && row.user_id === 'u-student'))
+  const logoutStarted = Date.now()
+  await page.click('button[aria-label="Sair da conta"]')
+  await page.waitForURL('**/login', { timeout: 30000 })
+  current = await state()
+  check('sair da conta apaga o aparelho no servidor', !current.push_subscriptions.some((row) => row.endpoint === MARIA_ENDPOINT))
+  check('sair da conta cancela a inscrição no navegador', (await page.evaluate(() => localStorage.getItem('__tj_fake_push__'))) === null)
+  check('o aparelho do treinador continua salvo', current.push_subscriptions.some((row) => row.user_id === 'u-admin'))
+  check('sair continua rápido (menos de 10 s)', Date.now() - logoutStarted < 10000)
 
   await browser.close()
   console.log(results.join('\n'))

@@ -46,6 +46,10 @@ begin
   exception when others then raise notice 'OK  medida vazia recusada'; end;
   begin insert into public.body_measurements (user_id, weight_kg) values ('00000000-0000-0000-0000-000000000001', 5); raise notice 'FALHOU: peso impossível';
   exception when others then raise notice 'OK  peso fora da faixa recusado'; end;
+  begin insert into public.body_measurements (user_id, photos) values ('00000000-0000-0000-0000-000000000001', array['00000000-0000-0000-0000-000000000002/p.jpg']); raise notice 'FALHOU: medida com foto de outra pessoa';
+  exception when check_violation then raise notice 'OK  medida com foto da pasta de outra pessoa recusada'; end;
+  begin update public.body_measurements set photos = array['00000000-0000-0000-0000-000000000002/p.jpg'] where user_id = '00000000-0000-0000-0000-000000000001'; raise notice 'FALHOU: trocou a foto por uma de outra pessoa';
+  exception when check_violation then raise notice 'OK  não troca a foto da medida por uma de outra pessoa'; end;
   -- fotos de evolução
   insert into storage.objects (bucket_id, name) values ('progress', '00000000-0000-0000-0000-000000000001/p1.jpg');
   raise notice 'OK  envia foto de evolução na própria pasta';
@@ -83,6 +87,10 @@ begin
   insert into public.body_measurements (user_id, weight_kg, note) values ('00000000-0000-0000-0000-000000000002', 88.2, 'Avaliação presencial');
   insert into storage.objects (bucket_id, name) values ('progress', '00000000-0000-0000-0000-000000000002/avaliacao.jpg');
   raise notice 'OK  treinador registra avaliação e foto para o aluno';
+  insert into public.body_measurements (user_id, photos) values ('00000000-0000-0000-0000-000000000002', array['00000000-0000-0000-0000-000000000002/avaliacao.jpg']);
+  raise notice 'OK  treinador registra medida com foto na pasta do aluno';
+  begin insert into public.body_measurements (user_id, photos) values ('00000000-0000-0000-0000-000000000002', array['00000000-0000-0000-0000-000000000001/p1.jpg']); raise notice 'FALHOU: treinador misturou foto de outra aluna';
+  exception when check_violation then raise notice 'OK  nem o treinador põe foto de outra aluna na medida'; end;
 end $$;
 
 reset role;

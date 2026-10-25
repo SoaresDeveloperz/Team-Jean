@@ -123,11 +123,16 @@ const GENERIC_PUSH = {
   title: 'Team Jean',
   feedback: 'Você tem um recado novo de um aluno. Abra o app para ver.',
   health: 'Você tem um aviso novo sobre um aluno. Abra o app para ver.',
+  // Aviso de outro tipo (do treinador, cobrança, comunidade) quando não dá para
+  // mostrar o texto completo: não afirma que é recado de aluno.
+  other: 'Você tem um aviso novo no Team Jean. Abra o app para ver.',
 }
 
 function pushText(notification: { type: string; title: string; message: string }, generic: boolean) {
   if (generic || PRIVATE_TYPES.has(notification.type)) {
-    return { title: GENERIC_PUSH.title, body: notification.type === 'health' ? GENERIC_PUSH.health : GENERIC_PUSH.feedback }
+    const body =
+      notification.type === 'health' ? GENERIC_PUSH.health : notification.type === 'feedback' ? GENERIC_PUSH.feedback : GENERIC_PUSH.other
+    return { title: GENERIC_PUSH.title, body }
   }
   return { title: shorten(notification.title || 'Team Jean', 80), body: shorten(notification.message || '', 240) }
 }

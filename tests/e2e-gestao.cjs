@@ -536,7 +536,7 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   coachPushes = (await waitForPushesTo('jean-celular', 1)).map((item) => decrypt(jean, item.body))
   check(
     'banco antigo (announcement): push para o treinador sai genérico',
-    coachPushes.length > 0 && coachPushes.every((item) => item.title === 'Team Jean' && item.body === 'Você tem um recado novo de um aluno. Abra o app para ver.' && !sensitive(item)),
+    coachPushes.length > 0 && coachPushes.every((item) => item.title === 'Team Jean' && item.body === 'Você tem um aviso novo no Team Jean. Abra o app para ver.' && !sensitive(item)),
   )
 
   // ------------------------------------------------ treinador no computador

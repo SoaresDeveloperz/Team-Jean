@@ -33,7 +33,7 @@ export function AuthShell({ subtitle, children, footer }: { subtitle: string; ch
           </m.div>
           <div className="text-center">
             <h1 className="font-display text-5xl font-bold uppercase leading-none tracking-[0.12em] text-white">Team Jean</h1>
-            <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.3em] text-zinc-500">{subtitle}</p>
+            <p className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">{subtitle}</p>
           </div>
         </div>
 

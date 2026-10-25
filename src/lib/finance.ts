@@ -3,6 +3,7 @@
 import type { createClient } from './supabase/client'
 import { notifyStudents } from './coach'
 import { reminderMessage, todaySP, type Billing, type CoachSettings, type Payment } from './finance-core'
+import { friendlyError } from './errors'
 
 export * from './finance-core'
 
@@ -28,7 +29,7 @@ function isMissing(error: DbError) {
 
 function fail(prefix: string, error: NonNullable<DbError>): never {
   const missing = isMissing(error)
-  throw new FinanceError(missing ? FINANCE_SETUP_MESSAGE : `${prefix}: ${error.message ?? 'erro desconhecido'}`, missing)
+  throw new FinanceError(missing ? FINANCE_SETUP_MESSAGE : friendlyError(error, prefix), missing)
 }
 
 const toNumber = (value: unknown) => Number(value) || 0

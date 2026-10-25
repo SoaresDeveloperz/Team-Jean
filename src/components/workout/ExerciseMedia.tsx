@@ -117,7 +117,7 @@ export function ExerciseMedia({ muscleGroup, videoUrl, imageUrl, name, className
           <Dumbbell className="h-5 w-5 text-zinc-300" aria-hidden="true" />
         </div>
         <div className="space-y-1">
-          <p className="flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase text-zinc-500">
+          <p className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase text-zinc-500">
             <Activity className="h-3 w-3" aria-hidden="true" />
             Músculo-alvo
           </p>
@@ -128,7 +128,7 @@ export function ExerciseMedia({ muscleGroup, videoUrl, imageUrl, name, className
             href={media.src}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[10px] font-bold uppercase text-zinc-400 underline-offset-2 hover:text-white hover:underline"
+            className="flex items-center gap-1 text-xs font-bold uppercase text-zinc-400 underline-offset-2 hover:text-white hover:underline"
           >
             <ExternalLink className="h-3 w-3" aria-hidden="true" /> Abrir demonstração
           </a>

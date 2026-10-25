@@ -60,7 +60,7 @@ export function CompareSlider({ open, entries, onClose }: CompareSliderProps) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label htmlFor="compare-before" className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+              <label htmlFor="compare-before" className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400">
                 Antes
               </label>
               <select id="compare-before" value={before.id} onChange={(event) => setBeforeId(event.target.value)} className={selectClassName}>
@@ -72,7 +72,7 @@ export function CompareSlider({ open, entries, onClose }: CompareSliderProps) {
               </select>
             </div>
             <div>
-              <label htmlFor="compare-after" className="mb-1 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+              <label htmlFor="compare-after" className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400">
                 Depois
               </label>
               <select id="compare-after" value={after.id} onChange={(event) => setAfterId(event.target.value)} className={selectClassName}>
@@ -134,10 +134,10 @@ export function CompareSlider({ open, entries, onClose }: CompareSliderProps) {
               )}
             </div>
 
-            <span className="absolute left-3 top-3 rounded-full bg-black/75 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white">
+            <span className="absolute left-3 top-3 rounded-full bg-black/75 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-white">
               Antes · {shortDate(before.measured_on)}
             </span>
-            <span className="absolute right-3 top-3 rounded-full bg-brand px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-black">
+            <span className="absolute right-3 top-3 rounded-full bg-brand px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black">
               Depois · {shortDate(after.measured_on)}
             </span>
 
@@ -157,7 +157,7 @@ export function CompareSlider({ open, entries, onClose }: CompareSliderProps) {
               </span>
             </div>
           </div>
-          <p className="text-center text-[11px] text-zinc-500">As fotos ficam visíveis só para você e seu treinador.</p>
+          <p className="text-center text-xs text-zinc-500">As fotos ficam visíveis só para você e seu treinador.</p>
         </div>
       ) : (
         <p className="py-10 text-center text-sm text-zinc-400">Registre fotos em duas datas para comparar.</p>

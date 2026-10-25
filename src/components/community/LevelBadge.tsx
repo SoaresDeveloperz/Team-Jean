@@ -7,7 +7,7 @@ export function LevelBadge({ workouts, className }: { workouts: number; classNam
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider',
+        'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-xs font-black uppercase tracking-wider',
         tone === 'gold' && 'bg-gold-soft text-gold',
         tone === 'brand' && 'bg-brand-soft text-brand',
         tone === 'zinc' && 'bg-white/[0.06] text-zinc-400',
@@ -26,7 +26,7 @@ export function CoachBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center rounded-full border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-brand',
+        'inline-flex shrink-0 items-center rounded-full border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-xs font-black uppercase tracking-wider text-brand',
         className,
       )}
     >

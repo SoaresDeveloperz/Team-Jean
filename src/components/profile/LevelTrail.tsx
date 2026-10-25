@@ -43,11 +43,11 @@ export function LevelTrail({ open, workouts, onClose }: { open: boolean; workout
                 <p className={cn('text-sm font-bold', active || done ? 'text-white' : 'text-zinc-400')}>
                   Nível {item.level} · {item.name}
                 </p>
-                <p className={cn('text-[11px]', active ? 'text-zinc-300' : 'text-zinc-500')}>
+                <p className={cn('text-xs', active ? 'text-zinc-300' : 'text-zinc-500')}>
                   {item.min === 0 ? 'Começo da jornada' : `A partir de ${item.min} treinos`}
                 </p>
               </div>
-              <span className="shrink-0 text-[11px] font-bold">
+              <span className="shrink-0 text-xs font-bold">
                 {active ? (
                   <span className="text-brand">Você está aqui</span>
                 ) : done ? (

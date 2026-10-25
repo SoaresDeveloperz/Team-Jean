@@ -10,12 +10,13 @@ import { Alert } from '@/components/ui/alert'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Tile } from '@/components/ui/tile'
+import { friendlyError } from '@/lib/errors'
 
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const fieldClassName =
   'h-12 w-full rounded-2xl border border-line-strong bg-black/40 px-4 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 const chipClassName =
-  'flex h-9 cursor-pointer items-center justify-center rounded-full border border-line px-3 text-[11px] font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
+  'flex h-9 cursor-pointer items-center justify-center rounded-full border border-line px-3 text-xs font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
 
 // Chave PIX do treinador (vira o "copia e cola" no Perfil do aluno) e o
 // lembrete automático no vencimento.
@@ -49,7 +50,7 @@ export function PixSettingsCard({ settings, onSaved }: { settings: CoachSettings
       onSaved(saved)
       toast({ tone: 'success', title: 'PIX salvo', description: saved.pix_key ? 'Os alunos já podem copiar o PIX no Perfil.' : undefined })
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar.')
+      setError(friendlyError(saveError, 'Não foi possível salvar'))
     } finally {
       setSaving(false)
     }
@@ -106,7 +107,7 @@ export function PixSettingsCard({ settings, onSaved }: { settings: CoachSettings
         <div className={cn('flex items-center justify-between gap-3 rounded-2xl border p-4', reminders ? 'border-brand/30 bg-brand-soft' : 'border-line bg-black/20')}>
           <div>
             <p className="text-sm font-bold text-white">Lembrete automático</p>
-            <p className="text-[11px] text-zinc-400">3 dias antes, no dia e 3 dias depois do vencimento (aviso + push).</p>
+            <p className="text-xs text-zinc-400">3 dias antes, no dia e 3 dias depois do vencimento (aviso + push).</p>
           </div>
           <Switch label="Lembrete automático da mensalidade" checked={reminders} onChange={setReminders} />
         </div>

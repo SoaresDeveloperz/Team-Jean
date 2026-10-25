@@ -9,6 +9,16 @@ export type PushActionResult = { ok: boolean; message: string; missing?: boolean
 type SubscriptionInput = { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }
 
 const BASE64URL = /^[A-Za-z0-9_-]+={0,2}$/
+const MAX_DEVICES = 10
+
+function saveFailure(error: { code?: string; message: string }): PushActionResult {
+  const missing = ['PGRST205', '42P01'].includes(error.code ?? '') || /schema cache|does not exist/i.test(error.message)
+  return {
+    ok: false,
+    missing,
+    message: missing ? 'Para usar as notificações, rode o arquivo supabase/gestao.sql no Supabase.' : `Não foi possível salvar o aparelho: ${error.message}`,
+  }
+}
 
 // Chave pública VAPID (o aparelho precisa dela para se inscrever).
 export async function getPushPublicKey() {
@@ -38,20 +48,25 @@ export async function savePushSubscription(input: SubscriptionInput, userAgent?:
   } catch {
     return { ok: false, message: 'Configure a variável SUPABASE_SERVICE_ROLE_KEY no servidor (Vercel).' }
   }
+  // No máximo MAX_DEVICES aparelhos por pessoa. Reenviar um aparelho que já
+  // é dela (mesmo endpoint) continua valendo.
+  const devices = await admin.from('push_subscriptions').select('endpoint').eq('user_id', session.userId)
+  if (devices.error) return saveFailure(devices.error)
+  const mine = (devices.data ?? []) as { endpoint: string }[]
+  if (mine.length >= MAX_DEVICES && !mine.some((row) => row.endpoint === endpoint)) {
+    return {
+      ok: false,
+      message: `Você já tem ${MAX_DEVICES} aparelhos com notificações. Desative em um aparelho que você não usa mais e tente de novo.`,
+    }
+  }
+
   const { error } = await admin
     .from('push_subscriptions')
     .upsert(
       { endpoint, p256dh, auth, user_id: session.userId, user_agent: userAgent ? userAgent.slice(0, 300) : null },
       { onConflict: 'endpoint' },
     )
-  if (error) {
-    const missing = ['PGRST205', '42P01'].includes(error.code ?? '') || /schema cache|does not exist/i.test(error.message)
-    return {
-      ok: false,
-      missing,
-      message: missing ? 'Para usar as notificações, rode o arquivo supabase/gestao.sql no Supabase.' : `Não foi possível salvar o aparelho: ${error.message}`,
-    }
-  }
+  if (error) return saveFailure(error)
   return { ok: true, message: 'Notificações ativadas neste aparelho.' }
 }
 

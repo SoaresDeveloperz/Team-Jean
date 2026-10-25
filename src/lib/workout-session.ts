@@ -4,6 +4,7 @@
 // para reabrir o treino sem internet (academia com sinal ruim).
 import type { createClient } from './supabase/client'
 import type { AssignedWorkout, PrescribedExercise, Exercise } from './types'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 
@@ -36,13 +37,15 @@ type Result = { data: unknown; error: { message: string } | null; status: number
 
 function check(result: Result) {
   if (result.status === 0) throw new OfflineError(result.error?.message ?? 'sem conexão')
-  if (result.error) throw new Error(result.error.message)
+  if (result.error) throw new Error(friendlyError(result.error), { cause: result.error })
   return result.data
 }
 
 export async function fetchWorkoutBundle(supabase: Supabase, userId: string, workoutId: string): Promise<WorkoutBundle> {
   const [workoutResult, exercisesResult, completedResult] = (await Promise.all([
     supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
+    // exercises(*): traz o media_id (GIF) quando o supabase/exercicios.sql já rodou,
+    // sem quebrar enquanto a coluna não existe. Vai junto na cópia offline.
     supabase.from('assigned_workout_exercises').select('*, exercises(*)').eq('assigned_workout_id', workoutId).order('order', { ascending: true }),
     // Últimos treinos concluídos do aluno: base do "anterior" e dos recordes.
     supabase

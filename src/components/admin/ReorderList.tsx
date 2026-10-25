@@ -59,7 +59,7 @@ function ReorderRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-bold text-white">{item.name}</span>
-        <span className="block text-[11px] text-zinc-500">
+        <span className="block text-xs text-zinc-500">
           {item.muscle_group} · {plural(item.planned_sets.length, 'série', 'séries')}
         </span>
       </span>

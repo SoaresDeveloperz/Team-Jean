@@ -12,7 +12,8 @@
 --     comenta como ele mesmo; o autor apaga o que é dele; o treinador apaga
 --     qualquer coisa e fixa posts no topo.
 --   - Bucket privado "community" para as fotos (cada um envia só na própria
---     pasta; o app mostra as fotos com links temporários).
+--     pasta; o app mostra as fotos com links temporários). Cada post só aponta
+--     para fotos da pasta do próprio autor.
 --   - community_members(): nomes e contagem de treinos para o ranking da
 --     semana e os níveis, sem expor e-mails nem dados de treino detalhados.
 --   - Aviso no sino do aluno quando alguém comenta no post dele.
@@ -40,6 +41,40 @@ create table if not exists public.community_posts (
 
 create index if not exists community_posts_feed_idx
   on public.community_posts (pinned desc, created_at desc);
+
+-- -----------------------------------------------------------------------------
+-- Fotos só da pasta do dono: cada caminho em photos começa com "<id do dono>/"
+-- (mesma definição no community.sql e no profile.sql, para rodarem em qualquer
+-- ordem). As restrições usam "not valid": linhas antigas não travam o script,
+-- só o que for gravado daqui em diante é conferido.
+-- -----------------------------------------------------------------------------
+create or replace function public.paths_in_folder(paths text[], folder uuid)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(bool_and(
+    starts_with(p, folder::text || '/')
+    and char_length(p) > char_length(folder::text) + 1
+    and position('..' in p) = 0
+  ), true)
+  from unnest(coalesce(paths, '{}'::text[])) as p;
+$$;
+
+revoke all on function public.paths_in_folder(text[], uuid) from public, anon;
+grant execute on function public.paths_in_folder(text[], uuid) to authenticated;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.paths_in_folder(text[], uuid) to service_role;
+  end if;
+end $$;
+
+-- O autor é sempre quem está logado (gatilho abaixo), então as fotos do post
+-- só podem ser da pasta dele no bucket "community".
+alter table public.community_posts drop constraint if exists community_posts_photos_folder_check;
+alter table public.community_posts add constraint community_posts_photos_folder_check
+  check (public.paths_in_folder(photos, author_id)) not valid;
 
 create table if not exists public.community_likes (
   post_id uuid not null references public.community_posts (id) on delete cascade,

@@ -22,7 +22,7 @@ export function AdminSidebar() {
         <span className="font-display text-2xl font-bold uppercase leading-none tracking-[0.16em]">Team Jean</span>
       </Link>
       <div className="ml-2 mt-3 flex items-center justify-between gap-2">
-        <span className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-brand">
+        <span className="rounded-full border border-brand/30 bg-brand-soft px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em] text-brand">
           Treinador
         </span>
         <NotificationsButton audience="coach" />

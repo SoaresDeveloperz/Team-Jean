@@ -19,10 +19,11 @@ import {
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal, SheetFooter } from '@/components/ui/modal'
+import { friendlyError } from '@/lib/errors'
 
 const chipClassName =
   'flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-line px-4 text-xs font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const fieldClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 px-3.5 py-3 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 const sectionTitle = 'flex items-center gap-2 font-display text-xl font-bold uppercase tracking-wide text-white'
@@ -79,7 +80,7 @@ export function AnamneseForm({ open, studentId, current, forStudent, onClose, on
     try {
       onSaved(await saveAnamnese(supabase, studentId, answers))
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar a ficha.')
+      setError(friendlyError(saveError, 'Não foi possível salvar a ficha'))
     } finally {
       setSaving(false)
     }
@@ -193,7 +194,7 @@ export function AnamneseForm({ open, studentId, current, forStudent, onClose, on
                 <label key={level.key} className={cn(chipClassName, 'h-auto flex-col gap-0 rounded-2xl py-2.5')}>
                   <input type="radio" name="anamnese-activity" checked={answers.activity === level.key} onChange={() => set({ activity: level.key })} className="sr-only" />
                   <span>{level.label}</span>
-                  <span className="text-[10px] font-semibold opacity-70">{level.hint}</span>
+                  <span className="text-xs font-semibold opacity-70">{level.hint}</span>
                 </label>
               ))}
             </div>

@@ -73,14 +73,37 @@ export async function enablePush(): Promise<{ status: PushStatus; message: strin
   return { status: 'on', message: result.message }
 }
 
-export async function disablePush(): Promise<PushStatus> {
-  const registration = await navigator.serviceWorker.getRegistration()
-  const subscription = await registration?.pushManager.getSubscription()
-  if (subscription) {
+// Tira este aparelho do servidor (só funciona com a sessão valendo) e cancela
+// a inscrição no navegador, mesmo se o servidor falhar: o aparelho cancelado
+// responde 410 no próximo envio e o servidor o apaga.
+async function removeThisDevice() {
+  const registration = await navigator.serviceWorker?.getRegistration()
+  const subscription = await registration?.pushManager?.getSubscription()
+  if (!subscription) return
+  try {
     await removePushSubscription(subscription.endpoint)
+  } finally {
     await subscription.unsubscribe().catch(() => false)
   }
+}
+
+export async function disablePush(): Promise<PushStatus> {
+  await removeThisDevice()
   return 'off'
+}
+
+// Ao sair da conta: cancela o push deste aparelho ANTES do signOut, enquanto
+// a sessão ainda vale. Nunca trava a saída: sem push, erro ou demora, segue.
+export async function cancelPushOnLogout(timeoutMs = 3000) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs)
+  })
+  try {
+    await Promise.race([removeThisDevice().catch(() => undefined), timeout])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export { sendTestPush }

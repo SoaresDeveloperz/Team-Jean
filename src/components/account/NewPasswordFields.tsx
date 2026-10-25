@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn'
 
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 pr-12 text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
-const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
+const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 
 type NewPasswordFieldsProps = {
   password: string
@@ -75,7 +75,7 @@ export function NewPasswordFields({
           <span
             id="new-password-strength"
             aria-live="polite"
-            className={cn('w-20 text-right text-[10px] font-black uppercase tracking-wider', password ? strengthInfo.className : 'text-zinc-500')}
+            className={cn('w-20 text-right text-xs font-black uppercase tracking-wider', password ? strengthInfo.className : 'text-zinc-500')}
           >
             {password ? strengthInfo.label : 'Força'}
           </span>
@@ -98,7 +98,7 @@ export function NewPasswordFields({
           className={cn(inputClassName, 'pr-3.5', mismatch && 'border-danger/60 focus:border-danger')}
         />
         {mismatch && (
-          <p id="confirm-password-error" className="mt-1.5 text-[11px] font-semibold text-danger">
+          <p id="confirm-password-error" className="mt-1.5 text-xs font-semibold text-danger">
             As senhas não conferem.
           </p>
         )}

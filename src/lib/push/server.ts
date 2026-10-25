@@ -114,6 +114,29 @@ function urlFor(type: string, isCoach: boolean) {
 
 const shorten = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
+// O push aparece na tela bloqueada, onde outra pessoa pode ler: o que vai
+// para o treinador (recados e saúde dos alunos, inclusive em bancos antigos
+// que gravavam esses avisos como 'announcement') e os avisos de saúde e de
+// recado saem com texto genérico (LGPD). O texto completo fica no sino do app.
+const PRIVATE_TYPES = new Set(['health', 'feedback'])
+const GENERIC_PUSH = {
+  title: 'Team Jean',
+  feedback: 'Você tem um recado novo de um aluno. Abra o app para ver.',
+  health: 'Você tem um aviso novo sobre um aluno. Abra o app para ver.',
+  // Aviso de outro tipo (do treinador, cobrança, comunidade) quando não dá para
+  // mostrar o texto completo: não afirma que é recado de aluno.
+  other: 'Você tem um aviso novo no Team Jean. Abra o app para ver.',
+}
+
+function pushText(notification: { type: string; title: string; message: string }, generic: boolean) {
+  if (generic || PRIVATE_TYPES.has(notification.type)) {
+    const body =
+      notification.type === 'health' ? GENERIC_PUSH.health : notification.type === 'feedback' ? GENERIC_PUSH.feedback : GENERIC_PUSH.other
+    return { title: GENERIC_PUSH.title, body }
+  }
+  return { title: shorten(notification.title || 'Team Jean', 80), body: shorten(notification.message || '', 240) }
+}
+
 // Entrega por push os avisos novos (chamado depois de criar avisos e pelo cron).
 export async function flushPendingPush() {
   const config = pushConfig()
@@ -144,6 +167,8 @@ export async function flushPendingPush() {
       .filter((row) => String(row.role ?? '').trim().toLowerCase() === 'admin')
       .map((row) => row.id),
   )
+  // Sem saber quem é o treinador, ninguém recebe o texto completo no push.
+  const rolesUnknown = Boolean(rolesResult.error)
 
   return sendJobs(
     notifications.flatMap((notification) =>
@@ -152,8 +177,7 @@ export async function flushPendingPush() {
         .map((subscription) => ({
           subscription,
           message: {
-            title: shorten(notification.title || 'Team Jean', 80),
-            body: shorten(notification.message || '', 240),
+            ...pushText(notification, rolesUnknown || coaches.has(notification.recipient_id)),
             url: urlFor(notification.type, coaches.has(notification.recipient_id)),
             tag: notification.id,
           },

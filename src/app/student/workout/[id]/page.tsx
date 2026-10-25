@@ -45,6 +45,7 @@ import { loadFill, muscleLoad, splitSecondary, type MuscleRegion, type MuscleWor
 import { usePreferences } from '@/lib/preferences'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProgressRing } from '@/components/ui/progress-ring'
@@ -143,7 +144,7 @@ export default function WorkoutExecutionPage() {
           return
         }
         if (!(error instanceof OfflineError)) {
-          setLoadState({ status: 'error', message: error instanceof Error ? error.message : 'Erro desconhecido.' })
+          setLoadState({ status: 'error', message: friendlyError(error) })
           return
         }
         bundle = readCachedBundle(user.id, workoutId)
@@ -641,7 +642,7 @@ export default function WorkoutExecutionPage() {
           </button>
           <div className="min-w-0 flex-1 text-center">
             <h1 className="truncate font-display text-xl font-bold uppercase leading-tight">{workout?.name}</h1>
-            <p className="flex items-center justify-center gap-2 text-[11px] font-semibold text-zinc-400">
+            <p className="flex items-center justify-center gap-2 text-xs font-semibold text-zinc-400">
               <span className="flex items-center gap-1 text-brand">
                 <Timer className="h-3.5 w-3.5" aria-hidden="true" />
                 {startedAt && <ElapsedTime startedAt={startedAt} />}
@@ -705,7 +706,7 @@ export default function WorkoutExecutionPage() {
                     onClick={() => scrollToExercise(item.id)}
                     aria-current={current ? 'step' : undefined}
                     className={cn(
-                      'flex h-10 items-center gap-2 rounded-full border pl-1 pr-3 text-[11px] font-bold transition',
+                      'flex h-10 items-center gap-2 rounded-full border pl-1 pr-3 text-xs font-bold transition',
                       current ? 'border-white/30 bg-white/10 text-white' : 'border-line text-zinc-400',
                     )}
                   >
@@ -713,7 +714,7 @@ export default function WorkoutExecutionPage() {
                       {finished ? (
                         <Check className="h-3.5 w-3.5 text-brand" aria-hidden="true" />
                       ) : (
-                        <span className="text-[10px] font-black">{index + 1}</span>
+                        <span className="text-xs font-black">{index + 1}</span>
                       )}
                     </ProgressRing>
                     <span className="max-w-[9rem] truncate">{item.name}</span>

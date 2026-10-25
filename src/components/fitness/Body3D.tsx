@@ -136,7 +136,7 @@ export function Body3D({
           </div>
         )}
 
-        <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-200 backdrop-blur">
+        <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em] text-zinc-200 backdrop-blur">
           <Box className="h-3.5 w-3.5 text-brand" aria-hidden="true" />
           {use3D ? 'Modelo 3D' : 'Mapa muscular'}
         </span>
@@ -153,7 +153,7 @@ export function Body3D({
                     setSelected(null)
                     setView((current) => ({ name: item.view, nonce: current.nonce + 1 }))
                   }}
-                  className="h-8 rounded-full px-3 text-[11px] font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white"
+                  className="h-8 rounded-full px-3 text-xs font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white"
                 >
                   <span className="sr-only">Ver </span>
                   {item.label}
@@ -191,7 +191,7 @@ export function Body3D({
                   onClick={() => handleSelect(region)}
                   aria-pressed={active}
                   className={cn(
-                    'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold transition',
+                    'flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition',
                     active ? 'border-white bg-white text-black' : 'border-line bg-surface text-zinc-200 hover:border-line-strong',
                   )}
                 >
@@ -207,7 +207,7 @@ export function Body3D({
         </ul>
       )}
       {showChips && use3D && (
-        <figcaption className="mt-2 text-[11px] text-zinc-500">Arraste para girar e toque num músculo para focar.</figcaption>
+        <figcaption className="mt-2 text-xs text-zinc-500">Arraste para girar e toque num músculo para focar.</figcaption>
       )}
       <p className="sr-only" aria-live="polite">
         {selected ? `${REGION_LABELS[selected]} em foco${selectedDetail ? `: ${selectedDetail}` : ''}` : ''}

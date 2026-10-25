@@ -18,6 +18,16 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-25 — GIFs de exercícios (biblioteca da Gym visual)
+- **Pergunta:** mostrar GIFs do movimento no treino e na biblioteca do treinador usando o dataset público [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (1.324 exercícios, GIFs 180 × 180).
+- **Licença:** o README e o LICENSE do repositório dizem que a mídia é © Gym visual, usada com permissão, e que quem reusa precisa da própria licença ([termos](https://gymvisual.com/content/3-terms-and-conditions-of-use)) e manter o crédito "© Gym visual — https://gymvisual.com/".
+- **Opções:** A) GIFs desligados por padrão, ligados só com `NEXT_PUBLIC_EXERCISE_MEDIA_BASE_URL` depois de confirmar a licença; B) ligados por padrão pela CDN do repositório (jsDelivr); C) copiar os GIFs para um armazenamento próprio.
+- **Conselheiro, voz do usuário e advogado do diabo:** não consultados nesta implementação (o plano veio aprovado pelo dono).
+- **Decisão:** o plano começou com A; o dono confirmou que é a biblioteca gratuita da Gym visual e escolheu B. A variável continua valendo e tem prioridade (endereço próprio) e `off` desliga tudo. O crédito "© Gym visual", com link e letra de pelo menos 12 px, fica sempre junto de cada GIF. O banco guarda só o nome do arquivo (`exercises.media_id`, com restrição de formato), nunca um endereço.
+- **O que muda ao ligar:** o app passa a depender de hospedagem externa (CDN jsDelivr servindo `@main` do repositório de outra pessoa). Se o repositório mudar, sair do ar ou trocar arquivos, os GIFs somem ou mudam sem aviso (o app só esconde o GIF que não carrega). Recomendado: fixar uma versão do repositório no lugar de `@main` (um commit, ex.: `...exercises-dataset@<commit>/videos`) ou copiar a pasta `videos/` para um armazenamento próprio (ex.: bucket público do Supabase) e apontar a variável para lá, mantendo o crédito.
+- **Por quê:** o treinador ganha 1.324 exercícios prontos com nome em português e o aluno vê a execução sem o treinador gravar vídeos.
+- **Rever quando:** a Gym visual mudar os termos, o repositório sair do ar, ou o app precisar dos GIFs sem internet (aí, armazenamento próprio).
+
 ## 2026-10-24 — Quanto a IA pode ver do Supabase (MCP)
 - **Pergunta:** até onde o Claude Code pode olhar o banco do app pelo MCP oficial do Supabase.
 - **Opções:** A) produção, só leitura, com SQL (o comando que o painel do Supabase sugeriu); B) produção, só leitura e sem SQL (docs, development e debugging: estrutura, logs e alertas de segurança); C) um projeto Supabase de teste, com dados inventados.

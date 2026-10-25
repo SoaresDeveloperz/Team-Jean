@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
               Se existir uma conta com <span className="font-bold text-white">{sentTo}</span>, chega em instantes um link para criar
               uma senha nova. Olhe também a caixa de spam.
             </p>
-            <p className="rounded-2xl border border-line bg-black/30 p-3 text-[11px] leading-relaxed text-zinc-400">
+            <p className="rounded-2xl border border-line bg-black/30 p-3 text-xs leading-relaxed text-zinc-400">
               Não chegou? Peça ao seu treinador: ele gera uma senha nova para você na hora.
             </p>
             <button
@@ -101,7 +101,7 @@ export default function ForgotPasswordPage() {
               <p className="mt-1 text-xs leading-relaxed text-zinc-400">Digite o e-mail da sua conta e enviamos um link para criar uma senha nova.</p>
             </div>
             <div className="space-y-1">
-              <label htmlFor="reset-email" className="block text-[10px] font-black uppercase tracking-wider text-zinc-400">
+              <label htmlFor="reset-email" className="block text-xs font-black uppercase tracking-wider text-zinc-400">
                 E-mail
               </label>
               <div className="relative">

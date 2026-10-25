@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { LoaderCircle, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { resetNotifications } from '@/lib/notifications'
+import { cancelPushOnLogout } from '@/lib/push/client'
 import { cn } from '@/lib/cn'
 
 export function LogoutButton({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
@@ -13,7 +14,14 @@ export function LogoutButton({ className, showLabel = false }: { className?: str
 
   const handleLogout = async () => {
     setLoading(true)
-    await createClient().auth.signOut()
+    // Primeiro cancela o push deste aparelho (o servidor só apaga o aparelho
+    // de quem ainda está logado); depois sai. Se falhar, sai do mesmo jeito.
+    await cancelPushOnLogout()
+    const supabase = createClient()
+    const { error } = await supabase.auth.signOut()
+    // Sem internet o servidor não confirma a saída: apaga a sessão só deste
+    // aparelho, para o login não ser desfeito pelo cookie que ficou.
+    if (error) await supabase.auth.signOut({ scope: 'local' })
     resetNotifications()
     // As telas guardadas para uso offline eram desta conta.
     navigator.serviceWorker?.controller?.postMessage({ type: 'clear-pages' })

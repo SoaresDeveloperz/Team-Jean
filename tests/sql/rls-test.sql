@@ -35,6 +35,17 @@ begin
   begin insert into public.community_posts (kind) values ('spam'); raise notice 'FALHOU: tipo inválido';
   exception when others then raise notice 'OK  tipo inválido recusado'; end;
   insert into public.community_posts (body) values ('vou apagar');
+  -- fotos do post: só da pasta do autor
+  insert into public.community_posts (photos) values (array['00000000-0000-0000-0000-000000000001/minha.jpg']);
+  raise notice 'OK  post com foto da própria pasta';
+  begin insert into public.community_posts (photos) values (array['00000000-0000-0000-0000-000000000002/dele.jpg']); raise notice 'FALHOU: post com foto de outra pessoa';
+  exception when check_violation then raise notice 'OK  post com foto da pasta de outra pessoa recusado'; end;
+  begin insert into public.community_posts (photos) values (array['00000000-0000-0000-0000-000000000001/a.jpg', '00000000-0000-0000-0000-000000000002/b.jpg']); raise notice 'FALHOU: uma das fotos era de outra pessoa';
+  exception when check_violation then raise notice 'OK  basta uma foto de outra pessoa para recusar'; end;
+  begin insert into public.community_posts (photos) values (array['00000000-0000-0000-0000-000000000001/../00000000-0000-0000-0000-000000000002/x.jpg']); raise notice 'FALHOU: caminho com ..';
+  exception when check_violation then raise notice 'OK  caminho com ".." recusado'; end;
+  begin insert into public.community_posts (author_id, photos) values ('00000000-0000-0000-0000-000000000002', array['00000000-0000-0000-0000-000000000002/dele.jpg']); raise notice 'FALHOU: autor forjado com foto alheia';
+  exception when check_violation then raise notice 'OK  forjar o autor não libera a foto de outra pessoa'; end;
   -- fotos: só na própria pasta
   insert into storage.objects (bucket_id, name) values ('community', '00000000-0000-0000-0000-000000000001/foto.jpg');
   raise notice 'OK  envia foto na própria pasta';

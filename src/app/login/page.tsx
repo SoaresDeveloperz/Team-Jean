@@ -63,7 +63,7 @@ export default function LoginPage() {
     <AuthShell
       subtitle="Consultoria esportiva"
       footer={
-        <p className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+        <p className="text-center text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">
           Acesso exclusivo para alunos cadastrados
         </p>
       }
@@ -73,7 +73,7 @@ export default function LoginPage() {
       )}
       <form onSubmit={handleLogin} className={authCardClassName}>
         <div className="space-y-1">
-          <label htmlFor="email" className="block text-[10px] font-black uppercase tracking-wider text-zinc-400">
+          <label htmlFor="email" className="block text-xs font-black uppercase tracking-wider text-zinc-400">
             E-mail
           </label>
           <div className="relative">
@@ -94,10 +94,10 @@ export default function LoginPage() {
 
         <div className="space-y-1">
           <div className="flex items-end justify-between gap-2">
-            <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-wider text-zinc-400">
+            <label htmlFor="password" className="block text-xs font-black uppercase tracking-wider text-zinc-400">
               Senha
             </label>
-            <Link href="/esqueci-senha" className="rounded-lg text-[11px] font-bold text-brand hover:underline">
+            <Link href="/esqueci-senha" className="rounded-lg text-xs font-bold text-brand hover:underline">
               Esqueci minha senha
             </Link>
           </div>

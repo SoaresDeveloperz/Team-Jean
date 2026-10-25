@@ -25,6 +25,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Modal, SheetFooter } from '@/components/ui/modal'
 import { Switch } from '@/components/ui/switch'
 import { AchievementShareCard, WorkoutShareCard } from './ShareCards'
+import { friendlyError } from '@/lib/errors'
 
 type SelectedPhoto = { id: string; file: File; preview: string }
 
@@ -179,7 +180,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
     } catch (publishError) {
       setStage(null)
       if (publishError instanceof CommunityError && publishError.missing) setError(COMMUNITY_MISSING_MESSAGE)
-      else setError(publishError instanceof Error ? publishError.message : 'Não foi possível publicar.')
+      else setError(friendlyError(publishError, 'Não foi possível publicar'))
     }
   }
 
@@ -190,7 +191,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
           <Avatar name={author?.name} seed={author?.id} src={author?.avatar} size="md" />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-white">{author?.name ?? 'Carregando...'}</p>
-            <p className="text-[11px] text-zinc-500">Publicando na Comunidade</p>
+            <p className="text-xs text-zinc-500">Publicando na Comunidade</p>
           </div>
         </div>
 
@@ -210,7 +211,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
             placeholder={PLACEHOLDERS[draft.kind]}
             className="max-h-72 min-h-28 w-full resize-none rounded-2xl border border-line-strong bg-black/40 p-4 leading-relaxed text-white placeholder:text-zinc-600 [field-sizing:content] focus:border-brand focus:outline-none"
           />
-          <p aria-hidden="true" className="mt-1 text-right text-[10px] tabular-nums text-zinc-500">
+          <p aria-hidden="true" className="mt-1 text-right text-xs tabular-nums text-zinc-500">
             {body.length}/{POST_MAX}
           </p>
         </div>
@@ -258,7 +259,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
                 }}
                 className="sr-only"
               />
-              <span className="flex flex-col items-center gap-1 text-[10px] font-bold">
+              <span className="flex flex-col items-center gap-1 text-xs font-bold">
                 <ImagePlus className="h-6 w-6" aria-hidden="true" />
                 <span>
                   <span className="sr-only">Adicionar </span>Foto
@@ -272,7 +273,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
             <div className="min-w-0">
               <p className="text-sm font-bold text-white">Fixar no topo</p>
-              <p className="text-[11px] text-zinc-500">O post fica em destaque para todos os alunos.</p>
+              <p className="text-xs text-zinc-500">O post fica em destaque para todos os alunos.</p>
             </div>
             <Switch checked={pinned} onChange={setPinned} label="Fixar no topo" />
           </div>

@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:build": "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-mock next build",
+    "test:build": "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-mock NEXT_PUBLIC_EXERCISE_MEDIA_BASE_URL=http://localhost:54321/__gif next build",
     "test:e2e": "node tests/run.mjs",
     "test:sql": "node tests/sql/run.mjs"
   },

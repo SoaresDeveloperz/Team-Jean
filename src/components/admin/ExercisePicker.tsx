@@ -100,7 +100,7 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
                 aria-checked={group === name}
                 onClick={() => setGroup(name)}
                 className={cn(
-                  'h-9 shrink-0 rounded-full border px-3.5 text-[11px] font-bold transition',
+                  'h-9 shrink-0 rounded-full border px-3.5 text-xs font-bold transition',
                   group === name ? 'border-white bg-white text-black' : 'border-line bg-surface text-zinc-400 hover:text-white',
                 )}
               >
@@ -127,10 +127,10 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-white">{exercise.name}</span>
-                    <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-500">
+                    <span className="mt-0.5 flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-zinc-500">
                       {exercise.muscle_group || 'Geral'}
                       {inWorkout.has(exercise.id) && (
-                        <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 text-[9px] normal-case tracking-normal text-zinc-300">
+                        <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 text-xs normal-case tracking-normal text-zinc-300">
                           No treino
                         </span>
                       )}

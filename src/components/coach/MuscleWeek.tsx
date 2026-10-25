@@ -8,6 +8,7 @@ import { plural } from '@/lib/text'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Body3D } from '@/components/fitness/Body3D'
+import { friendlyError } from '@/lib/errors'
 
 // Mapa 3D do que o aluno treinou nos últimos 7 dias e o que ficou de fora.
 export function MuscleWeek({ studentId, studentName }: { studentId: string; studentName: string }) {
@@ -22,7 +23,7 @@ export function MuscleWeek({ studentId, studentName }: { studentId: string; stud
         const week = await loadMuscleWeek(supabase, studentId)
         if (active) setData(week)
       } catch (loadError) {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a semana.')
+        if (active) setError(friendlyError(loadError, 'Não foi possível carregar a semana'))
       }
     }
     void load()

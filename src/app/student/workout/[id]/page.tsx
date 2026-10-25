@@ -45,6 +45,7 @@ import { loadFill, muscleLoad, splitSecondary, type MuscleRegion, type MuscleWor
 import { usePreferences } from '@/lib/preferences'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ProgressRing } from '@/components/ui/progress-ring'
@@ -143,7 +144,7 @@ export default function WorkoutExecutionPage() {
           return
         }
         if (!(error instanceof OfflineError)) {
-          setLoadState({ status: 'error', message: error instanceof Error ? error.message : 'Erro desconhecido.' })
+          setLoadState({ status: 'error', message: friendlyError(error) })
           return
         }
         bundle = readCachedBundle(user.id, workoutId)

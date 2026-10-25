@@ -10,6 +10,7 @@ import { Alert } from '@/components/ui/alert'
 import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Tile } from '@/components/ui/tile'
+import { friendlyError } from '@/lib/errors'
 
 const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
 const fieldClassName =
@@ -49,7 +50,7 @@ export function PixSettingsCard({ settings, onSaved }: { settings: CoachSettings
       onSaved(saved)
       toast({ tone: 'success', title: 'PIX salvo', description: saved.pix_key ? 'Os alunos já podem copiar o PIX no Perfil.' : undefined })
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar.')
+      setError(friendlyError(saveError, 'Não foi possível salvar'))
     } finally {
       setSaving(false)
     }

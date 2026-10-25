@@ -4,6 +4,7 @@ import type { createClient } from './supabase/client'
 import type { PlannedSet, Profile } from './types'
 import { REGION_LABELS, loadFill, regionsForExercise, splitSecondary, type MuscleRegion } from './muscles'
 import { PREP_SET_TYPES, getPlannedSets } from './workouts'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 
@@ -67,7 +68,7 @@ async function inChunks<T>(
   const results = await Promise.all(chunks.map((chunk) => run(chunk)))
   const rows: T[] = []
   for (const { data, error } of results) {
-    if (error) throw new Error(error.message)
+    if (error) throw new Error(friendlyError(error), { cause: error })
     rows.push(...((data ?? []) as T[]))
   }
   return rows
@@ -104,8 +105,8 @@ export async function loadRadar(supabase: Supabase, students: Pick<Profile, 'id'
       .limit(400),
     supabase.from('assigned_workouts').select('id, student_id').eq('is_current', true),
   ])
-  if (sessionsResult.error) throw new Error(sessionsResult.error.message)
-  if (workoutsResult.error) throw new Error(workoutsResult.error.message)
+  if (sessionsResult.error) throw new Error(friendlyError(sessionsResult.error), { cause: sessionsResult.error })
+  if (workoutsResult.error) throw new Error(friendlyError(workoutsResult.error), { cause: workoutsResult.error })
 
   const sessions = ((sessionsResult.data ?? []) as SessionRow[]).filter((session) => session.completed_at)
   const workouts = (workoutsResult.data ?? []) as { id: string; student_id: string }[]
@@ -258,7 +259,7 @@ export async function applyProgression(supabase: Supabase, progression: Pick<Rad
       .update({ planned_sets: next, sets_count: next.length })
       .eq('id', prescription.id)
       .select('id')
-    if (error) throw new Error(error.message)
+    if (error) throw new Error(friendlyError(error), { cause: error })
     updated += data?.length ?? 0
   }
   return updated
@@ -286,7 +287,7 @@ export async function loadMuscleWeek(supabase: Supabase, studentId: string, now 
     .gte('completed_at', since.toISOString())
     .order('completed_at', { ascending: false })
     .limit(60)
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(friendlyError(error), { cause: error })
   const sessions = ((data ?? []) as SessionRow[]).filter((session) => session.completed_at)
   const sets = await inChunks<SetRow>(
     sessions.map((session) => session.id),

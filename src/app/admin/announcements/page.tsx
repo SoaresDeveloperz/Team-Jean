@@ -11,6 +11,7 @@ import { relativeDay } from '@/lib/stats'
 import { plural } from '@/lib/text'
 import { requestPushDelivery } from '@/lib/push/client'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -149,8 +150,11 @@ export default function AdminAnnouncementsPage() {
       const [studentsResult, probe] = await Promise.all([studentsQuery, probeQuery])
       if (!active) return
 
-      if (studentsResult.error) setLoadError(`Não foi possível carregar os alunos: ${studentsResult.error.message}`)
-      else setStudents((studentsResult.data ?? []) as Profile[])
+      if (studentsResult.error) setLoadError(friendlyError(studentsResult.error, 'Não foi possível carregar os alunos'))
+      else {
+        setLoadError('')
+        setStudents((studentsResult.data ?? []) as Profile[])
+      }
 
       if (probe.error) {
         setHistory([])
@@ -213,7 +217,7 @@ export default function AdminAnnouncementsPage() {
     setSending(false)
 
     if (error) {
-      setFormError(`Erro ao enviar aviso: ${error.message}`)
+      setFormError(friendlyError(error, 'Não foi possível enviar o aviso'))
       return
     }
     requestPushDelivery()
@@ -248,7 +252,17 @@ export default function AdminAnnouncementsPage() {
         <p className="mt-1.5 text-xs text-zinc-500">Aparecem no sino do app do aluno.</p>
       </div>
 
-      {loadError && <Alert variant="error">{loadError}</Alert>}
+      {loadError && (
+        <Alert
+          variant="error"
+          onRetry={() => {
+            setLoadError('')
+            setReloadKey((key) => key + 1)
+          }}
+        >
+          {loadError}
+        </Alert>
+      )}
 
       {/* No computador: formulário à esquerda, enviados à direita. */}
       <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">

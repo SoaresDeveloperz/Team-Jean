@@ -9,8 +9,10 @@ import { ProfileError } from '@/lib/profile'
 import { plural } from '@/lib/text'
 import { formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { LineChart } from '@/components/fitness/LineChart'
 import { PhotoViewer } from '@/components/community/PhotoViewer'
+import { Alert } from '@/components/ui/alert'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
@@ -83,7 +85,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
         if (!active) return
         if (error instanceof ProfileError && error.missing) setStatus('missing')
         else {
-          setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar as medidas.')
+          setErrorMessage(friendlyError(error, 'Não foi possível carregar as medidas'))
           setStatus('error')
         }
       }
@@ -120,7 +122,7 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
       setItems((list) => list.filter((item) => item.id !== confirmItem.id))
       toast({ tone: 'success', title: 'Registro apagado' })
     } catch (error) {
-      toast({ tone: 'error', title: 'Não foi possível apagar', description: error instanceof Error ? error.message : undefined })
+      toast({ tone: 'error', title: 'Não foi possível apagar', description: friendlyError(error) })
     } finally {
       setDeleting(false)
       setConfirmItem(null)
@@ -179,7 +181,18 @@ export function MeasurementsCard({ userId, goal, studentName, bare = false, prof
         </p>
       )}
 
-      {status === 'error' && <p className="mt-3 text-xs text-danger">{errorMessage}</p>}
+      {status === 'error' && (
+        <Alert
+          variant="error"
+          className="mt-3"
+          onRetry={() => {
+            setStatus('loading')
+            setReloadKey((key) => key + 1)
+          }}
+        >
+          {errorMessage}
+        </Alert>
+      )}
 
       {status === 'ready' && items.length === 0 && (
         <button

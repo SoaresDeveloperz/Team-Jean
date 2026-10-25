@@ -20,6 +20,7 @@ import {
 import { publicImageUrl } from '@/lib/profile'
 import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Avatar } from '@/components/ui/avatar'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -281,7 +282,7 @@ export function ChallengesSection({
       setBoards((list) => list.filter((board) => board.challenge.id !== confirm.id))
       toast({ tone: 'success', title: 'Desafio apagado' })
     } catch (error) {
-      toast({ tone: 'error', title: 'Não foi possível apagar', description: error instanceof Error ? error.message : undefined })
+      toast({ tone: 'error', title: 'Não foi possível apagar', description: friendlyError(error) })
     } finally {
       setDeleting(false)
       setConfirm(null)

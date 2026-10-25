@@ -6,6 +6,7 @@ import { Check, ChevronDown, Dumbbell, Search, TrendingDown, TrendingUp, Trophy,
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import { formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -77,7 +78,11 @@ export default function StudentProgressPage() {
   const [metric, setMetric] = useState<Metric>('weight')
   const [loading, setLoading] = useState(true)
   const [loadingChart, setLoadingChart] = useState(false)
+  // listError: a lista de exercícios não carregou; errorMessage: o gráfico não carregou.
+  const [listError, setListError] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [chartAttempt, setChartAttempt] = useState(0)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState('')
   const requestId = useRef(0)
@@ -88,7 +93,12 @@ export default function StudentProgressPage() {
 
     const loadExercises = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setListError(friendlyError(MISSING_SESSION, 'Não foi possível carregar seus exercícios'))
+        setLoading(false)
+        return
+      }
 
       const [workoutsResult, sessionsResult] = await Promise.all([
         supabase.from('assigned_workouts').select('id').eq('student_id', user.id),
@@ -104,7 +114,7 @@ export default function StudentProgressPage() {
 
       const firstError = workoutsResult.error ?? sessionsResult.error
       if (firstError) {
-        setErrorMessage(`Não foi possível carregar seus exercícios: ${firstError.message}`)
+        setListError(friendlyError(firstError, 'Não foi possível carregar seus exercícios'))
         setLoading(false)
         return
       }
@@ -133,7 +143,7 @@ export default function StudentProgressPage() {
       if (!active) return
 
       if (exercisesResult.error) {
-        setErrorMessage(`Não foi possível carregar seus exercícios: ${exercisesResult.error.message}`)
+        setListError(friendlyError(exercisesResult.error, 'Não foi possível carregar seus exercícios'))
         setLoading(false)
         return
       }
@@ -145,6 +155,7 @@ export default function StudentProgressPage() {
       const options = [...unique.values()].sort((first, second) => first.name.localeCompare(second.name, 'pt-BR'))
 
       const lastExerciseId = (lastSetResult.data as { exercise_id: string } | null)?.exercise_id
+      setListError('')
       setCompletedSessions(sessions)
       setExercises(options)
       setSelectedExerciseId(options.find((option) => option.id === lastExerciseId)?.id ?? options[0]?.id ?? '')
@@ -155,7 +166,17 @@ export default function StudentProgressPage() {
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
+
+  const retryList = () => {
+    setListError('')
+    setLoading(true)
+    setAttempt((value) => value + 1)
+  }
+  const retryChart = () => {
+    setErrorMessage('')
+    setChartAttempt((value) => value + 1)
+  }
 
   useEffect(() => {
     if (!completedSessions || completedSessions.length === 0 || !selectedExerciseId) return
@@ -177,7 +198,8 @@ export default function StudentProgressPage() {
       if (currentRequest !== requestId.current) return
 
       if (error) {
-        setErrorMessage(`Não foi possível carregar sua evolução: ${error.message}`)
+        // Limpa o gráfico (podia ser de outro exercício) e avisa: a área diz que não carregou, sem fingir "nenhum registro".
+        setErrorMessage(friendlyError(error, 'Não foi possível carregar sua evolução'))
         setStats([])
       } else {
         const dateBySession = new Map(completedSessions.map((session) => [session.id, session.completed_at ?? '']))
@@ -188,7 +210,7 @@ export default function StudentProgressPage() {
     }
 
     void loadProgress()
-  }, [supabase, completedSessions, selectedExerciseId])
+  }, [supabase, completedSessions, selectedExerciseId, chartAttempt])
 
   const summary = useMemo(() => {
     if (stats.length === 0) return null
@@ -233,11 +255,14 @@ export default function StudentProgressPage() {
           </div>
           <Skeleton className="h-64 rounded-3xl" />
         </div>
+      ) : listError && exercises.length === 0 ? (
+        <Alert variant="error" onRetry={retryList}>
+          {listError}
+        </Alert>
       ) : exercises.length === 0 ? (
         <div className="space-y-3 rounded-3xl border border-line bg-surface p-8 text-center">
           <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />
           <p className="text-sm font-semibold text-zinc-400">Seu treinador ainda não prescreveu exercícios.</p>
-          {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
         </div>
       ) : (
         <Stagger className="space-y-4">
@@ -260,7 +285,11 @@ export default function StudentProgressPage() {
             </span>
           </m.button>
 
-          {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+          {errorMessage && (
+            <Alert variant="error" onRetry={retryChart}>
+              {errorMessage}
+            </Alert>
+          )}
 
           {summary && (
             <div className="grid grid-cols-2 gap-3">
@@ -326,7 +355,11 @@ export default function StudentProgressPage() {
             <div className={cn('mt-3 transition-opacity', loadingChart && 'opacity-40')}>
               {stats.length === 0 ? (
                 <p className="py-10 text-center text-xs text-zinc-600">
-                  {loadingChart ? 'Carregando...' : 'Nenhum registro deste exercício ainda. Bora treinar!'}
+                  {loadingChart
+                    ? 'Carregando...'
+                    : errorMessage
+                      ? 'O gráfico não carregou.'
+                      : 'Nenhum registro deste exercício ainda. Bora treinar!'}
                 </p>
               ) : (
                 <LineChart

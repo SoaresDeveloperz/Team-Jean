@@ -25,6 +25,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Modal, SheetFooter } from '@/components/ui/modal'
 import { Switch } from '@/components/ui/switch'
 import { AchievementShareCard, WorkoutShareCard } from './ShareCards'
+import { friendlyError } from '@/lib/errors'
 
 type SelectedPhoto = { id: string; file: File; preview: string }
 
@@ -179,7 +180,7 @@ export function Composer({ open, onClose, onPosted, draft = EMPTY_DRAFT, canPin 
     } catch (publishError) {
       setStage(null)
       if (publishError instanceof CommunityError && publishError.missing) setError(COMMUNITY_MISSING_MESSAGE)
-      else setError(publishError instanceof Error ? publishError.message : 'Não foi possível publicar.')
+      else setError(friendlyError(publishError, 'Não foi possível publicar'))
     }
   }
 

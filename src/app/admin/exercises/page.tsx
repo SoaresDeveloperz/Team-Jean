@@ -12,6 +12,7 @@ import { plural } from '@/lib/text'
 import { summarizeWork } from '@/lib/workout-summary'
 import type { MuscleRegion } from '@/lib/muscles'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Body3D } from '@/components/fitness/Body3D'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { Alert } from '@/components/ui/alert'
@@ -82,7 +83,7 @@ export default function AdminExercisesPage() {
       const { data, error } = await supabase.from('exercises').select('*').order('name', { ascending: true })
       if (!active) return
       if (error) {
-        setLoadError(`Não foi possível carregar a biblioteca: ${error.message}`)
+        setLoadError(friendlyError(error, 'Não foi possível carregar a biblioteca'))
       } else {
         setLoadError('')
         setExercises((data ?? []) as Exercise[])
@@ -123,7 +124,7 @@ export default function AdminExercisesPage() {
     const { error } = await supabase.from('exercises').insert(missingCatalog)
     setCatalogLoading(false)
     if (error) {
-      toast({ tone: 'error', title: 'Não foi possível adicionar o catálogo', description: error.message })
+      toast({ tone: 'error', title: 'Não foi possível adicionar o catálogo', description: friendlyError(error) })
       return
     }
     toast({
@@ -158,7 +159,7 @@ export default function AdminExercisesPage() {
     setSaving(false)
 
     if (error) {
-      setEditorError(`Não foi possível salvar: ${error.message}`)
+      setEditorError(friendlyError(error, 'Não foi possível salvar'))
       return
     }
     setEditor(null)
@@ -287,7 +288,15 @@ export default function AdminExercisesPage() {
           ))}
         </div>
       ) : loadError ? (
-        <Alert variant="error">{loadError}</Alert>
+        <Alert
+          variant="error"
+          onRetry={() => {
+            setLoading(true)
+            reload()
+          }}
+        >
+          {loadError}
+        </Alert>
       ) : filteredExercises.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-line-strong p-8 text-center">
           <Dumbbell className="h-9 w-9 text-zinc-600" aria-hidden="true" />

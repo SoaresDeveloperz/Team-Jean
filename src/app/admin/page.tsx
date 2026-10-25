@@ -22,6 +22,7 @@ import { avatarUrlOf } from '@/lib/profile'
 import { formatKg } from '@/lib/workouts'
 import { relativeDay, relativeDayPhrase, startOfDay, startOfWeek } from '@/lib/stats'
 import { cn } from '@/lib/cn'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Avatar } from '@/components/ui/avatar'
@@ -62,6 +63,7 @@ export default function AdminDashboardPage() {
   const [supabase] = useState(() => createClient())
   const [data, setData] = useState<DashboardData | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const closePhotoMenu = useCallback(() => setPhotoMenuOpen(false), [])
@@ -72,7 +74,11 @@ export default function AdminDashboardPage() {
 
     const load = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setLoadError(friendlyError(MISSING_SESSION, 'Não foi possível carregar o painel'))
+        return
+      }
       const since = new Date(Date.now() - WINDOW_DAYS * 86_400_000)
 
       const [coachResult, studentsResult, sessionsResult] = await Promise.all([
@@ -91,7 +97,7 @@ export default function AdminDashboardPage() {
 
       const error = studentsResult.error ?? sessionsResult.error
       if (error) {
-        setLoadError(`Não foi possível carregar o painel: ${error.message}`)
+        setLoadError(friendlyError(error, 'Não foi possível carregar o painel'))
         return
       }
 
@@ -114,6 +120,7 @@ export default function AdminDashboardPage() {
         }
       }
 
+      setLoadError('')
       setData({
         coach: { id: user.id, role: 'admin', full_name: null, email: user.email ?? null, ...(coachResult.data as Partial<Profile> | null) },
         students: (studentsResult.data ?? []) as Profile[],
@@ -126,7 +133,12 @@ export default function AdminDashboardPage() {
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
+
+  const retry = () => {
+    setLoadError('')
+    setAttempt((value) => value + 1)
+  }
 
   const derived = useMemo(() => {
     if (!data) return null
@@ -173,7 +185,12 @@ export default function AdminDashboardPage() {
     }
   }, [data])
 
-  if (loadError) return <Alert variant="error">{loadError}</Alert>
+  if (loadError && !data)
+    return (
+      <Alert variant="error" onRetry={retry}>
+        {loadError}
+      </Alert>
+    )
   if (!data || !derived) return <PageSkeleton label="Carregando painel" />
 
   const now = new Date()

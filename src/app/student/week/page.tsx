@@ -10,6 +10,7 @@ import { pickNextWorkout } from '@/lib/workouts'
 import { readActiveSession } from '@/lib/active-session'
 import { relativeDay } from '@/lib/stats'
 import { cn } from '@/lib/cn'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Stagger, tileVariants } from '@/components/ui/tile'
@@ -27,13 +28,18 @@ export default function StudentWeekPage() {
   const [workouts, setWorkouts] = useState<RoutineWorkout[] | null>(null)
   const [nextWorkoutId, setNextWorkoutId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
 
     const load = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setLoadError(friendlyError(MISSING_SESSION, 'Não foi possível carregar sua rotina'))
+        return
+      }
 
       const [workoutsResult, sessionsResult] = await Promise.all([
         supabase
@@ -54,8 +60,8 @@ export default function StudentWeekPage() {
 
       const error = workoutsResult.error ?? sessionsResult.error
       if (error) {
-        setLoadError(`Não foi possível carregar sua rotina: ${error.message}`)
-        setWorkouts([])
+        // Mantém o que já estava na tela (sem fingir que não há treinos).
+        setLoadError(friendlyError(error, 'Não foi possível carregar sua rotina'))
         return
       }
 
@@ -96,6 +102,7 @@ export default function StudentWeekPage() {
         lastDoneAt: lastDone.get(workout.id) ?? null,
         inProgress: workout.id === inProgressId,
       }))
+      setLoadError('')
       setWorkouts(rows)
       setNextWorkoutId(pickNextWorkout(rows, lastDone, inProgressId)?.id ?? null)
     }
@@ -104,7 +111,12 @@ export default function StudentWeekPage() {
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
+
+  const retry = () => {
+    setLoadError('')
+    setAttempt((value) => value + 1)
+  }
 
   return (
     <div className="space-y-8">
@@ -117,13 +129,19 @@ export default function StudentWeekPage() {
           <p className="mt-2 text-sm text-zinc-400">Siga a ordem: o próximo da rotina fica em destaque.</p>
         </div>
 
-        {loadError && <Alert variant="error">{loadError}</Alert>}
+        {loadError && (
+          <Alert variant="error" onRetry={retry}>
+            {loadError}
+          </Alert>
+        )}
 
         {workouts === null ? (
-          <div className="space-y-3" role="status" aria-label="Carregando rotina">
-            <Skeleton className="h-28 rounded-3xl" />
-            <Skeleton className="h-28 rounded-3xl" />
-          </div>
+          loadError ? null : (
+            <div className="space-y-3" role="status" aria-label="Carregando rotina">
+              <Skeleton className="h-28 rounded-3xl" />
+              <Skeleton className="h-28 rounded-3xl" />
+            </div>
+          )
         ) : workouts.length === 0 ? (
           <div className="space-y-3 rounded-3xl border border-line bg-surface p-8 text-center">
             <Dumbbell className="mx-auto h-10 w-10 text-zinc-700" aria-hidden="true" />

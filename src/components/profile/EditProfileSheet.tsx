@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal, SheetFooter } from '@/components/ui/modal'
+import { friendlyError } from '@/lib/errors'
 
 type EditableFields = Pick<ProfileDetails, 'full_name' | 'bio' | 'goal' | 'instagram'>
 
@@ -65,7 +66,7 @@ export function EditProfileSheet({ open, profile, onClose, onSave }: EditProfile
       await onSave(patch)
     } catch (saveError) {
       if (saveError instanceof ProfileError && saveError.missing) setError(PROFILE_SETUP_MESSAGE)
-      else setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar.')
+      else setError(friendlyError(saveError, 'Não foi possível salvar'))
     } finally {
       setSaving(false)
     }

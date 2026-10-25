@@ -3,6 +3,7 @@
 import { getSupabaseEnv } from './supabase/env'
 import type { createClient } from './supabase/client'
 import type { Profile } from './types'
+import { friendlyError } from './errors'
 
 type Supabase = ReturnType<typeof createClient>
 type DbError = { code?: string; message?: string } | null | undefined
@@ -73,7 +74,7 @@ export class ProfileError extends Error {
 export const PROFILE_SETUP_MESSAGE = 'Este recurso ainda não foi ativado. Avise seu treinador.'
 
 function fail(prefix: string, error: NonNullable<DbError>): never {
-  throw new ProfileError(`${prefix}: ${error.message ?? 'erro desconhecido'}`, isProfileSetupMissing(error))
+  throw new ProfileError(friendlyError(error, prefix), isProfileSetupMissing(error))
 }
 
 export async function updateProfileDetails(

@@ -24,6 +24,7 @@ import {
   type SkinfoldSite,
 } from '@/lib/health'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Modal, SheetFooter } from '@/components/ui/modal'
 
@@ -151,7 +152,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
         physical.sex !== (profile?.sex ?? null) || physical.birth_date !== (profile?.birth_date ?? null) || physical.height_cm !== (profile?.height_cm ?? null)
       if (changed) {
         const { error: profileError } = await supabase.from('profiles').update(physical).eq('id', userId)
-        if (profileError) throw new ProfileError(isHealthSetupMissing(profileError) ? HEALTH_SETUP_MESSAGE : `Não foi possível salvar o perfil: ${profileError.message}`)
+        if (profileError) throw new ProfileError(isHealthSetupMissing(profileError) ? HEALTH_SETUP_MESSAGE : friendlyError(profileError, 'Não foi possível salvar o perfil'))
         onProfileChange?.(physical)
       }
       await addMeasurement(
@@ -172,7 +173,7 @@ export function MeasurementForm({ open, userId, forStudent, profile, onProfileCh
     } catch (saveError) {
       setStage(null)
       if (saveError instanceof ProfileError && saveError.missing) setError(PROFILE_SETUP_MESSAGE)
-      else setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar.')
+      else setError(friendlyError(saveError, 'Não foi possível salvar'))
     }
   }
 

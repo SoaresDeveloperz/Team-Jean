@@ -8,6 +8,7 @@ import { REGION_LABELS, loadFill, muscleLoad, regionsForExercise, splitSecondary
 import { WEEKDAY_SHORT, startOfWeek } from '@/lib/stats'
 import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -196,7 +197,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
         setErrorMessage('')
       } catch (error) {
         if (!active) return
-        setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar o resumo semanal.')
+        setErrorMessage(friendlyError(error, 'Não foi possível carregar o resumo semanal'))
         setInsights(null)
       } finally {
         if (active) setLoading(false)

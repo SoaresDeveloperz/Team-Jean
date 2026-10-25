@@ -13,6 +13,7 @@ import { WEEKDAY_INITIALS, countInMonth, isSameDay, relativeDay, startOfWeek, we
 import { usePreferences } from '@/lib/preferences'
 import { openNotifications, useNotifications } from '@/lib/notifications'
 import { cn } from '@/lib/cn'
+import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { PageSkeleton } from '@/components/ui/skeleton'
 import { ProgressRing } from '@/components/ui/progress-ring'
@@ -49,6 +50,7 @@ export default function StudentTodayPage() {
   const [supabase] = useState(() => createClient())
   const [data, setData] = useState<TodayData | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
   const [readiness, setReadiness] = useState(80)
   const [readinessStatus, setReadinessStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -62,7 +64,11 @@ export default function StudentTodayPage() {
 
     const load = async () => {
       const user = await getCurrentUser(supabase)
-      if (!active || !user) return
+      if (!active) return
+      if (!user) {
+        setLoadError(friendlyError(MISSING_SESSION, 'Não foi possível carregar seu treino'))
+        return
+      }
       setUserId(user.id)
 
       const [profileResult, workoutsResult, sessionsResult] = await Promise.all([
@@ -85,7 +91,8 @@ export default function StudentTodayPage() {
 
       const error = profileResult.error ?? workoutsResult.error ?? sessionsResult.error
       if (error) {
-        setLoadError(`Não foi possível carregar seu treino: ${error.message}`)
+        // Se já havia um treino na tela, ele continua lá com o aviso.
+        setLoadError(friendlyError(error, 'Não foi possível carregar seu treino'))
         return
       }
 
@@ -140,6 +147,7 @@ export default function StudentTodayPage() {
       const profile = profileResult.data as { full_name?: string | null; readiness_score?: number | null } | null
       if (typeof profile?.readiness_score === 'number') setReadiness(profile.readiness_score)
 
+      setLoadError('')
       setData({
         firstName: profile?.full_name?.trim().split(' ')[0] || 'Atleta',
         workouts,
@@ -156,7 +164,12 @@ export default function StudentTodayPage() {
     return () => {
       active = false
     }
-  }, [supabase])
+  }, [supabase, attempt])
+
+  const retry = () => {
+    setLoadError('')
+    setAttempt((value) => value + 1)
+  }
 
   useEffect(
     () => () => {
@@ -220,8 +233,12 @@ export default function StudentTodayPage() {
     }
   }, [data])
 
-  if (loadError) return <Alert variant="error">{loadError}</Alert>
-  if (!data || !derived) return <PageSkeleton label="Carregando seu dia" />
+  const errorAlert = loadError ? (
+    <Alert variant="error" onRetry={retry}>
+      {loadError}
+    </Alert>
+  ) : null
+  if (!data || !derived) return errorAlert ?? <PageSkeleton label="Carregando seu dia" />
 
   const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
   const next = data.next
@@ -237,6 +254,7 @@ export default function StudentTodayPage() {
 
   return (
     <Stagger className="space-y-4">
+      {errorAlert}
       <m.header variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="px-1 pb-1 pt-1">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-500">{today}</p>
         <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9] tracking-tight">

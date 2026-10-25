@@ -8,6 +8,7 @@ import { formatBRL, monthOf, parseMoney, saveBilling, todaySP, type Billing } fr
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
 import { Switch } from '@/components/ui/switch'
+import { friendlyError } from '@/lib/errors'
 
 const labelClassName = 'mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400'
 const fieldClassName = 'h-14 w-full rounded-2xl border border-line-strong bg-black/40 px-4 text-white focus:border-brand focus:outline-none'
@@ -41,7 +42,7 @@ export function PlanSheet({ open, studentId, studentName, current, onClose, onSa
     try {
       onSaved(await saveBilling(supabase, { student_id: studentId, monthly_fee: value, due_day: dueDay, active, starts_on: `${startsOn}-01` }))
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar o plano.')
+      setError(friendlyError(saveError, 'Não foi possível salvar o plano'))
     } finally {
       setSaving(false)
     }

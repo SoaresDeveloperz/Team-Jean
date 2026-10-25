@@ -22,6 +22,7 @@ import {
 import { avatarUrlOf } from '@/lib/profile'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -45,7 +46,7 @@ function sortFeed(posts: FeedPost[]) {
   return [...posts].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.created_at.localeCompare(a.created_at))
 }
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : undefined)
+const messageOf = (error: unknown) => friendlyError(error)
 
 export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
   const [supabase] = useState(() => createClient())
@@ -90,7 +91,7 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
         if (error instanceof CommunityError && error.missing) {
           setStatus('missing')
         } else {
-          setLoadError(messageOf(error) ?? 'Não foi possível carregar a comunidade.')
+          setLoadError(friendlyError(error, 'Não foi possível carregar a comunidade'))
           setStatus('error')
         }
         return
@@ -309,16 +310,9 @@ export function CommunityScreen({ role }: { role: 'student' | 'admin' }) {
       )}
 
       {status === 'error' && (
-        <div className="space-y-3">
-          <Alert variant="error">{loadError}</Alert>
-          <button
-            type="button"
-            onClick={refresh}
-            className="h-11 w-full rounded-2xl border border-line-strong text-xs font-bold text-zinc-200"
-          >
-            Tentar de novo
-          </button>
-        </div>
+        <Alert variant="error" onRetry={refresh}>
+          {loadError}
+        </Alert>
       )}
 
       {status === 'ready' && viewerId && (

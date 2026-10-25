@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal, SheetFooter } from '@/components/ui/modal'
+import { friendlyError } from '@/lib/errors'
 
 const chipClassName =
   'flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-line px-4 text-xs font-bold text-zinc-300 transition hover:text-white has-[:checked]:border-white has-[:checked]:bg-white has-[:checked]:text-black has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand'
@@ -79,7 +80,7 @@ export function AnamneseForm({ open, studentId, current, forStudent, onClose, on
     try {
       onSaved(await saveAnamnese(supabase, studentId, answers))
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar a ficha.')
+      setError(friendlyError(saveError, 'Não foi possível salvar a ficha'))
     } finally {
       setSaving(false)
     }

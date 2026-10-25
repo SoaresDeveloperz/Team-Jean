@@ -13,6 +13,7 @@ import { relativeDay } from '@/lib/stats'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui/avatar'
 import { useToast } from '@/components/ui/toast'
+import { friendlyError } from '@/lib/errors'
 
 const QUICK_REPLIES = ['Boa! Continua assim 💪', 'Vou ajustar seu treino.', 'Descansa e me conta como ficou.']
 
@@ -53,7 +54,7 @@ export function FeedbackCard({ item, student, onReplied, showStudent = true }: F
         description: result.notified ? `${name} vai ver no sino de avisos.` : 'Salva no treino (o aviso não pôde ser enviado).',
       })
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : 'Não foi possível responder.')
+      setError(friendlyError(sendError, 'Não foi possível responder'))
     } finally {
       setSending(false)
     }

@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/toast'
 import { Eyebrow, Tile } from '@/components/ui/tile'
+import { friendlyError } from '@/lib/errors'
 
 type RadarTab = 'feedback' | 'records' | 'progressions' | 'alerts'
 type ListTab = Exclude<RadarTab, 'feedback'>
@@ -150,7 +151,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
         if (firstWithItems) setTab(firstWithItems)
         if (fromPush) sectionRef.current?.scrollIntoView({ block: 'start' })
       } catch (loadError) {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Não foi possível montar o radar.')
+        if (active) setError(friendlyError(loadError, 'Não foi possível montar o radar'))
       }
     }
     void load()
@@ -180,7 +181,7 @@ export function CoachRadar({ students }: { students: Profile[] }) {
           : `${student?.full_name ?? 'Aluno'} vai ver no sino de avisos.`,
       })
     } catch (sendError) {
-      toast({ tone: 'error', title: 'Não foi possível enviar', description: sendError instanceof Error ? sendError.message : undefined })
+      toast({ tone: 'error', title: 'Não foi possível enviar', description: friendlyError(sendError) })
     } finally {
       setSending(null)
     }

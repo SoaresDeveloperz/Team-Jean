@@ -29,6 +29,7 @@ import type { AssignedWorkout, Profile } from '@/lib/types'
 import { avatarUrlOf, goalInfo } from '@/lib/profile'
 import { relativeDay, relativeDayPhrase, startOfWeek } from '@/lib/stats'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
 import { Modal } from '@/components/ui/modal'
@@ -148,8 +149,8 @@ export default function AdminStudentsPage() {
 
       const error = studentsResult.error ?? sessionsResult.error ?? workoutsResult.error
       if (error) {
-        setLoadError(`Não foi possível carregar os alunos: ${error.message}`)
-        setStudents([])
+        // Mantém a lista que já estava na tela (sem fingir "nenhum aluno").
+        setLoadError(friendlyError(error, 'Não foi possível carregar os alunos'))
         return
       }
       setLoadError('')
@@ -291,7 +292,7 @@ export default function AdminStudentsPage() {
     const { error } = await supabase.from('profiles').update({ full_name: name }).eq('id', detail.id)
     setSavingEdit(false)
     if (error) {
-      setEditError(`Erro ao atualizar nome: ${error.message}`)
+      setEditError(friendlyError(error, 'Não foi possível atualizar o nome'))
       return
     }
     setEditingName(null)
@@ -355,14 +356,26 @@ export default function AdminStudentsPage() {
         ))}
       </div>
 
-      {loadError && <Alert variant="error">{loadError}</Alert>}
+      {loadError && (
+        <Alert
+          variant="error"
+          onRetry={() => {
+            setLoadError('')
+            reload()
+          }}
+        >
+          {loadError}
+        </Alert>
+      )}
 
       {students === null ? (
-        <div className="grid gap-2.5 lg:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Carregando alunos">
-          {[0, 1, 2].map((item) => (
-            <Skeleton key={item} className="h-24 rounded-3xl" />
-          ))}
-        </div>
+        loadError ? null : (
+          <div className="grid gap-2.5 lg:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Carregando alunos">
+            {[0, 1, 2].map((item) => (
+              <Skeleton key={item} className="h-24 rounded-3xl" />
+            ))}
+          </div>
+        )
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-line-strong p-10 text-center">
           <User className="h-9 w-9 text-zinc-600" aria-hidden="true" />

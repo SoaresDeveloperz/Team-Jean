@@ -28,6 +28,7 @@ import { requestPushDelivery } from '@/lib/push/client'
 import { plural } from '@/lib/text'
 import { summarizePrescription, summarizeWork, summaryLine, type WorkoutSummary } from '@/lib/workout-summary'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Body3D } from '@/components/fitness/Body3D'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { BuilderExerciseCard, type BuilderExercise, type BuilderSet } from '@/components/admin/BuilderExerciseCard'
@@ -206,7 +207,7 @@ export default function AdminWorkoutsPage() {
 
       const error = workoutsResult.error ?? templatesResult.error ?? studentsResult.error ?? exercisesResult.error
       if (error) {
-        setLoadError(`Não foi possível carregar os dados: ${error.message}`)
+        setLoadError(friendlyError(error, 'Não foi possível carregar os dados'))
         setLoading(false)
         return
       }
@@ -311,7 +312,7 @@ export default function AdminWorkoutsPage() {
       .limit(20)
 
     if (error) {
-      setHistoryError(error.message)
+      setHistoryError(friendlyError(error, 'Não foi possível carregar o histórico'))
       setLoadingHistory(false)
       return
     }
@@ -329,7 +330,7 @@ export default function AdminWorkoutsPage() {
         )
         .order('set_number', { ascending: true })
 
-      if (setsError) setHistoryError(setsError.message)
+      if (setsError) setHistoryError(friendlyError(setsError, 'Algumas séries do histórico não carregaram'))
       setRows = (setsData ?? []) as unknown as HistorySet[]
     }
 
@@ -368,7 +369,7 @@ export default function AdminWorkoutsPage() {
     setOpeningId(null)
 
     if (error) {
-      toast({ tone: 'error', title: 'Não foi possível abrir para edição', description: error.message })
+      toast({ tone: 'error', title: 'Não foi possível abrir para edição', description: friendlyError(error) })
       return
     }
 
@@ -507,11 +508,11 @@ export default function AdminWorkoutsPage() {
       updates.map(({ item, row }) => supabase.from(table).update(row).eq('id', item.rowId as string)),
     )
     const updateError = updateResults.find((result) => result.error)?.error
-    if (updateError) throw new Error(`Erro ao atualizar exercícios: ${updateError.message}`)
+    if (updateError) throw new Error(friendlyError(updateError, 'Não foi possível atualizar os exercícios'))
 
     if (inserts.length > 0) {
       const { error } = await supabase.from(table).insert(inserts)
-      if (error) throw new Error(`Erro ao adicionar exercícios: ${error.message}`)
+      if (error) throw new Error(friendlyError(error, 'Não foi possível adicionar os exercícios'))
     }
 
     const keptIds = new Set(selectedExercises.map((item) => item.rowId).filter(Boolean))
@@ -519,9 +520,7 @@ export default function AdminWorkoutsPage() {
     if (removedIds.length > 0) {
       const { error } = await supabase.from(table).delete().in('id', removedIds)
       if (error) {
-        throw new Error(
-          `Os exercícios foram salvos, mas não foi possível remover os que saíram do treino (${error.message}).`,
-        )
+        throw new Error(friendlyError(error, 'Os exercícios foram salvos, mas não foi possível remover os que saíram do treino'))
       }
     }
   }
@@ -546,10 +545,10 @@ export default function AdminWorkoutsPage() {
       if (builder.kind === 'template') {
         if (parentId) {
           const { error } = await supabase.from('workout_templates').update({ name }).eq('id', parentId)
-          if (error) throw new Error(`Erro ao salvar o modelo: ${error.message}`)
+          if (error) throw new Error(friendlyError(error, 'Não foi possível salvar o modelo'))
         } else {
           const { data, error } = await supabase.from('workout_templates').insert({ name }).select('id').single()
-          if (error || !data) throw new Error(`Erro ao criar o modelo: ${error?.message}`)
+          if (error || !data) throw new Error(friendlyError(error, 'Não foi possível criar o modelo'))
           parentId = data.id as string
         }
       } else if (parentId) {
@@ -557,14 +556,14 @@ export default function AdminWorkoutsPage() {
           .from('assigned_workouts')
           .update({ name, student_id: selectedStudent })
           .eq('id', parentId)
-        if (error) throw new Error(`Erro ao salvar o treino: ${error.message}`)
+        if (error) throw new Error(friendlyError(error, 'Não foi possível salvar o treino'))
       } else {
         const { data, error } = await supabase
           .from('assigned_workouts')
           .insert({ student_id: selectedStudent, name, is_current: true })
           .select('id')
           .single()
-        if (error || !data) throw new Error(`Erro ao criar o treino: ${error?.message}`)
+        if (error || !data) throw new Error(friendlyError(error, 'Não foi possível criar o treino'))
         parentId = data.id as string
       }
 
@@ -603,7 +602,7 @@ export default function AdminWorkoutsPage() {
       }
       reload()
     } catch (error) {
-      setBuilderError(error instanceof Error ? error.message : 'Erro ao salvar.')
+      setBuilderError(friendlyError(error, 'Não foi possível salvar'))
       // Recarrega para o próximo salvamento comparar com o estado real do banco.
       if (parentId) void reopenAfterPartialSave(builder.kind, parentId)
     } finally {
@@ -639,7 +638,7 @@ export default function AdminWorkoutsPage() {
       setWorkouts((items) =>
         items.map((item) => (item.id === workout.id ? { ...item, is_current: workout.is_current } : item)),
       )
-      toast({ tone: 'error', title: 'Não foi possível alterar o status', description: error.message })
+      toast({ tone: 'error', title: 'Não foi possível alterar o status', description: friendlyError(error) })
       return
     }
     toast({ tone: 'success', title: next ? 'Treino reativado' : 'Treino arquivado', description: workout.name })
@@ -656,7 +655,7 @@ export default function AdminWorkoutsPage() {
           toast({
             tone: 'error',
             title: 'Não foi possível apagar',
-            description: `${error.message}. Se o treino já tem histórico, prefira arquivá-lo.`,
+            description: error.code === '23503' ? 'Este treino já tem histórico de cargas. Prefira arquivá-lo.' : friendlyError(error),
           })
           return
         }
@@ -673,7 +672,7 @@ export default function AdminWorkoutsPage() {
       run: async () => {
         const { error } = await supabase.from('workout_templates').delete().eq('id', template.id)
         if (error) {
-          toast({ tone: 'error', title: 'Não foi possível apagar o modelo', description: error.message })
+          toast({ tone: 'error', title: 'Não foi possível apagar o modelo', description: friendlyError(error) })
           return
         }
         toast({ tone: 'success', title: 'Modelo apagado', description: template.name })
@@ -722,14 +721,14 @@ export default function AdminWorkoutsPage() {
         .select('*')
         .eq('template_id', templateToAssign.id)
         .order('order', { ascending: true })
-      if (templateError) throw new Error(`Erro ao ler o modelo: ${templateError.message}`)
+      if (templateError) throw new Error(friendlyError(templateError, 'Não foi possível ler o modelo'))
 
       const { data: newWorkout, error: workoutError } = await supabase
         .from('assigned_workouts')
         .insert({ student_id: assignStudentId, name: templateToAssign.name, is_current: true })
         .select('id')
         .single()
-      if (workoutError || !newWorkout) throw new Error(`Erro ao atribuir: ${workoutError?.message ?? 'sem resposta'}`)
+      if (workoutError || !newWorkout) throw new Error(friendlyError(workoutError, 'Não foi possível lançar o treino'))
 
       const rows = (templateRows ?? []) as PrescribedExercise[]
       if (rows.length > 0) {
@@ -746,7 +745,7 @@ export default function AdminWorkoutsPage() {
         )
         if (error) {
           await supabase.from('assigned_workouts').delete().eq('id', newWorkout.id)
-          throw new Error(`Erro ao copiar os exercícios: ${error.message}`)
+          throw new Error(friendlyError(error, 'Não foi possível copiar os exercícios'))
         }
       }
 
@@ -777,7 +776,7 @@ export default function AdminWorkoutsPage() {
       })
       reload()
     } catch (error) {
-      setAssignError(error instanceof Error ? error.message : 'Erro ao atribuir.')
+      setAssignError(friendlyError(error, 'Não foi possível lançar o treino'))
     } finally {
       setAssigning(false)
     }
@@ -825,7 +824,18 @@ export default function AdminWorkoutsPage() {
         ]}
       />
 
-      {loadError && <Alert variant="error">{loadError}</Alert>}
+      {loadError && (
+        <Alert
+          variant="error"
+          onRetry={() => {
+            setLoadError('')
+            setLoading(true)
+            reload()
+          }}
+        >
+          {loadError}
+        </Alert>
+      )}
 
       <AnimatePresence mode="wait" initial={false}>
         {activeTab === 'students' ? (

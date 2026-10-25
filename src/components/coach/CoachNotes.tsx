@@ -7,6 +7,7 @@ import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import { CoachError, NOTE_MAX, addNote, deleteNote, loadNotes, setNotePinned, type CoachNote } from '@/lib/coach'
 import { relativeDay } from '@/lib/stats'
 import { cn } from '@/lib/cn'
+import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
@@ -27,6 +28,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -40,7 +42,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
         if (!active) return
         if (error instanceof CoachError && error.missing) setStatus('missing')
         else {
-          setErrorMessage(error instanceof Error ? error.message : 'Não foi possível carregar as notas.')
+          setErrorMessage(friendlyError(error, 'Não foi possível carregar as notas'))
           setStatus('error')
         }
       }
@@ -49,7 +51,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
     return () => {
       active = false
     }
-  }, [supabase, studentId])
+  }, [supabase, studentId, attempt])
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -64,7 +66,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
       setNotes((list) => sortNotes([note, ...list]))
       setDraft('')
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Não foi possível salvar a nota.')
+      setFormError(friendlyError(error, 'Não foi possível salvar a nota'))
     } finally {
       setSaving(false)
     }
@@ -76,7 +78,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
       await setNotePinned(supabase, note.id, !note.pinned)
     } catch (error) {
       setNotes((list) => sortNotes(list.map((item) => (item.id === note.id ? { ...item, pinned: note.pinned } : item))))
-      toast({ tone: 'error', title: 'Não foi possível fixar', description: error instanceof Error ? error.message : undefined })
+      toast({ tone: 'error', title: 'Não foi possível fixar', description: friendlyError(error) })
     }
   }
 
@@ -87,7 +89,7 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
       toast({ tone: 'success', title: 'Nota apagada' })
     } catch (error) {
       setNotes((list) => sortNotes([note, ...list]))
-      toast({ tone: 'error', title: 'Não foi possível apagar', description: error instanceof Error ? error.message : undefined })
+      toast({ tone: 'error', title: 'Não foi possível apagar', description: friendlyError(error) })
     }
   }
 
@@ -106,7 +108,18 @@ export function CoachNotes({ studentId, studentName }: { studentId: string; stud
       </p>
     )
   }
-  if (status === 'error') return <Alert variant="error">{errorMessage}</Alert>
+  if (status === 'error')
+    return (
+      <Alert
+        variant="error"
+        onRetry={() => {
+          setStatus('loading')
+          setAttempt((value) => value + 1)
+        }}
+      >
+        {errorMessage}
+      </Alert>
+    )
 
   return (
     <div className="space-y-3">

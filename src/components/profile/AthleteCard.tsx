@@ -12,7 +12,8 @@ import { LevelBadge } from '@/components/community/LevelBadge'
 type AthleteCardProps = {
   profile: ProfileDetails
   email: string | null
-  stats: { workouts: number; streak: number; unlocked: number; achievements: number }
+  // null: os treinos não carregaram (sem internet). Mostra "—" em vez de zeros.
+  stats: { workouts: number; streak: number; unlocked: number; achievements: number } | null
   uploading: ProfileImageKind | null
   onEditImage: (kind: ProfileImageKind) => void
   onEditProfile: () => void
@@ -24,7 +25,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
   const avatarUrl = publicImageUrl(profile.avatar_path, profile.id)
   const coverUrl = publicImageUrl(profile.cover_path, profile.id)
   const goal = goalInfo(profile.goal)
-  const level = levelFor(stats.workouts)
+  const level = stats ? levelFor(stats.workouts) : null
 
   return (
     <Tile className="glow-brand rounded-[2rem] p-0 text-center">
@@ -93,7 +94,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
         <p className="mt-1.5 truncate text-xs text-zinc-500">{profile.email || email}</p>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-          <LevelBadge workouts={stats.workouts} className="px-3 py-1 text-[10px] tracking-[0.16em]" />
+          {stats && <LevelBadge workouts={stats.workouts} className="px-3 py-1 text-[10px] tracking-[0.16em]" />}
           {goal && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-200">
               <span aria-hidden="true">{goal.emoji}</span> {goal.label}
@@ -128,47 +129,58 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
 
         <dl className="mt-5 grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-black/30">
           {[
-            { label: 'Treinos', value: stats.workouts },
-            { label: 'Sequência', value: stats.streak, suffix: 'sem' },
-            { label: 'Conquistas', value: stats.unlocked, suffix: `/${stats.achievements}` },
+            { label: 'Treinos', value: stats?.workouts },
+            { label: 'Sequência', value: stats?.streak, suffix: 'sem' },
+            { label: 'Conquistas', value: stats?.unlocked, suffix: stats ? `/${stats.achievements}` : undefined },
           ].map((stat) => (
             <div key={stat.label} className="px-2 py-3">
               <dd className="font-display text-3xl font-bold leading-none">
-                <AnimatedNumber value={stat.value} />
-                {stat.suffix && <span className="text-sm text-zinc-500">{stat.suffix}</span>}
+                {stat.value === undefined ? (
+                  <>
+                    <span aria-hidden="true">—</span>
+                    <span className="sr-only">não carregou</span>
+                  </>
+                ) : (
+                  <>
+                    <AnimatedNumber value={stat.value} />
+                    {stat.suffix && <span className="text-sm text-zinc-500">{stat.suffix}</span>}
+                  </>
+                )}
               </dd>
               <dt className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">{stat.label}</dt>
             </div>
           ))}
         </dl>
 
-        <button
-          type="button"
-          onClick={onOpenLevels}
-          className="mt-4 block w-full rounded-2xl border border-line bg-black/30 p-3.5 text-left transition hover:border-line-strong"
-        >
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Nível {level.level}</span>
-            <span className="flex items-center gap-1 text-[11px] font-bold text-zinc-300">
-              {level.next ? `Próximo: ${level.next.name}` : 'Nível máximo'}
-              <ChevronRight className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
+        {level && (
+          <button
+            type="button"
+            onClick={onOpenLevels}
+            className="mt-4 block w-full rounded-2xl border border-line bg-black/30 p-3.5 text-left transition hover:border-line-strong"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-500">Nível {level.level}</span>
+              <span className="flex items-center gap-1 text-[11px] font-bold text-zinc-300">
+                {level.next ? `Próximo: ${level.next.name}` : 'Nível máximo'}
+                <ChevronRight className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
+              </span>
             </span>
-          </span>
-          {/* Dentro do botão a barra é só visual; o texto abaixo diz quanto falta. */}
-          <span aria-hidden="true" className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10">
-            <m.span
-              className="block h-full rounded-full bg-gradient-to-r from-brand-deep via-brand to-gold"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.max(4, level.progress * 100)}%` }}
-              transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.3 }}
-            />
-          </span>
-          <span className="mt-2 block text-[11px] text-zinc-400">
-            {level.next
-              ? `Faltam ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} para virar ${level.next.name}. Toque para ver a trilha.`
-              : 'Você é lenda do Team Jean. 👑'}
-          </span>
-        </button>
+            {/* Dentro do botão a barra é só visual; o texto abaixo diz quanto falta. */}
+            <span aria-hidden="true" className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10">
+              <m.span
+                className="block h-full rounded-full bg-gradient-to-r from-brand-deep via-brand to-gold"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.max(4, level.progress * 100)}%` }}
+                transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.3 }}
+              />
+            </span>
+            <span className="mt-2 block text-[11px] text-zinc-400">
+              {level.next
+                ? `Faltam ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} para virar ${level.next.name}. Toque para ver a trilha.`
+                : 'Você é lenda do Team Jean. 👑'}
+            </span>
+          </button>
+        )}
       </div>
     </Tile>
   )

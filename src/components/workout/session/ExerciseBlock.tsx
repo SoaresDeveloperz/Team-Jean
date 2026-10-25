@@ -190,7 +190,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
       <div className="px-2 pb-2" role="table" aria-label={`Séries de ${exercise?.name ?? 'exercício'}`}>
         <div
           role="row"
-          className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.4rem_4.4rem_2.9rem] gap-2 px-2 pb-1 text-center text-xs font-bold text-zinc-400"
+          className="grid grid-cols-[3.25rem_minmax(0,1fr)_4.4rem_4.4rem_2.9rem] gap-1.5 px-2 pb-1 text-center text-xs font-bold text-zinc-400"
         >
           <span role="columnheader">Série</span>
           <span role="columnheader">Anterior</span>

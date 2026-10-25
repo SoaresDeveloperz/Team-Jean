@@ -308,6 +308,8 @@ async function openShortcuts(page) {
   const workoutText = await page.textContent('main')
   check('treino: RIR traduzido ("4 na reserva", "até a falha")', workoutText.includes('4 na reserva') && workoutText.includes('até a falha') && !/\bRIR\b/.test(workoutText))
   check('treino: "Top set" vira "Série principal"', workoutText.includes('Série principal') && !workoutText.includes('Top set'))
+  // Pior caso: fonte larga (a do sistema muda de máquina para máquina, como no CI).
+  await page.addStyleTag({ content: "body, body * { font-family: 'DejaVu Sans', sans-serif !important }" })
   const tableOverflow = await page.evaluate(() =>
     [...document.querySelectorAll('[role=row] > [role=cell]:first-child, [role=columnheader]')].some((cell) => cell.scrollWidth > cell.clientWidth + 1),
   )

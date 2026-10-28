@@ -95,3 +95,16 @@ export function parseSwapState(
     return {}
   }
 }
+
+// "Estou trocando por causa de dor": guardado para o recado "Senti dor" não se
+// perder se a tela recarregar. Só treino e dia, nada de texto.
+export const PAIN_STORAGE_KEY = 'team-jean:trocas-dor'
+
+export function parsePainFlag(raw: string | null, workoutId: string, day: string): boolean {
+  try {
+    const parsed = JSON.parse(raw ?? 'null') as { workoutId?: string; day?: string } | null
+    return parsed?.workoutId === workoutId && parsed?.day === day
+  } catch {
+    return false
+  }
+}

@@ -19,7 +19,7 @@ import {
   type ShortRow,
   type ShortState,
 } from '@/lib/short-workout'
-import { SWAP_STORAGE_KEY, canOfferSwap, parseSwapState, swapOptions, type SwapOption } from '@/lib/swap-exercise'
+import { PAIN_STORAGE_KEY, SWAP_STORAGE_KEY, canOfferSwap, parsePainFlag, parseSwapState, swapOptions, type SwapOption } from '@/lib/swap-exercise'
 import {
   clearActiveSession,
   readActiveSession,
@@ -229,6 +229,13 @@ export default function WorkoutExecutionPage() {
         restoredSwaps = {}
       }
       const rows = applySwaps(baseRows, restoredSwaps, libraryItems)
+      try {
+        if (parsePainFlag(window.localStorage.getItem(PAIN_STORAGE_KEY), workoutId, localDay())) {
+          setFeedbackTags((tags) => (tags.includes('Senti dor') ? tags : [...tags, 'Senti dor']))
+        }
+      } catch {
+        // Sem armazenamento: o aviso vale até fechar a tela.
+      }
       const pastRecords: Record<string, PreviousSet> = {}
       for (const row of bundle.recordSets) {
         const weight = Number(row.weight_kg) || 0
@@ -670,7 +677,14 @@ export default function WorkoutExecutionPage() {
       [rowId]: (previous[rowId] ?? []).map((entry) => ({ ...entry, previous: null, targetWeight: null })),
     }))
     // Troca por dor: o recado "Senti dor" já vem marcado ao finalizar (o Jean fica sabendo).
-    if (pain) setFeedbackTags((tags) => (tags.includes('Senti dor') ? tags : [...tags, 'Senti dor']))
+    if (pain) {
+      setFeedbackTags((tags) => (tags.includes('Senti dor') ? tags : [...tags, 'Senti dor']))
+      try {
+        window.localStorage.setItem(PAIN_STORAGE_KEY, JSON.stringify({ workoutId, day: localDay() }))
+      } catch {
+        // Sem armazenamento: o aviso vale até fechar a tela.
+      }
+    }
     setSwapRowId(null)
     toast({
       tone: 'info',
@@ -678,7 +692,7 @@ export default function WorkoutExecutionPage() {
       description: pain ? 'O Jean vai receber o aviso de dor quando você finalizar.' : 'Vale só para hoje.',
       duration: 4000,
     })
-    focusLater(() => document.getElementById(`exercise-${rowId}`))
+    focusLater(() => document.querySelector<HTMLElement>(`#exercise-${rowId} h2`))
   }
 
   const restoreSwap = () => {
@@ -692,7 +706,7 @@ export default function WorkoutExecutionPage() {
     if (original) setSets((previous) => ({ ...previous, [rowId]: original }))
     setSwapRowId(null)
     toast({ tone: 'info', title: 'Exercício original de volta', duration: 3000 })
-    focusLater(() => document.getElementById(`exercise-${rowId}`))
+    focusLater(() => document.querySelector<HTMLElement>(`#exercise-${rowId} h2`))
   }
 
   const scrollToExercise = (rowId: string) => {

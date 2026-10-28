@@ -157,6 +157,9 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
                 <Star className="h-3.5 w-3.5 text-gold" aria-hidden="true" /> Essencial
               </span>
               Fica na versão curta e só troca por alternativa sua
+              {item.essential && item.alternatives.length === 0 && (
+                <span className="mt-0.5 block font-semibold text-gold">Sem alternativa, o aluno não poderá trocar este exercício.</span>
+              )}
             </span>
           </label>
           <div className="rounded-xl border border-line bg-black/20 px-3 py-2">
@@ -172,7 +175,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
                         type="button"
                         onClick={() => update((current) => ({ ...current, alternatives: current.alternatives.filter((other) => other !== id) }))}
                         aria-label={`Tirar ${name} das alternativas`}
-                        className="grid h-8 w-8 place-items-center rounded-full text-zinc-300 hover:bg-white/10 hover:text-white"
+                        className="-my-1.5 grid h-11 w-11 place-items-center rounded-full text-zinc-300 hover:bg-white/10 hover:text-white"
                       >
                         <X className="h-3.5 w-3.5" aria-hidden="true" />
                       </button>
@@ -185,7 +188,7 @@ export const BuilderExerciseCard = memo(function BuilderExerciseCard({
               <button
                 type="button"
                 onClick={() => onPickAlternatives?.(item.key)}
-                className="mt-2 flex h-10 items-center gap-1.5 rounded-xl bg-white/[0.06] px-3 text-xs font-bold text-zinc-200 hover:bg-white/10"
+                className="mt-2 flex h-11 items-center gap-1.5 rounded-xl bg-white/[0.06] px-3 text-xs font-bold text-zinc-200 hover:bg-white/10"
               >
                 <Plus className="h-4 w-4" aria-hidden="true" /> Alternativa<span className="sr-only"> para {item.name}</span>
               </button>

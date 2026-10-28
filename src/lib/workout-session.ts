@@ -139,6 +139,7 @@ export function clearSavedWorkouts() {
     Object.keys(window.localStorage)
       .filter((key) => key.startsWith(CACHE_PREFIX))
       .forEach((key) => window.localStorage.removeItem(key))
+    window.localStorage.removeItem(LIBRARY_KEY)
   } catch {
     // Sem armazenamento: nada a limpar.
   }
@@ -147,10 +148,16 @@ export function clearSavedWorkouts() {
 const CACHE_LIMIT = 8
 const cacheKey = (userId: string, workoutId: string) => `${CACHE_PREFIX}${userId}:${workoutId}`
 
+// A biblioteca (opções do "Trocar") é a mesma para todos os treinos: fica numa
+// chave só, para a cópia de cada treino não crescer.
+const LIBRARY_KEY = 'team-jean:biblioteca'
+
 export function readCachedBundle(userId: string, workoutId: string): WorkoutBundle | null {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(cacheKey(userId, workoutId)) ?? 'null') as WorkoutBundle | null
-    return parsed && parsed.workout && Array.isArray(parsed.rows) ? parsed : null
+    if (!parsed || !parsed.workout || !Array.isArray(parsed.rows)) return null
+    const library = JSON.parse(window.localStorage.getItem(LIBRARY_KEY) ?? '[]') as LibraryExercise[]
+    return { ...parsed, library: Array.isArray(library) ? library : [] }
   } catch {
     return null
   }
@@ -158,7 +165,9 @@ export function readCachedBundle(userId: string, workoutId: string): WorkoutBund
 
 export function saveCachedBundle(userId: string, workoutId: string, bundle: WorkoutBundle) {
   try {
-    window.localStorage.setItem(cacheKey(userId, workoutId), JSON.stringify(bundle))
+    const { library, ...rest } = bundle
+    window.localStorage.setItem(cacheKey(userId, workoutId), JSON.stringify(rest))
+    if (library && library.length > 0) window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(library))
     // Guarda só os treinos abertos mais recentemente.
     const keys = Object.keys(window.localStorage).filter((key) => key.startsWith(CACHE_PREFIX))
     if (keys.length > CACHE_LIMIT) {

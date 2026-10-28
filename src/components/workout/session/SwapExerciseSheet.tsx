@@ -29,9 +29,22 @@ export function SwapExerciseSheet({ open, onClose, originalName, swapped, option
       open={open}
       onClose={onClose}
       title={`Trocar ${originalName}`}
-      description="A troca vale só para hoje. O Jean vê no histórico o que você fez no lugar. Se sentir dor forte, pare e fale com ele."
+      description="A troca vale só para hoje. O Jean vê no histórico o que você fez no lugar. Se sentir dor forte, pare o exercício e fale com ele ou com um profissional de saúde."
     >
       <div className="space-y-4">
+        <label
+          className={cn(
+            'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-2 transition-colors',
+            pain ? 'border-gold/40 bg-gold-soft' : 'border-line bg-white/[0.03]',
+          )}
+        >
+          <input type="checkbox" checked={pain} onChange={(event) => setPain(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#fbbf24]" />
+          <span className="min-w-0 flex-1 text-sm font-semibold text-white">
+            Estou trocando por causa de dor
+            <span className="block text-xs font-normal text-zinc-300">Marque antes de escolher o exercício. O Jean recebe um aviso no seu recado ao finalizar.</span>
+          </span>
+        </label>
+
         <ul className="space-y-1.5" aria-label={`Opções no lugar de ${originalName}`}>
           {options.map((option) => (
             <li key={option.id}>
@@ -54,18 +67,6 @@ export function SwapExerciseSheet({ open, onClose, originalName, swapped, option
           {options.length === 0 && <li className="rounded-2xl bg-white/[0.04] px-4 py-3 text-sm text-zinc-200">Sem outras opções para este exercício.</li>}
         </ul>
 
-        <label
-          className={cn(
-            'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-2 transition-colors',
-            pain ? 'border-gold/40 bg-gold-soft' : 'border-line bg-white/[0.03]',
-          )}
-        >
-          <input type="checkbox" checked={pain} onChange={(event) => setPain(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#fbbf24]" />
-          <span className="min-w-0 flex-1 text-sm font-semibold text-white">
-            Estou trocando por causa de dor
-            <span className="block text-xs font-normal text-zinc-300">O Jean recebe um aviso no seu recado ao finalizar o treino.</span>
-          </span>
-        </label>
 
         <div className="flex flex-col gap-2">
           {swapped && (

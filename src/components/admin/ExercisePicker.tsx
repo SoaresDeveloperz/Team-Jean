@@ -54,6 +54,8 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd, title
     return !term || normalizeText(`${exercise.name ?? ''} ${exercise.muscle_group ?? ''}`).includes(term)
   })
 
+  const atLimit = max !== undefined && picked.length >= max
+
   const reset = () => {
     setSearch('')
     setGroup(ALL)
@@ -118,6 +120,12 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd, title
           </div>
         )}
 
+        {max !== undefined && (
+          <p role="status" className="text-xs font-semibold text-zinc-300">
+            {atLimit ? `Limite de ${max} escolhido${max === 1 ? '' : 's'}: tire um para trocar.` : `Você pode escolher até ${max}.`}
+          </p>
+        )}
+
         <ul className="space-y-1.5" aria-label="Biblioteca de exercícios">
           {filtered.map((exercise) => {
             const order = picked.indexOf(exercise.id)
@@ -127,6 +135,7 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd, title
                 <button
                   type="button"
                   aria-pressed={selected}
+                  aria-disabled={!selected && atLimit ? true : undefined}
                   onClick={() => toggle(exercise.id)}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors',

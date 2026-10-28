@@ -210,6 +210,12 @@ const gifRequests = []
 // /__curto/longo cria o "Treino D - Longo" (6 exercícios, ~60 min) para a Maria.
 let curtoEnabled = true
 
+// --- Trocar exercício (supabase/trocar-exercicio.sql) ---
+// /__trocar/off simula o banco sem o trocar-exercicio.sql (sem essential, alternatives e swaps);
+// /__trocar/seed prepara o Treino A (alternativa do Jean, essencial sem alternativa) e o D (essencial).
+let trocarEnabled = true
+const SWAP_TABLES = ['assigned_workout_exercises', 'workout_template_exercises']
+
 // /__community/off simula o banco sem o community.sql.
 let communityEnabled = true
 const COMMUNITY_TABLES = ['community_posts', 'community_likes', 'community_comments']
@@ -246,6 +252,8 @@ function columnsOf(table) {
   if (gestaoEnabled && GESTAO_COLUMNS[table] && (table !== 'body_measurements' || profileEnabled)) columns = [...columns, ...GESTAO_COLUMNS[table]]
   if (table === 'exercises' && exerciciosEnabled) columns = [...columns, 'media_id']
   if (table === 'workout_sessions' && curtoEnabled) columns = [...columns, 'short_mode']
+  if (table === 'workout_sessions' && trocarEnabled) columns = [...columns, 'swaps']
+  if (SWAP_TABLES.includes(table) && trocarEnabled) columns = [...columns, 'essential', 'alternatives']
   return columns
 }
 // Colunas que o banco real não teria sem o gestao.sql/profile.sql somem das respostas.
@@ -655,6 +663,24 @@ http
       curtoEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { curtoEnabled })
     }
+    if (url.pathname === '/__trocar/off' || url.pathname === '/__trocar/on') {
+      trocarEnabled = url.pathname.endsWith('/on')
+      return send(res, 200, { trocarEnabled })
+    }
+    if (url.pathname === '/__trocar/seed') {
+      if (!exercises.some((item) => item.id === 'e7')) {
+        exercises.push(ex('e7', 'Supino Inclinado com Halteres', 'Peito', { media_id: '0314-3TZduzM' }))
+        exercises.push(ex('e8', 'Supino Máquina', 'Peito', { media_id: '0577-xHYD4Qp' }))
+      }
+      const patch = (id, fields) => Object.assign(assigned_workout_exercises.find((row) => row.id === id) ?? {}, fields)
+      // Treino A: Supino (alternativa do Jean), Crucifixo (essencial, sem alternativa), Tríceps (sem opção).
+      patch('awe1', { essential: false, alternatives: ['e7'] })
+      patch('awe2', { essential: true, alternatives: [] })
+      patch('awe3', { essential: false, alternatives: [] })
+      // Treino D (se existir): o último exercício é essencial.
+      patch('awd6', { essential: true, alternatives: [] })
+      return send(res, 200, { ok: true })
+    }
     if (url.pathname === '/__curto/longo') {
       if (!exercises.some((item) => item.id === 'e6')) exercises.push(ex('e6', 'Remada Baixa', 'Costas'))
       if (!assigned_workouts.some((item) => item.id === 'w-d')) {
@@ -984,7 +1010,9 @@ http
         student_billing: { due_day: 10, active: true, starts_on: monthISO(0), last_reminder_on: null, note: null, created_at: new Date().toISOString() },
         payments: { id: crypto.randomUUID(), paid_on: dayISO(0), method: 'pix', note: null, created_by: user?.id ?? null, created_at: new Date().toISOString() },
         coach_settings: { id: 1, pix_key: null, pix_name: null, pix_city: null, billing_reminders: false },
-        workout_sessions: curtoEnabled ? { short_mode: false } : {},
+        workout_sessions: { ...(curtoEnabled ? { short_mode: false } : {}), ...(trocarEnabled ? { swaps: 0 } : {}) },
+        assigned_workout_exercises: trocarEnabled ? { essential: false, alternatives: [] } : {},
+        workout_template_exercises: trocarEnabled ? { essential: false, alternatives: [] } : {},
       })[table]
 
       if (req.method === 'POST') {
@@ -1181,6 +1209,7 @@ http
       const items = (Array.isArray(body) ? body : [body]).map((item) => ({
         id: `${table}-new-${++idCounter}`,
         ...(table === 'exercises' ? { video_url: null, media_id: null } : {}),
+        ...(SWAP_TABLES.includes(table) && trocarEnabled ? { essential: false, alternatives: [] } : {}),
         ...(columnsOf(table).includes('created_at') ? { created_at: new Date().toISOString() } : {}),
         ...(table === 'notifications' && gestaoEnabled ? { pushed_at: null } : {}),
         ...item,

@@ -29,6 +29,8 @@ const SUITES = {
   exercicios: ['tests/contas-exercicios.mjs', 'tests/e2e-exercicios.cjs'],
   // "Tenho pouco tempo" (versão curta do treino): contas puras + telas, com e sem o SQL.
   curto: ['tests/contas-curto.mjs', 'tests/e2e-curto.cjs'],
+  // "Trocar exercício" e marca "Essencial": contas puras + telas, com e sem o SQL.
+  trocar: ['tests/contas-trocar.mjs', 'tests/contas-curto.mjs', 'tests/e2e-trocar.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],
@@ -42,6 +44,7 @@ const SUITES = {
   'novidades-a11y': ['tests/a11y/novidades-a11y.cjs'],
   'exercicios-a11y': ['tests/a11y/exercicios-a11y.cjs'],
   'curto-a11y': ['tests/a11y/curto-a11y.cjs'],
+  'trocar-a11y': ['tests/a11y/trocar-a11y.cjs'],
 }
 
 const vapid = webpush.generateVAPIDKeys()

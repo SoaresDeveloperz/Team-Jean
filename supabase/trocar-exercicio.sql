@@ -22,9 +22,10 @@
 -- lê os seus treinos e grava só as suas sessões; só o treinador muda a
 -- prescrição.
 --
--- Até este arquivo ser rodado, o app funciona como antes: o treinador vê um
--- aviso no construtor e o aluno troca exercício normalmente, só que o treino é
--- salvo sem o número de trocas (o app tenta de novo sem a coluna).
+-- Até este arquivo ser rodado, o app funciona como antes: o construtor não
+-- mostra "Essencial" nem "Alternativas", e o aluno troca exercício por sugestão
+-- do mesmo grupo muscular, só que o treino é salvo sem o número de trocas (o
+-- app tenta de novo sem a coluna).
 -- =============================================================================
 
 alter table public.assigned_workout_exercises add column if not exists essential boolean not null default false;

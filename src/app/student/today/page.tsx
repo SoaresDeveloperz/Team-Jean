@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { m } from 'framer-motion'
-import { Check, ChevronRight, Clock, Dumbbell, Flame, Megaphone, Moon, Play, RotateCcw, Sparkles, Target } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Clock, Dumbbell, Flame, Hourglass, Megaphone, Moon, Play, RotateCcw, Sparkles, Target } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
 import { getPlannedSets, getSetsCount, pickNextWorkout } from '@/lib/workouts'
 import { readActiveSession } from '@/lib/active-session'
+import { canOfferShort } from '@/lib/short-workout'
 import { REGION_LABELS, computeRecovery, loadFill, muscleLoad, recoveryFill, splitSecondary, type MuscleRegion } from '@/lib/muscles'
 import { WEEKDAY_INITIALS, countInMonth, isSameDay, relativeDay, startOfWeek, weekDayCounts, weekStreak } from '@/lib/stats'
 import { usePreferences } from '@/lib/preferences'
@@ -217,6 +218,14 @@ export default function StudentTodayPage() {
 
     return {
       totalSets,
+      // "Tenho pouco tempo" só aparece quando o treino passa de ~30 min.
+      offerShort: canOfferShort(
+        data.exercises.map((item) => ({
+          id: item.id,
+          name: item.exercises?.name ?? 'Exercício',
+          sets: getPlannedSets(item).map((set) => ({ type: set.type, completed: false, extra: false })),
+        })),
+      ),
       estimatedMinutes: Math.max(10, Math.round((totalSets * MINUTES_PER_SET) / 5) * 5),
       muscles: [
         ...new Set(data.exercises.map((item) => item.exercises?.muscle_group).filter((muscle): muscle is string => Boolean(muscle))),
@@ -354,6 +363,14 @@ export default function StudentTodayPage() {
                 )}
               </Link>
             </m.div>
+            {derived.offerShort && !data.inProgress && !doneForToday && (
+              <Link
+                href={`/student/workout/${next.id}?curto=1`}
+                className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line-strong text-sm font-bold text-zinc-200 transition hover:bg-white/5"
+              >
+                <Hourglass className="h-4 w-4" aria-hidden="true" /> Tenho pouco tempo
+              </Link>
+            )}
           </div>
         </Tile>
       ) : (
@@ -453,6 +470,13 @@ export default function StudentTodayPage() {
 
       <ReadinessCard value={readiness} onChange={handleReadinessChange} status={readinessStatus} />
 
+      {/* O resto do dia fica recolhido: a tela Hoje mostra primeiro o treino. */}
+      <details className="group space-y-4">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 text-sm font-bold text-zinc-200 [&::-webkit-details-marker]:hidden">
+          Ver mais do seu dia
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="space-y-4 pt-1">
       {/* Recuperação muscular */}
       <Tile>
         <div className="flex gap-4">
@@ -588,6 +612,8 @@ export default function StudentTodayPage() {
           </ul>
         </m.section>
       )}
+        </div>
+      </details>
     </Stagger>
   )
 }

@@ -380,21 +380,25 @@ export default function AdminDashboardPage() {
                     </p>
                     <ul className="space-y-1.5">
                       {derived.inactive.slice(0, 5).map(({ student, last }) => (
-                        <li key={student.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.03] px-3 py-2">
-                          <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-white">{student.full_name || student.email}</span>
-                            <span className="block text-xs text-zinc-500">
-                              {last ? `Último treino ${relativeDayPhrase(last)}` : `Sem treinos nos últimos ${WINDOW_DAYS} dias`}
+                        <li key={student.id} className="space-y-2 rounded-2xl bg-white/[0.03] px-3 py-2.5">
+                          <div className="flex items-center gap-3">
+                            <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="sm" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-white [overflow-wrap:anywhere]">{student.full_name || student.email}</span>
+                              <span className="block text-xs text-zinc-400">
+                                {last ? `Último treino ${relativeDayPhrase(last)}` : `Sem treinos nos últimos ${WINDOW_DAYS} dias`}
+                              </span>
                             </span>
-                          </span>
-                          <Link
-                            href={`/admin/announcements?para=${student.id}`}
-                            className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-xs font-black uppercase text-black"
-                          >
-                            Avisar
-                          </Link>
-                          <WhatsAppComeback fullName={student.full_name} last={last} />
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Link
+                              href={`/admin/announcements?para=${student.id}`}
+                              className="inline-flex h-11 shrink-0 items-center rounded-xl bg-white px-4 text-sm font-bold text-black"
+                            >
+                              Avisar
+                            </Link>
+                            <WhatsAppComeback fullName={student.full_name} last={last} />
+                          </div>
                         </li>
                       ))}
                     </ul>

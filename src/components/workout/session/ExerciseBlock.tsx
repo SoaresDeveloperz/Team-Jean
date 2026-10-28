@@ -84,7 +84,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-bold leading-tight text-white">{exercise?.name ?? 'Exercício'}</h2>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
             <span className="font-semibold uppercase tracking-wider">{exercise?.muscle_group || 'Geral'}</span>
             <span aria-hidden="true">·</span>
             <span>
@@ -216,7 +216,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-2.5">
-        <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500">
+        <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
           {usedTypes.map((type) => (
             <span key={type.value} className="flex items-center gap-1">
               <span className={cn('grid h-5 w-5 place-items-center rounded border text-xs font-black leading-none', type.className)}>
@@ -232,7 +232,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
               type="button"
               onClick={() => onRemoveExtra(row.id)}
               aria-label="Remover série extra"
-              className="grid h-9 w-9 place-items-center rounded-xl bg-white/[0.06] text-zinc-400 hover:text-white"
+              className="grid h-11 w-11 place-items-center rounded-xl bg-white/[0.06] text-zinc-300 hover:text-white"
             >
               <Minus className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -240,7 +240,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
           <button
             type="button"
             onClick={() => onAddSet(row.id)}
-            className="flex h-9 items-center gap-1 rounded-xl bg-white/[0.06] px-3 text-xs font-bold text-zinc-300 hover:text-white"
+            className="flex h-11 items-center gap-1 rounded-xl bg-white/[0.06] px-3.5 text-sm font-bold text-zinc-300 hover:text-white"
           >
             <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Série
           </button>

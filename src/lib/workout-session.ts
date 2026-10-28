@@ -115,6 +115,19 @@ export async function fetchResumableSets(supabase: Supabase, userId: string, ses
 }
 
 const CACHE_PREFIX = 'team-jean:treino-salvo:'
+
+// Ao sair da conta, os treinos guardados para uso sem internet (com cargas e
+// recordes do aluno) saem do aparelho: ele pode ser emprestado.
+export function clearSavedWorkouts() {
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith(CACHE_PREFIX))
+      .forEach((key) => window.localStorage.removeItem(key))
+  } catch {
+    // Sem armazenamento: nada a limpar.
+  }
+}
+
 const CACHE_LIMIT = 8
 const cacheKey = (userId: string, workoutId: string) => `${CACHE_PREFIX}${userId}:${workoutId}`
 

@@ -53,8 +53,8 @@ export function LevelTrail({ open, workouts, onClose }: { open: boolean; workout
                 ) : done ? (
                   <span className="text-zinc-400">Concluído</span>
                 ) : (
-                  <span className="flex items-center gap-1 text-zinc-500">
-                    <Lock className="h-3.5 w-3.5" aria-hidden="true" /> faltam {remaining}
+                  <span className="flex items-center gap-1 text-zinc-400">
+                    <Lock className="h-3.5 w-3.5" aria-hidden="true" /> a {remaining} {remaining === 1 ? 'treino' : 'treinos'}
                   </span>
                 )}
               </span>

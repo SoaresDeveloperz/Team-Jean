@@ -176,7 +176,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
             </span>
             <span className="mt-2 block text-xs text-zinc-400">
               {level.next
-                ? `Faltam ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} para virar ${level.next.name}. Toque para ver a trilha.`
+                ? `Você está a ${level.remaining} ${level.remaining === 1 ? 'treino' : 'treinos'} de virar ${level.next.name}. Toque para ver a trilha.`
                 : 'Você é lenda do Team Jean. 👑'}
             </span>
           </button>

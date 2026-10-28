@@ -81,20 +81,22 @@ const now = new Date(2026, 9, 24, 10, 0)
 const nineDaysAgo = new Date(2026, 9, 15, 22, 30)
 const message = whatsapp.comebackMessage('Maria Souza', whatsapp.daysSince(nineDaysAgo, now))
 check(
-  'mensagem com o primeiro nome e os dias sem treinar',
-  message === 'Oi, Maria! Faz 9 dias que não vejo seu treino. Tudo bem? Bora voltar essa semana? 💪',
+  'mensagem acolhedora com o primeiro nome, sem contar dias',
+  message === 'Oi, Maria! Sentimos sua falta por aqui. Quando quiser, um treino leve de 20 minutos já vale. Posso te ajudar a escolher? 💪',
   message,
 )
 check('dias contados por dia do calendário', whatsapp.daysSince(new Date(2026, 9, 23, 23, 59), now) === 1)
-check('um dia: "Faz 1 dia"', whatsapp.comebackMessage('João', 1).includes('Faz 1 dia que'))
-check('sem data do último treino: "Faz um tempo"', whatsapp.comebackMessage('Ana Lima', null).startsWith('Oi, Ana! Faz um tempo que não vejo seu treino.'))
-check('sem nome: "Oi!"', whatsapp.comebackMessage('   ', 9).startsWith('Oi! Faz 9 dias'))
+check('mensagem não cobra nem conta dias', !/\bdias?\b|\bfaltou\b|\bfalta de\b/i.test(whatsapp.comebackMessage('João', 9).replace('Sentimos sua falta', '')))
+check('sem data do último treino: mesma mensagem acolhedora', whatsapp.comebackMessage('Ana Lima', null).startsWith('Oi, Ana! Sentimos sua falta por aqui. Quando quiser'))
+check('depois de 14 dias: "Sem pressa."', whatsapp.comebackMessage('Ana', 15).includes('por aqui. Sem pressa. Quando quiser'))
+check('menos de 14 dias: sem "Sem pressa."', !whatsapp.comebackMessage('Ana', 13).includes('Sem pressa'))
+check('sem nome: "Oi!"', whatsapp.comebackMessage('   ', 9).startsWith('Oi! Sentimos sua falta'))
 
 const link = whatsapp.comebackWhatsappLink('Conceição Ávila', nineDaysAgo, now)
 check('link do WhatsApp sem telefone (wa.me/?text=)', link.startsWith('https://wa.me/?text=') && !/wa\.me\/\d/.test(link) && !/phone=/.test(link), link)
-check('link codifica acentos e emoji', link.includes('Concei%C3%A7%C3%A3o') && link.includes('n%C3%A3o') && link.includes('%F0%9F%92%AA') && !/[^\x21-\x7e]/.test(link), link)
+check('link codifica acentos e emoji', link.includes('Concei%C3%A7%C3%A3o') && link.includes('j%C3%A1') && link.includes('%F0%9F%92%AA') && !/[^\x21-\x7e]/.test(link), link)
 check('link decodifica de volta para a mensagem', decodeURIComponent(link.split('?text=')[1]) === whatsapp.comebackMessage('Conceição Ávila', 9))
-check('mensagem leva só nome e dias (sem sobrenome)', !decodeURIComponent(link).includes('Ávila'))
+check('mensagem leva só o primeiro nome (sem sobrenome)', !decodeURIComponent(link).includes('Ávila'))
 
 console.log(results.join('\n'))
 const failed = results.filter((line) => line.startsWith('FAIL')).length

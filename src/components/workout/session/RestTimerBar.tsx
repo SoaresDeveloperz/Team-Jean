@@ -28,6 +28,8 @@ function remainingOf(rest: RestState, now: number) {
 // então não atrasa quando o celular bloqueia a tela.
 export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, onFinish }: RestTimerBarProps) {
   const [now, setNow] = useState(() => Date.now())
+  // Texto lido pelo leitor de tela quando o descanso termina (a barra some nessa hora).
+  const [announcement, setAnnouncement] = useState('')
   const running = rest.endsAt !== null
   const visible = rest.endsAt !== null || rest.pausedRemaining !== null
 
@@ -39,6 +41,8 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
       setNow(current)
       if (current >= endsAt) {
         window.clearInterval(interval)
+        setAnnouncement('Descanso terminou. Hora da próxima série.')
+        window.setTimeout(() => setAnnouncement(''), 5000)
         onFinish()
       }
     }, 250)
@@ -48,6 +52,10 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
   const remaining = remainingOf(rest, now)
 
   return (
+    <>
+      <span role="status" className="sr-only">
+        {announcement}
+      </span>
     <AnimatePresence>
       {visible && (
         <m.div
@@ -65,15 +73,15 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
               <span className="font-display text-lg font-bold">{formatDuration(remaining)}</span>
             </ProgressRing>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-brand">{running ? 'Descanso' : 'Pausado'}</p>
-              <p className="text-xs font-semibold text-zinc-300">Respire e se prepare</p>
+              <p className="text-sm font-bold text-brand">{running ? 'Descanso' : 'Pausado'}</p>
+              <p className="text-sm font-semibold text-zinc-300">Respire e se prepare</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <button
                 type="button"
                 onClick={() => onAdjust(-15, remaining)}
                 aria-label="Menos 15 segundos"
-                className="grid h-10 w-9 place-items-center rounded-xl bg-white/[0.06] text-zinc-300"
+                className="grid h-11 w-11 place-items-center rounded-xl bg-white/[0.06] text-zinc-300"
               >
                 <Minus className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -81,7 +89,7 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
                 type="button"
                 onClick={() => onAdjust(30, remaining)}
                 aria-label="Mais 30 segundos"
-                className="flex h-10 items-center gap-0.5 rounded-xl bg-white/[0.06] px-2 text-xs font-bold text-zinc-300"
+                className="flex h-11 items-center gap-0.5 rounded-xl bg-white/[0.06] px-3 text-sm font-bold text-zinc-300"
               >
                 <Plus className="h-3 w-3" aria-hidden="true" />
                 30
@@ -90,7 +98,7 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
                 type="button"
                 onClick={() => onTogglePause(remaining)}
                 aria-label={running ? 'Pausar descanso' : 'Continuar descanso'}
-                className="grid h-10 w-10 place-items-center rounded-xl bg-white text-black"
+                className="grid h-11 w-11 place-items-center rounded-xl bg-white text-black"
               >
                 {running ? <Pause className="h-4 w-4 fill-current" aria-hidden="true" /> : <Play className="h-4 w-4 fill-current" aria-hidden="true" />}
               </button>
@@ -98,15 +106,16 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
                 type="button"
                 onClick={onSkip}
                 aria-label="Pular descanso"
-                className="grid h-10 w-9 place-items-center rounded-xl bg-white/[0.06] text-zinc-400"
+                className="grid h-11 w-11 place-items-center rounded-xl bg-white/[0.06] text-zinc-300"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </div>
-          {nextHint && <p className="mt-2 truncate border-t border-line pt-2 text-xs text-zinc-400">{nextHint}</p>}
+          {nextHint && <p className="mt-2 truncate border-t border-line pt-2 text-sm text-zinc-300">{nextHint}</p>}
         </m.div>
       )}
     </AnimatePresence>
+    </>
   )
 }

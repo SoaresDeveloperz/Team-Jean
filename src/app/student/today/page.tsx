@@ -248,15 +248,15 @@ export default function StudentTodayPage() {
   const doneForToday = derived.trainedToday && !data.inProgress
 
   let subtitle = 'Seu treinador ainda não liberou um treino. Aproveite para recuperar.'
-  if (data.inProgress) subtitle = 'Você tem um treino em andamento. Bora terminar?'
-  else if (derived.trainedToday) subtitle = 'Missão de hoje cumprida. Recuperação também é treino.'
+  if (data.inProgress) subtitle = 'Você tem um treino em andamento. Quer terminar?'
+  else if (derived.trainedToday) subtitle = 'Treino de hoje feito. Descansar também é treinar.'
   else if (next) subtitle = `Bora pro ${next.name}?`
 
   return (
     <Stagger className="space-y-4">
       {errorAlert}
       <m.header variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="px-1 pb-1 pt-1">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-500">{today}</p>
+        <p className="text-sm font-semibold text-zinc-400 first-letter:uppercase">{today}</p>
         <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9] tracking-tight">
           Fala, {data.firstName}!
         </h1>
@@ -333,7 +333,7 @@ export default function StudentTodayPage() {
               <Link
                 href={`/student/workout/${next.id}`}
                 className={cn(
-                  'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-sm font-black uppercase tracking-[0.18em] transition',
+                  'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-base font-bold transition',
                   doneForToday
                     ? 'border border-line-strong bg-white/5 text-white hover:bg-white/10'
                     : 'bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,0.12)] hover:bg-zinc-200',
@@ -342,6 +342,10 @@ export default function StudentTodayPage() {
                 {data.inProgress ? (
                   <>
                     <RotateCcw className="h-5 w-5" aria-hidden="true" /> Continuar treino
+                  </>
+                ) : doneForToday ? (
+                  <>
+                    <RotateCcw className="h-5 w-5" aria-hidden="true" /> Repetir treino
                   </>
                 ) : (
                   <>
@@ -417,7 +421,7 @@ export default function StudentTodayPage() {
               </span>
             </ProgressRing>
             <p className="text-xs leading-snug text-zinc-400">
-              {derived.weekCount >= weeklyGoal ? 'Meta batida!' : `Faltam ${weeklyGoal - derived.weekCount}`}
+              {derived.weekCount >= weeklyGoal ? 'Meta batida!' : derived.weekCount === 0 ? 'Um treino começa a semana' : 'Boa! Vem mais um.'}
             </p>
           </div>
           <ol className="mt-3 flex justify-between border-t border-line pt-2.5" aria-label="Dias treinados nesta semana">

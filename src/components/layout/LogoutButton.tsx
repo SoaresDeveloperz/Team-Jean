@@ -6,6 +6,8 @@ import { LoaderCircle, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { resetNotifications } from '@/lib/notifications'
 import { cancelPushOnLogout } from '@/lib/push/client'
+import { clearActiveSession } from '@/lib/active-session'
+import { clearSavedWorkouts } from '@/lib/workout-session'
 import { cn } from '@/lib/cn'
 
 export function LogoutButton({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
@@ -23,6 +25,9 @@ export function LogoutButton({ className, showLabel = false }: { className?: str
     // aparelho, para o login não ser desfeito pelo cookie que ficou.
     if (error) await supabase.auth.signOut({ scope: 'local' })
     resetNotifications()
+    // Treino em andamento e treinos guardados são desta conta: não ficam no aparelho.
+    clearActiveSession()
+    clearSavedWorkouts()
     // As telas guardadas para uso offline eram desta conta.
     navigator.serviceWorker?.controller?.postMessage({ type: 'clear-pages' })
     router.replace('/login')

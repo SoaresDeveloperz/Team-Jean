@@ -20,11 +20,11 @@ export function WhatsAppComeback({ fullName, last, className }: WhatsAppComeback
       rel="noopener noreferrer"
       aria-label={`Chamar ${name} no WhatsApp`}
       className={cn(
-        'inline-flex h-9 shrink-0 items-center gap-1 rounded-xl border border-brand/40 bg-brand-soft px-3 text-xs font-black uppercase text-brand transition hover:bg-brand hover:text-black',
+        'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl border border-brand/40 bg-brand-soft px-4 text-sm font-bold text-brand transition hover:bg-brand hover:text-black',
         className,
       )}
     >
-      <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> WhatsApp
+      <MessageCircle className="h-4 w-4" aria-hidden="true" /> WhatsApp
     </a>
   )
 }

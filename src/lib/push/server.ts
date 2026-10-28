@@ -116,9 +116,10 @@ const shorten = (text: string, max: number) => (text.length > max ? `${text.slic
 
 // O push aparece na tela bloqueada, onde outra pessoa pode ler: o que vai
 // para o treinador (recados e saúde dos alunos, inclusive em bancos antigos
-// que gravavam esses avisos como 'announcement') e os avisos de saúde e de
-// recado saem com texto genérico (LGPD). O texto completo fica no sino do app.
-const PRIVATE_TYPES = new Set(['health', 'feedback'])
+// que gravavam esses avisos como 'announcement'), os avisos de saúde, de
+// recado e de mensalidade (valor e vencimento) saem com texto genérico (LGPD).
+// O texto completo fica no sino do app.
+const PRIVATE_TYPES = new Set(['health', 'feedback', 'billing'])
 const GENERIC_PUSH = {
   title: 'Team Jean',
   feedback: 'Você tem um recado novo de um aluno. Abra o app para ver.',

@@ -52,8 +52,12 @@ export function LeaderboardCard({
   if (viewerIsAdmin)
     footer = `${activeCount} de ${students.length} ${students.length === 1 ? 'aluno treinou' : 'alunos treinaram'} esta semana`
   else if (me && me.week_workouts > 0)
-    footer = `Você está em ${myIndex + 1}º lugar · ${plural(me.week_workouts, 'treino', 'treinos')} na semana`
-  else footer = 'Você ainda não treinou esta semana. Bora subir no ranking!'
+    // Só quem está no pódio vê a posição: quem treinou menos não é exposto.
+    footer =
+      myIndex < 3
+        ? `Você está em ${myIndex + 1}º lugar · ${plural(me.week_workouts, 'treino', 'treinos')} na semana`
+        : `${plural(me.week_workouts, 'treino', 'treinos')} na semana. Continue assim!`
+  else footer = 'Sua semana começa com um treino. Que tal o de hoje?'
 
   return (
     <Tile className="p-4" aria-labelledby="leaderboard-title">

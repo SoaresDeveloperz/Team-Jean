@@ -28,6 +28,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Falha com dependência de produção de gravidade alta ou crítica e se um
+      # segredo do servidor aparecer com NEXT_PUBLIC_ (iria para o navegador).
+      - name: Segurança, dependências e segredos
+        run: |
+          pnpm audit --prod --audit-level=high
+          if grep -rEn "NEXT_PUBLIC_[A-Z_]*(SERVICE_ROLE|VAPID_PRIVATE|CRON_SECRET)" src .env.example next.config.mjs vercel.json; then
+            echo "Segredo do servidor com NEXT_PUBLIC_: troque o nome (só vale no servidor)."
+            exit 1
+          fi
+
       - run: pnpm lint
 
       # Build apontando para o Supabase falso dos testes (tests/mock-supabase.mjs).

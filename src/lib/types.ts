@@ -80,6 +80,8 @@ export type WorkoutSession = {
   feedback_tags?: string[] | null
   coach_reply?: string | null
   coach_reply_at?: string | null
+  // supabase/treino-curto.sql: o aluno fez a versão curta ("Tenho pouco tempo").
+  short_mode?: boolean | null
   // Não existe na tabela atual; lidos só se um dia forem adicionados.
   created_at?: string | null
   started_at?: string | null

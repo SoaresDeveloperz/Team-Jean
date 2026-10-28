@@ -3,10 +3,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, Check, CloudOff, CloudUpload, Dumbbell, Flag, Timer } from 'lucide-react'
+import { ArrowLeft, Check, CloudOff, CloudUpload, Dumbbell, Flag, Hourglass, Timer } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
 import { formatKg, getPlannedSets, normalizeRir, normalizeWeight } from '@/lib/workouts'
+import {
+  SHORT_SET_CAP,
+  SHORT_STORAGE_KEY,
+  canOfferShort,
+  fullMinutes,
+  hiddenSetIndexes,
+  localDay,
+  parseShortState,
+  shortMinutes,
+  type ShortRow,
+  type ShortState,
+} from '@/lib/short-workout'
 import {
   clearActiveSession,
   readActiveSession,
@@ -54,6 +66,7 @@ import { ElapsedTime } from '@/components/workout/session/ElapsedTime'
 import { ExerciseBlock } from '@/components/workout/session/ExerciseBlock'
 import { FinishSheet } from '@/components/workout/session/FinishSheet'
 import { RestTimerBar } from '@/components/workout/session/RestTimerBar'
+import { ShortWorkoutSheet } from '@/components/workout/session/ShortWorkoutSheet'
 import { WorkoutSummary, type WorkoutSummaryData } from '@/components/workout/session/WorkoutSummary'
 import { parseNumber, type ExerciseRow, type PreviousSet, type RestState, type SetEntry } from '@/components/workout/session/types'
 
@@ -102,6 +115,11 @@ export default function WorkoutExecutionPage() {
   const [finishing, setFinishing] = useState(false)
   const [finishError, setFinishError] = useState('')
   const [summary, setSummary] = useState<WorkoutSummaryData | null>(null)
+  // Versão curta ("Tenho pouco tempo"): só esconde coisas na tela, nada muda na
+  // prescrição nem nas séries. Vale para este treino e neste dia (aparelho).
+  const [shortState, setShortState] = useState<ShortState | null>(null)
+  const [shortOpen, setShortOpen] = useState(false)
+  const [shortKey, setShortKey] = useState(0)
   // Sessão finalizada sem internet (ainda na fila ao mostrar o resumo).
   const [queuedSessionId, setQueuedSessionId] = useState<string | null>(null)
 
@@ -243,6 +261,27 @@ export default function WorkoutExecutionPage() {
         setStartedAt(resumeCandidate.startedAt)
       } else {
         setStartedAt(Date.now())
+      }
+      let restoredShort: ShortState | null = null
+      try {
+        restoredShort = parseShortState(window.localStorage.getItem(SHORT_STORAGE_KEY), workoutId, localDay(), rows.map((row) => row.id))
+      } catch {
+        restoredShort = null
+      }
+      setShortState(restoredShort)
+      // Link da tela Hoje ("Tenho pouco tempo"): abre o painel já na primeira vez.
+      if (new URLSearchParams(window.location.search).get('curto') === '1') {
+        window.history.replaceState(null, '', window.location.pathname)
+        const lite: ShortRow[] = rows.map((row) => ({
+          id: row.id,
+          name: row.exercises?.name ?? 'Exercício',
+          sets: (initialSets[row.id] ?? []).map((entry) => ({ type: entry.type, completed: entry.completed, extra: entry.extra })),
+        }))
+        const anyDone = lite.some((row) => row.sets.some((entry) => entry.completed))
+        if (!restoredShort && !anyDone && canOfferShort(lite)) {
+          setShortKey((value) => value + 1)
+          setShortOpen(true)
+        }
       }
       setWorkout(bundle.workout as AssignedWorkout)
       setExercises(rows)
@@ -439,6 +478,10 @@ export default function WorkoutExecutionPage() {
   const skipRest = useCallback(() => setRest(IDLE_REST), [])
   const closeFinish = useCallback(() => setShowFinish(false), [])
 
+  const hiddenRows = useMemo(() => new Set(shortState?.hidden ?? []), [shortState])
+  const shortCap = shortState ? shortState.cap : null
+  const visibleExercises = useMemo(() => exercises.filter((row) => !hiddenRows.has(row.id)), [exercises, hiddenRows])
+
   const progress = useMemo(() => {
     let done = 0
     let total = 0
@@ -446,27 +489,73 @@ export default function WorkoutExecutionPage() {
     let nextHint: string | null = null
     const perExercise: { id: string; name: string; done: number; total: number }[] = []
 
-    for (const row of exercises) {
+    for (const row of visibleExercises) {
       const entries = sets[row.id] ?? []
+      const hiddenIndexes = shortCap === null ? null : hiddenSetIndexes(entries, shortCap)
       let exerciseDone = 0
-      for (const entry of entries) {
+      let exerciseTotal = 0
+      let nextOrdinal = -1
+      entries.forEach((entry, index) => {
+        if (hiddenIndexes?.has(index)) return
+        exerciseTotal += 1
         if (entry.completed) {
           exerciseDone += 1
           volume += parseNumber(entry.weight) * parseNumber(entry.reps)
+        } else if (nextOrdinal < 0) {
+          nextOrdinal = exerciseTotal
         }
-      }
+      })
       done += exerciseDone
-      total += entries.length
-      const nextIndex = entries.findIndex((entry) => !entry.completed)
-      if (nextHint === null && nextIndex >= 0) {
-        nextHint = `Próxima: ${row.exercises?.name ?? 'exercício'} · série ${nextIndex + 1} de ${entries.length}`
+      total += exerciseTotal
+      if (nextHint === null && nextOrdinal > 0) {
+        nextHint = `Próxima: ${row.exercises?.name ?? 'exercício'} · série ${nextOrdinal} de ${exerciseTotal}`
       }
-      perExercise.push({ id: row.id, name: row.exercises?.name ?? 'Exercício', done: exerciseDone, total: entries.length })
+      perExercise.push({ id: row.id, name: row.exercises?.name ?? 'Exercício', done: exerciseDone, total: exerciseTotal })
     }
 
     const currentId = perExercise.find((item) => item.done < item.total)?.id ?? null
     return { done, total, volume, nextHint, perExercise, currentId }
-  }, [exercises, sets])
+  }, [visibleExercises, sets, shortCap])
+
+  // Treino todo (sem corte) em números simples, para decidir se oferece a versão curta.
+  const shortRows = useMemo<ShortRow[]>(
+    () =>
+      exercises.map((row) => ({
+        id: row.id,
+        name: row.exercises?.name ?? 'Exercício',
+        sets: (sets[row.id] ?? []).map((entry) => ({ type: entry.type, completed: entry.completed, extra: entry.extra })),
+      })),
+    [exercises, sets],
+  )
+  const shortOffer = shortState === null && progress.done === 0 && canOfferShort(shortRows)
+
+  const openShort = useCallback(() => {
+    setShortKey((value) => value + 1)
+    setShortOpen(true)
+  }, [])
+
+  const applyShort = (hidden: string[]) => {
+    const next: ShortState = { workoutId, day: localDay(), hidden, cap: SHORT_SET_CAP }
+    setShortState(next)
+    setShortOpen(false)
+    try {
+      window.localStorage.setItem(SHORT_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // Sem armazenamento: a versão curta vale até fechar a tela.
+    }
+    toast({ tone: 'info', title: 'Versão curta ligada', description: 'Dá para desfazer logo acima dos exercícios.', duration: 4000 })
+  }
+
+  const undoShort = () => {
+    setShortState(null)
+    try {
+      window.localStorage.removeItem(SHORT_STORAGE_KEY)
+    } catch {
+      // Nada a limpar.
+    }
+    toast({ tone: 'info', title: 'Treino completo de volta', duration: 3000 })
+  }
+
 
   const scrollToExercise = (rowId: string) => {
     document.getElementById(`exercise-${rowId}`)?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
@@ -489,6 +578,8 @@ export default function WorkoutExecutionPage() {
       session_rpe: rpe,
       status: 'completed',
       ...(withFeedback ? { feedback: note || null, feedback_tags: feedbackTags } : {}),
+      // Só quando o aluno fez a versão curta (o treinador vê no histórico).
+      ...(shortState ? { short_mode: true } : {}),
     }
     const sending = enqueueWorkoutOp(supabase, userId, { kind: 'finish', sessionId, patch })
     // Com internet, espera o envio (até 8 s) para confirmar. Sem internet, o
@@ -742,11 +833,42 @@ export default function WorkoutExecutionPage() {
           </div>
         )}
 
-        {exercises.map((row, index) => (
+        {shortOffer && (
+          <button
+            type="button"
+            onClick={openShort}
+            className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-line-strong bg-surface px-4 py-2.5 text-left transition hover:bg-white/5"
+          >
+            <Hourglass className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold text-white">Tenho pouco tempo</span>
+              <span className="block text-xs text-zinc-300">Fazer uma versão mais curta só hoje (cerca de {shortMinutes(shortRows, new Set(), SHORT_SET_CAP)} min em vez de {fullMinutes(shortRows)})</span>
+            </span>
+          </button>
+        )}
+
+        {shortState && (
+          <div role="status" className="flex items-center gap-3 rounded-2xl border border-gold/25 bg-gold-soft px-4 py-2">
+            <Hourglass className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
+            <p className="min-w-0 flex-1 text-sm font-semibold text-gold">
+              Versão curta de hoje · cerca de {shortMinutes(shortRows, hiddenRows, shortState.cap)} min
+            </p>
+            <button
+              type="button"
+              onClick={undoShort}
+              className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-bold text-white underline-offset-4 hover:underline"
+            >
+              Desfazer
+            </button>
+          </div>
+        )}
+
+        {visibleExercises.map((row, index) => (
           <ExerciseBlock
             key={row.id}
             row={row}
             index={index}
+            shortCap={shortCap}
             entries={sets[row.id] ?? []}
             record={records[row.exercise_id]}
             pendingIds={pendingIds}
@@ -776,6 +898,8 @@ export default function WorkoutExecutionPage() {
           </m.button>
         )}
       </div>
+
+      <ShortWorkoutSheet key={shortKey} open={shortOpen} onClose={() => setShortOpen(false)} rows={shortRows} onConfirm={applyShort} />
 
       <RestTimerBar
         rest={rest}

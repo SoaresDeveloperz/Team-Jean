@@ -28,6 +28,8 @@ export type FinishPatch = {
   status: 'completed'
   feedback?: string | null
   feedback_tags?: string[]
+  // Treino feito na versão curta (supabase/treino-curto.sql).
+  short_mode?: boolean
 }
 
 export type SyncOp =
@@ -138,9 +140,18 @@ async function send(supabase: Supabase, op: SyncOp): Promise<Outcome> {
   const update = (patch: Partial<FinishPatch>) =>
     supabase.from('workout_sessions').update(patch).eq('id', op.sessionId).select('id') as unknown as Promise<Result>
   let result = await update(op.patch)
+  // Sem o treino-curto.sql não existe a coluna short_mode: salva o treino sem ela
+  // (nunca trava a fila por causa disso).
+  let patch = op.patch
+  if (result.error?.code === 'PGRST204' && 'short_mode' in patch) {
+    const withoutShort: Partial<FinishPatch> = { ...patch }
+    delete withoutShort.short_mode
+    patch = withoutShort as FinishPatch
+    result = await update(patch)
+  }
   // Sem o gestao.sql não existem as colunas do recado: salva o treino sem ele.
-  if (result.error?.code === 'PGRST204' && ('feedback' in op.patch || 'feedback_tags' in op.patch)) {
-    const withoutFeedback: Partial<FinishPatch> = { ...op.patch }
+  if (result.error?.code === 'PGRST204' && ('feedback' in patch || 'feedback_tags' in patch)) {
+    const withoutFeedback: Partial<FinishPatch> = { ...patch }
     delete withoutFeedback.feedback
     delete withoutFeedback.feedback_tags
     result = await update(withoutFeedback)

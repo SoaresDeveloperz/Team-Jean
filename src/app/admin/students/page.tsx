@@ -69,6 +69,8 @@ type SessionRow = {
   feedback_tags?: string[] | null
   coach_reply?: string | null
   coach_reply_at?: string | null
+  // supabase/treino-curto.sql
+  short_mode?: boolean | null
 }
 
 type Filter = 'all' | 'active' | 'inactive' | 'tired'
@@ -570,11 +572,16 @@ export default function AdminStudentsPage() {
                                   </span>
                                   <span className="block text-xs text-zinc-500">{relativeDay(new Date(session.completed_at))}</span>
                                 </span>
-                                {session.session_rpe != null && (
-                                  <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
-                                    RPE {session.session_rpe}
-                                  </span>
-                                )}
+                                <span className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                                  {session.short_mode && (
+                                    <span className="rounded-full bg-gold-soft px-2 py-0.5 text-xs font-bold text-gold">Versão curta</span>
+                                  )}
+                                  {session.session_rpe != null && (
+                                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
+                                      RPE {session.session_rpe}
+                                    </span>
+                                  )}
+                                </span>
                               </li>
                             ),
                           )}

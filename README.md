@@ -249,6 +249,27 @@ para o Supabase em ordem; sem conexão, o treino continua normalmente (inclusive
 finalizar com recado) e tudo é enviado sozinho quando a internet volta. O
 treino aberto fica guardado no aparelho e pode ser reaberto offline.
 
+### Tenho pouco tempo (versão curta do treino)
+
+Quando o treino de hoje passa de uns 30 minutos (estimativa de ~40 s de
+execução e 90 s de descanso por série, mais 1 min por exercício), a tela Hoje e
+o próprio treino mostram **"Tenho pouco tempo"**. Um painel lista o que sai
+("Sai hoje: ..."), deixa o aluno marcar qualquer exercício para manter e promete
+só uma estimativa ("cerca de N min"). Regra padrão: os exercícios do começo do
+treino, em ordem, até uns 20 min, com 2 séries de trabalho cada; aquecimento e
+série principal ficam; série já feita nunca some.
+
+- **Só muda a tela:** a prescrição do Jean, as séries (`sets`) e os ids da fila
+  do aparelho continuam intactos. A faixa "Versão curta de hoje" tem **Desfazer**
+  e o estado fica no aparelho só para aquele treino e aquele dia.
+- **Para o treinador:** a coluna `workout_sessions.short_mode` (sim/não, nada de
+  motivo ou saúde) mostra o selo "Versão curta" no histórico do aluno e na ficha.
+  Não gera aviso nem push. Rode [`supabase/treino-curto.sql`](supabase/treino-curto.sql)
+  (idempotente). Antes disso o app funciona normalmente: ao finalizar, se a
+  coluna não existe, o treino é salvo sem a marca (nunca fica preso na fila).
+- **Contas:** `src/lib/short-workout.ts` (puras, testadas em
+  `tests/contas-curto.mjs`). Telas: roteiros `curto` e `curto-a11y`.
+
 ## Testes e CI
 
 - `pnpm test:build && pnpm test:e2e`: sobe um Supabase falso
@@ -264,6 +285,10 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
   casamento. Também roda no roteiro `exercicios`; a auditoria axe das telas dos
   GIFs é o roteiro `exercicios-a11y`. O `pnpm test:build` aponta os GIFs para o
   Supabase falso (`/__gif/`), sem internet.
+- `node tests/contas-curto.mjs`: confere, sem navegador, as contas da versão curta
+  (duração, séries escondidas, regra padrão, estado no aparelho). Também roda no
+  roteiro `curto`, que testa as telas com e sem o SQL e sem internet; a auditoria
+  axe é o roteiro `curto-a11y`.
 - `pnpm test:sql`: aplica os `supabase/*.sql` duas vezes, em duas ordens, num
   Postgres 16 e testa RLS, restrições e funções (`PGHOST`, `PGUSER` e
   `PGPASSWORD` apontando para o banco).

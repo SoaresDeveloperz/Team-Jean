@@ -1,11 +1,12 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
 import { ChevronDown, Flame, Info, Minus, Plus, Target, Trophy, Video } from 'lucide-react'
 import { SET_TYPES, formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import { canSuggestWarmup } from '@/lib/warmup'
+import { hiddenSetIndexes } from '@/lib/short-workout'
 import { ExerciseMedia, getExerciseMedia } from '@/components/workout/ExerciseMedia'
 import { ExerciseGif } from '@/components/workout/ExerciseGif'
 import { exerciseGifUrl } from '@/lib/exercises/media'
@@ -24,7 +25,11 @@ type ExerciseBlockProps = {
   onToggleSet: (rowId: string, setIndex: number) => void
   onAddSet: (rowId: string) => void
   onRemoveExtra: (rowId: string) => void
+  // Versão curta do treino: séries de trabalho mostradas por exercício (null = treino completo).
+  shortCap?: number | null
 }
+
+const NO_HIDDEN: ReadonlySet<number> = new Set()
 
 export const ExerciseBlock = memo(function ExerciseBlock({
   row,
@@ -36,6 +41,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
   onToggleSet,
   onAddSet,
   onRemoveExtra,
+  shortCap = null,
 }: ExerciseBlockProps) {
   const [showMedia, setShowMedia] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
@@ -49,8 +55,11 @@ export const ExerciseBlock = memo(function ExerciseBlock({
   const coachMedia = getExerciseMedia(exercise?.video_url) ?? getExerciseMedia(exercise?.image_url)
   const showGif = !coachMedia && !gifFailed && exerciseGifUrl(exercise?.media_id) !== null
   const hasMedia = Boolean(coachMedia) || showGif
+  // A versão curta só esconde séries na tela: `entries` (e os índices) não mudam.
+  const hidden = useMemo(() => (shortCap === null ? NO_HIDDEN : hiddenSetIndexes(entries, shortCap)), [entries, shortCap])
+  const visibleCount = entries.length - hidden.size
   const done = entries.filter((entry) => entry.completed).length
-  const allDone = entries.length > 0 && done === entries.length
+  const allDone = visibleCount > 0 && done === visibleCount
   const usedTypes = SET_TYPES.filter((type) => type.value !== 'working' && entries.some((entry) => entry.type === type.value))
   const lastExtra = entries[entries.length - 1]
   const canRemoveExtra = lastExtra?.extra && !lastExtra.completed
@@ -88,7 +97,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
             <span className="font-semibold uppercase tracking-wider">{exercise?.muscle_group || 'Geral'}</span>
             <span aria-hidden="true">·</span>
             <span>
-              {done}/{entries.length} séries
+              {done}/{visibleCount} séries
             </span>
             {targets.length > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 font-bold text-brand">
@@ -201,17 +210,19 @@ export const ExerciseBlock = memo(function ExerciseBlock({
           </span>
         </div>
         <div role="rowgroup" className="space-y-1">
-          {entries.map((entry, setIndex) => (
-            <SetRow
-              key={entry.setNumber}
-              entry={entry}
-              label={labels[setIndex]}
-              inputIdPrefix={`set-${row.id}-${setIndex}`}
-              pending={entry.rowId !== null && pendingIds.has(entry.rowId)}
-              onChange={(patch) => onChangeSet(row.id, setIndex, patch)}
-              onToggle={() => onToggleSet(row.id, setIndex)}
-            />
-          ))}
+          {entries.map((entry, setIndex) =>
+            hidden.has(setIndex) ? null : (
+              <SetRow
+                key={entry.setNumber}
+                entry={entry}
+                label={labels[setIndex]}
+                inputIdPrefix={`set-${row.id}-${setIndex}`}
+                pending={entry.rowId !== null && pendingIds.has(entry.rowId)}
+                onChange={(patch) => onChangeSet(row.id, setIndex, patch)}
+                onToggle={() => onToggleSet(row.id, setIndex)}
+              />
+            ),
+          )}
         </div>
       </div>
 

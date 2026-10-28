@@ -164,13 +164,13 @@ export function Modal({ open, onClose, title, description, children, variant = '
                   <h2 id={titleId} className="font-display text-2xl font-bold uppercase leading-none tracking-wide">
                     {title}
                   </h2>
-                  {description && <div className="mt-1.5 text-xs text-zinc-500">{description}</div>}
+                  {description && <div className="mt-1.5 text-[13px] leading-snug text-zinc-300">{description}</div>}
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
                   aria-label="Fechar"
-                  className="-mr-2 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white"
+                  className="-mr-2 -mt-1 grid h-11 w-11 shrink-0 place-items-center rounded-xl text-zinc-300 transition hover:bg-white/5 hover:text-white"
                 >
                   <X className="h-5 w-5" aria-hidden="true" />
                 </button>

@@ -11,7 +11,8 @@
     - `gestao` (`tests/e2e-gestao.cjs`): esqueci minha senha, push, ficha de saúde, avaliação, treino sem internet, recados, carga-alvo, financeiro e o treinador no computador;
     - `novidades` (`tests/contas-novidades.mjs` e `tests/e2e-novidades.cjs`): contas do aquecimento com anilhas e do link de WhatsApp, e as telas que os usam;
     - `exercicios` (`tests/contas-exercicios.mjs` e `tests/e2e-exercicios.cjs`): GIFs dos exercícios no treino, biblioteca do treinador e o banco sem o SQL;
-    - `routes`, `admin`, `coach`, `community`, `profile`, `gestao-a11y`, `novidades-a11y` e `exercicios-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
+    - `curto` (`tests/contas-curto.mjs` e `tests/e2e-curto.cjs`): "Tenho pouco tempo" (versão curta do treino), com e sem o SQL e sem internet;
+    - `routes`, `admin`, `coach`, `community`, `profile`, `gestao-a11y`, `novidades-a11y`, `exercicios-a11y` e `curto-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
   - banco: `pnpm test:sql` (precisa de um Postgres; veja o README);
   - não rode dois `tests/run.mjs` ao mesmo tempo, nem `pnpm test:build` com um teste rodando: eles usam as mesmas portas (3200 e 54321) e a mesma pasta `.next`;
   - o CI do GitHub roda tudo isso a cada push e a cada PR.

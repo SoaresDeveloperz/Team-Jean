@@ -18,6 +18,18 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-28 — "Tenho pouco tempo" e a Hoje enxuta (reunião dos agentes)
+- **Pergunta:** qual inovação adicionar ao app agora e como reformar o front (revisão com a skill `design-taste-frontend` e os agentes novos).
+- **Opções da inovação:** A) trocar exercício (equivalente do mesmo músculo, com GIF); B) "tenho pouco tempo" (treino de ~20 min); C) cartão semanal compartilhável; D) carga/volume pela prontidão; E) lembrete de treino inteligente (push).
+- **Conselheiro:** escolheria **A** (a série já guarda o exercício feito separado do prescrito, então não precisa de SQL); B vem depois e só é bom se o app souber quais exercícios são os principais; E esbarra no plano grátis da Vercel (cron 1 vez por dia, com atraso). Na segunda rodada: a regra com "Manter" por item reduz o "corte no chute" e basta para lançar; a marca "essencial" do Jean pode vir depois; A não é pré-requisito de B. **Divergência registrada: o conselheiro prefere A.**
+- **Voz do usuário:** B é a que mais agrada os três (Ana usa com um toque, Seu Wilson não é incomodado, Jean só precisa ver que foi curto). D incomoda o Seu Wilson (parece pergunta de saúde); C confunde ("para onde vai a imagem?").
+- **Priorizador:** B tem o melhor retorno em adesão com o menor risco, sem SQL obrigatório; plano em dois PRs.
+- **Advogado do diabo:** os riscos eram a fila e os ids ao esconder e voltar (corrigido: o corte é só na hora de desenhar, `sets` e `rowId` não mudam), o corte pela ordem do treino ser chute (corrigido: painel lista o que sai e deixa manter), o treino curto distorcer o que o treinador lê (corrigido: coluna `short_mode`, selo no histórico), e o texto de status oculto mudar o nome dos botões (corrigido: região de status à parte; os rótulos não mudam). Segunda rodada: o `short_mode` tem de ir junto da finalização, que já tem plano B se a coluna não existe, e nunca na criação da sessão; o estado no aparelho é por treino e dia; a duração é "cerca de N min", nunca promessa.
+- **LGPD:** só sim/não, sem campo de motivo (motivo viraria dado de saúde); texto sem pedir dado de saúde; apagar o treino guardado e o em andamento ao sair da conta (feito no PR 1). Urgente fora deste lançamento: política de privacidade, consentimento para dados de saúde, exclusão de conta e exportação (o aluno hoje só consegue pedindo ao Jean) e retenção; isso precisa de advogado.
+- **Cobrança e segurança:** push de mensalidade sem valor na tela bloqueada (feito); atraso de mês anterior some na virada do mês e desfazer pagamento não deixa rastro (**abertos, para o dono decidir**); segunda etapa de login do treinador, links de foto de 6 h, GIFs em `@main` e proteção contra senhas vazadas (**abertos**).
+- **Decisão (a IA decidiu, o dono pediu "1 inovação"):** B, com os cuidados acima; a tela Hoje fica enxuta (treino + botão + recado + prontidão visíveis; recuperação muscular, "O que vem aí" e "Sua rotina" recolhidos em "Ver mais do seu dia"). A fica como a próxima.
+- **Rever quando:** o Jean disser que a regra padrão corta o que não pode (aí entra a marca "essencial" por exercício, vinda do banco), ou quando poucos alunos usarem a versão curta (mede-se pelo `short_mode`).
+
 ## 2026-10-28 — Mais dez agentes e a skill de direção de arte
 - **Pergunta:** instalar agentes e skill de repositórios públicos ([agency-agents](https://github.com/msitarzewski/agency-agents) e [taste-skill](https://github.com/Leonxlnx/taste-skill)) no projeto.
 - **Opções:** A) instalar tudo como está (mais de 250 agentes, em inglês); B) escolher e adaptar só o que falta; C) instalar no computador do dono, fora do Git.

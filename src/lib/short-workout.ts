@@ -109,7 +109,8 @@ export function parseShortState(raw: string | null, workoutId: string, day: stri
 
 export const SHORT_STORAGE_KEY = 'team-jean:treino-curto'
 
-// Dia local (AAAA-MM-DD) do aparelho; o treino curto não passa para o dia seguinte.
+// Dia local (AAAA-MM-DD) do aparelho (o mesmo relógio que o aluno vê); a versão
+// curta não passa para o dia seguinte.
 export function localDay(now = new Date()) {
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`

@@ -38,11 +38,13 @@ export function saveActiveSession(session: ActiveSession) {
   }
 }
 
-export function clearActiveSession() {
+// keepShort: ao carregar a tela, a sessão antiga sem séries sai, mas a escolha da
+// versão curta (por treino e dia) continua valendo.
+export function clearActiveSession(keepShort = false) {
   try {
     window.localStorage.removeItem(STORAGE_KEY)
     window.localStorage.removeItem(JOURNAL_KEY)
-    window.localStorage.removeItem(SHORT_STORAGE_KEY)
+    if (!keepShort) window.localStorage.removeItem(SHORT_STORAGE_KEY)
   } catch {
     // Ignora: nada a limpar.
   }

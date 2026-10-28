@@ -120,6 +120,8 @@ export default function WorkoutExecutionPage() {
   const [shortState, setShortState] = useState<ShortState | null>(null)
   const [shortOpen, setShortOpen] = useState(false)
   const [shortKey, setShortKey] = useState(0)
+  const shortStripRef = useRef<HTMLDivElement>(null)
+  const shortOfferRef = useRef<HTMLButtonElement>(null)
   // Sessão finalizada sem internet (ainda na fila ao mostrar o resumo).
   const [queuedSessionId, setQueuedSessionId] = useState<string | null>(null)
 
@@ -189,7 +191,7 @@ export default function WorkoutExecutionPage() {
             ...queued.sets.filter((set) => !known.has(set.id)),
           ]
         }
-        if (resumedSets === null) clearActiveSession()
+        if (resumedSets === null) clearActiveSession(true)
       }
 
       const rows = bundle.rows as ExerciseRow[]
@@ -534,6 +536,20 @@ export default function WorkoutExecutionPage() {
     setShortOpen(true)
   }, [])
 
+  // O botão que abriu o painel some ao confirmar: o foco vai para onde o aluno continua.
+  const focusLater = (target: () => HTMLElement | null) => {
+    window.setTimeout(() => {
+      const element = target()
+      if (!element) return
+      if (!element.hasAttribute('tabindex') && !['BUTTON', 'A', 'INPUT'].includes(element.tagName)) element.setAttribute('tabindex', '-1')
+      element.focus({ preventScroll: false })
+    }, 120)
+  }
+  const closeShort = () => {
+    setShortOpen(false)
+    focusLater(() => shortOfferRef.current)
+  }
+
   const applyShort = (hidden: string[]) => {
     const next: ShortState = { workoutId, day: localDay(), hidden, cap: SHORT_SET_CAP }
     setShortState(next)
@@ -544,6 +560,7 @@ export default function WorkoutExecutionPage() {
       // Sem armazenamento: a versão curta vale até fechar a tela.
     }
     toast({ tone: 'info', title: 'Versão curta ligada', description: 'Dá para desfazer logo acima dos exercícios.', duration: 4000 })
+    focusLater(() => shortStripRef.current)
   }
 
   const undoShort = () => {
@@ -554,6 +571,7 @@ export default function WorkoutExecutionPage() {
       // Nada a limpar.
     }
     toast({ tone: 'info', title: 'Treino completo de volta', duration: 3000 })
+    focusLater(() => shortOfferRef.current ?? document.getElementById(`exercise-${exercises[0]?.id}`))
   }
 
 
@@ -835,6 +853,7 @@ export default function WorkoutExecutionPage() {
 
         {shortOffer && (
           <button
+            ref={shortOfferRef}
             type="button"
             onClick={openShort}
             className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-line-strong bg-surface px-4 py-2.5 text-left transition hover:bg-white/5"
@@ -848,7 +867,7 @@ export default function WorkoutExecutionPage() {
         )}
 
         {shortState && (
-          <div role="status" className="flex items-center gap-3 rounded-2xl border border-gold/25 bg-gold-soft px-4 py-2">
+          <div ref={shortStripRef} tabIndex={-1} role="status" className="flex items-center gap-3 rounded-2xl border border-gold/25 bg-gold-soft px-4 py-2 outline-none focus-visible:ring-2 focus-visible:ring-gold/60">
             <Hourglass className="h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
             <p className="min-w-0 flex-1 text-sm font-semibold text-gold">
               Versão curta de hoje · cerca de {shortMinutes(shortRows, hiddenRows, shortState.cap)} min
@@ -899,7 +918,7 @@ export default function WorkoutExecutionPage() {
         )}
       </div>
 
-      <ShortWorkoutSheet key={shortKey} open={shortOpen} onClose={() => setShortOpen(false)} rows={shortRows} onConfirm={applyShort} />
+      <ShortWorkoutSheet key={shortKey} open={shortOpen} onClose={closeShort} rows={shortRows} onConfirm={applyShort} />
 
       <RestTimerBar
         rest={rest}

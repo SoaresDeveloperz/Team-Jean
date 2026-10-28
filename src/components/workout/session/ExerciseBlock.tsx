@@ -212,15 +212,15 @@ export const ExerciseBlock = memo(function ExerciseBlock({
         <div role="rowgroup" className="space-y-1">
           {entries.map((entry, setIndex) =>
             hidden.has(setIndex) ? null : (
-            <SetRow
-              key={entry.setNumber}
-              entry={entry}
-              label={labels[setIndex]}
-              inputIdPrefix={`set-${row.id}-${setIndex}`}
-              pending={entry.rowId !== null && pendingIds.has(entry.rowId)}
-              onChange={(patch) => onChangeSet(row.id, setIndex, patch)}
-              onToggle={() => onToggleSet(row.id, setIndex)}
-            />
+              <SetRow
+                key={entry.setNumber}
+                entry={entry}
+                label={labels[setIndex]}
+                inputIdPrefix={`set-${row.id}-${setIndex}`}
+                pending={entry.rowId !== null && pendingIds.has(entry.rowId)}
+                onChange={(patch) => onChangeSet(row.id, setIndex, patch)}
+                onToggle={() => onToggleSet(row.id, setIndex)}
+              />
             ),
           )}
         </div>

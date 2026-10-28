@@ -81,17 +81,20 @@ export function ShortWorkoutSheet({ open, onClose, rows, onConfirm }: ShortWorko
           </ul>
         </fieldset>
 
-        <p role="status" className="rounded-2xl bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-zinc-200">
-          {noneKept
-            ? 'Escolha pelo menos um exercício.'
-            : nothingLeaves
-              ? 'Do jeito que está, nada sai do treino de hoje.'
-              : `${plural(keptRows.length, 'exercício', 'exercícios')} e ${plural(setsToDo, 'série', 'séries')}, cerca de ${minutes} min. ${
-                  leaving.length > 0 ? `Sai hoje: ${leaving.map((row) => row.name).join(', ')}.` : ''
-                }`}
-        </p>
+        <div className="rounded-2xl bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-zinc-200">
+          {/* Só a contagem fica na região viva: o leitor de tela não repete a lista a cada caixa marcada. */}
+          <p role="status">
+            {noneKept
+              ? 'Escolha pelo menos um exercício.'
+              : nothingLeaves
+                ? 'Do jeito que está, nada sai do treino de hoje.'
+                : `${plural(keptRows.length, 'exercício', 'exercícios')} e ${plural(setsToDo, 'série', 'séries')}, cerca de ${minutes} min.`}
+          </p>
+          {leaving.length > 0 && !noneKept && <p className="mt-1.5">Sai hoje: {leaving.map((row) => row.name).join(', ')}.</p>}
+        </div>
 
-        <div className="flex flex-col gap-2">
+        {/* Os botões ficam sempre à vista, mesmo com muitos exercícios ou zoom de 200%. */}
+        <div className="sticky bottom-0 -mx-6 flex flex-col gap-2 border-t border-line bg-surface-2 px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
           <button
             type="button"
             disabled={noneKept || nothingLeaves}

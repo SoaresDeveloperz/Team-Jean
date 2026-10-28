@@ -470,106 +470,6 @@ export default function StudentTodayPage() {
 
       <ReadinessCard value={readiness} onChange={handleReadinessChange} status={readinessStatus} />
 
-      {/* O resto do dia fica recolhido: a tela Hoje mostra primeiro o treino. */}
-      <details className="group space-y-4">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 text-sm font-bold text-zinc-200 [&::-webkit-details-marker]:hidden">
-          Ver mais do seu dia
-          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
-        </summary>
-        <div className="space-y-4 pt-1">
-      {/* Recuperação muscular */}
-      <Tile>
-        <div className="flex gap-4">
-          <div className="min-w-0 flex-1">
-            <Eyebrow>Recuperação muscular</Eyebrow>
-            {derived.recovering.length === 0 ? (
-              <>
-                <p className="mt-2 font-display text-2xl font-bold uppercase leading-none text-brand">Tudo pronto</p>
-                <p className="mt-1.5 text-xs text-zinc-400">Nenhum músculo em recuperação. Corpo liberado pra treinar.</p>
-              </>
-            ) : (
-              <>
-                <p className="mt-2 text-xs text-zinc-400">Com base nos seus últimos treinos:</p>
-                <ul className="mt-2.5 space-y-2">
-                  {derived.recovering.slice(0, 4).map(([region, value]) => (
-                    <li key={region}>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-zinc-200">{REGION_LABELS[region]}</span>
-                        <span className={cn('font-bold', value < 0.5 ? 'text-danger' : 'text-gold')}>
-                          {Math.round(value * 100)}%
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                        <m.div
-                          className={cn('h-full rounded-full', value < 0.5 ? 'bg-danger' : 'bg-gold')}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.max(6, value * 100)}%` }}
-                          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-          <div className="w-[38%] max-w-[150px] shrink-0">
-            <MuscleMap
-              fills={derived.recoveryFills}
-              label={
-                derived.recovering.length > 0
-                  ? `Em recuperação: ${derived.recovering.map(([region]) => REGION_LABELS[region]).join(', ')}`
-                  : 'Todos os músculos recuperados'
-              }
-            />
-          </div>
-        </div>
-        {derived.recovering.length > 0 && (
-          <div className="mt-3 flex gap-3 border-t border-line pt-2.5 text-xs font-semibold text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-danger" /> Recuperando
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-gold" /> Quase pronto
-            </span>
-          </div>
-        )}
-      </Tile>
-
-      {/* Exercícios do próximo treino */}
-      {next && data.exercises.length > 0 && (
-        <Tile className="p-0">
-          <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-5">
-            <Eyebrow icon={Dumbbell} className="min-w-0 truncate">
-              O que vem aí
-            </Eyebrow>
-            <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-zinc-500">
-              <Clock className="h-3 w-3" aria-hidden="true" /> ~{derived.estimatedMinutes} min
-            </span>
-          </div>
-          <ol className="divide-y divide-line">
-            {data.exercises.map((item, index) => {
-              const sets = getPlannedSets(item)
-              // Mostra as repetições da série de trabalho, não as do aquecimento.
-              const mainReps = (sets.find((set) => set.type !== 'warmup') ?? sets[0])?.reps
-              return (
-                <li key={item.id} className="flex items-center gap-3.5 px-5 py-3">
-                  <span className="w-5 text-center font-display text-lg font-bold text-zinc-600">{index + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-zinc-100">{item.exercises?.name ?? 'Exercício'}</p>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      {sets.length} {sets.length === 1 ? 'série' : 'séries'}
-                      {mainReps ? ` · ${mainReps} reps` : ''}
-                      {item.exercises?.muscle_group ? ` · ${item.exercises.muscle_group}` : ''}
-                    </p>
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </Tile>
-      )}
-
       {/* Rotina em carrossel */}
       {data.workouts.length > 1 && (
         <m.section variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }} aria-label="Sua rotina">
@@ -612,6 +512,105 @@ export default function StudentTodayPage() {
           </ul>
         </m.section>
       )}
+      {/* O resto do dia fica recolhido: a tela Hoje mostra primeiro o treino. */}
+      <details className="group space-y-4">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 text-sm font-bold text-zinc-200 [&::-webkit-details-marker]:hidden">
+          Ver mais do seu dia
+          <ChevronDown className="h-4 w-4 transition-transform motion-reduce:transition-none group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <div className="space-y-4 pt-1">
+          {/* Recuperação muscular */}
+          <Tile>
+            <div className="flex gap-4">
+              <div className="min-w-0 flex-1">
+                <Eyebrow>Recuperação muscular</Eyebrow>
+                {derived.recovering.length === 0 ? (
+                  <>
+                    <p className="mt-2 font-display text-2xl font-bold uppercase leading-none text-brand">Tudo pronto</p>
+                    <p className="mt-1.5 text-xs text-zinc-400">Nenhum músculo em recuperação. Corpo liberado pra treinar.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs text-zinc-400">Com base nos seus últimos treinos:</p>
+                    <ul className="mt-2.5 space-y-2">
+                      {derived.recovering.slice(0, 4).map(([region, value]) => (
+                        <li key={region}>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-zinc-200">{REGION_LABELS[region]}</span>
+                            <span className={cn('font-bold', value < 0.5 ? 'text-danger' : 'text-gold')}>
+                              {Math.round(value * 100)}%
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                            <m.div
+                              className={cn('h-full rounded-full', value < 0.5 ? 'bg-danger' : 'bg-gold')}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.max(6, value * 100)}%` }}
+                              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                            />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+              <div className="w-[38%] max-w-[150px] shrink-0">
+                <MuscleMap
+                  fills={derived.recoveryFills}
+                  label={
+                    derived.recovering.length > 0
+                      ? `Em recuperação: ${derived.recovering.map(([region]) => REGION_LABELS[region]).join(', ')}`
+                      : 'Todos os músculos recuperados'
+                  }
+                />
+              </div>
+            </div>
+            {derived.recovering.length > 0 && (
+              <div className="mt-3 flex gap-3 border-t border-line pt-2.5 text-xs font-semibold text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-danger" /> Recuperando
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-gold" /> Quase pronto
+                </span>
+              </div>
+            )}
+          </Tile>
+
+          {/* Exercícios do próximo treino */}
+          {next && data.exercises.length > 0 && (
+            <Tile className="p-0">
+              <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-5">
+                <Eyebrow icon={Dumbbell} className="min-w-0 truncate">
+                  O que vem aí
+                </Eyebrow>
+                <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-zinc-500">
+                  <Clock className="h-3 w-3" aria-hidden="true" /> ~{derived.estimatedMinutes} min
+                </span>
+              </div>
+              <ol className="divide-y divide-line">
+                {data.exercises.map((item, index) => {
+                  const sets = getPlannedSets(item)
+                  // Mostra as repetições da série de trabalho, não as do aquecimento.
+                  const mainReps = (sets.find((set) => set.type !== 'warmup') ?? sets[0])?.reps
+                  return (
+                    <li key={item.id} className="flex items-center gap-3.5 px-5 py-3">
+                      <span className="w-5 text-center font-display text-lg font-bold text-zinc-600">{index + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-zinc-100">{item.exercises?.name ?? 'Exercício'}</p>
+                        <p className="mt-0.5 text-xs text-zinc-500">
+                          {sets.length} {sets.length === 1 ? 'série' : 'séries'}
+                          {mainReps ? ` · ${mainReps} reps` : ''}
+                          {item.exercises?.muscle_group ? ` · ${item.exercises.muscle_group}` : ''}
+                        </p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Tile>
+          )}
         </div>
       </details>
     </Stagger>

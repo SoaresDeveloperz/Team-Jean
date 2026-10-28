@@ -143,7 +143,7 @@ async function send(supabase: Supabase, op: SyncOp): Promise<Outcome> {
   // Sem o treino-curto.sql não existe a coluna short_mode: salva o treino sem ela
   // (nunca trava a fila por causa disso).
   let patch = op.patch
-  if (result.error?.code === 'PGRST204' && 'short_mode' in patch) {
+  if (result.error?.code === 'PGRST204' && 'short_mode' in patch && /short_mode/.test(result.error.message ?? '')) {
     const withoutShort: Partial<FinishPatch> = { ...patch }
     delete withoutShort.short_mode
     patch = withoutShort as FinishPatch

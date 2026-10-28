@@ -82,7 +82,7 @@ export function FinishSheet({
             { label: 'Volume', icon: Weight, value: `${formatKg(volume)}` },
           ].map((stat) => (
             <div key={stat.label} className="rounded-2xl border border-line bg-black/30 px-3 py-2.5 text-center">
-              <dt className="flex items-center justify-center gap-1 text-xs font-black uppercase tracking-wider text-zinc-500">
+              <dt className="flex items-center justify-center gap-1 text-xs font-bold text-zinc-400">
                 <stat.icon className="h-3 w-3" aria-hidden="true" />
                 {stat.label}
               </dt>
@@ -124,7 +124,7 @@ export function FinishSheet({
                   animate={{ backgroundColor: filled ? rpeColor(value) : 'rgba(255,255,255,0.06)', y: selected ? -3 : 0 }}
                   className={cn(
                     'flex items-end justify-center rounded-lg pb-1 text-xs font-black',
-                    filled ? 'text-black' : 'text-zinc-500',
+                    filled ? 'text-black' : 'text-zinc-400',
                   )}
                   style={{ height: `${28 + value * 2.4}px` }}
                 >
@@ -133,7 +133,7 @@ export function FinishSheet({
               )
             })}
           </div>
-          <div className="mt-2 flex justify-between text-xs font-bold uppercase tracking-wider text-zinc-600">
+          <div className="mt-2 flex justify-between text-xs font-bold text-zinc-400">
             <span>Leve</span>
             <span>Máximo</span>
           </div>
@@ -141,7 +141,7 @@ export function FinishSheet({
 
         <fieldset>
           <legend className="mb-2.5 text-sm font-bold text-white">
-            Como foi? <span className="text-xs font-semibold text-zinc-500">(opcional)</span>
+            Como foi? <span className="text-xs font-semibold text-zinc-400">(opcional)</span>
           </legend>
           <div className="flex flex-wrap gap-1.5">
             {FEEDBACK_TAGS.map((tag) => {
@@ -154,7 +154,7 @@ export function FinishSheet({
                   onClick={() => toggleTag(tag.label)}
                   whileTap={{ scale: 0.94 }}
                   className={cn(
-                    'flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors',
+                    'flex h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-bold transition-colors',
                     selected ? 'border-white bg-white text-black' : 'border-line bg-white/[0.04] text-zinc-300 hover:text-white',
                   )}
                 >
@@ -168,11 +168,11 @@ export function FinishSheet({
 
         <div>
           <div className="mb-1.5 flex items-end justify-between gap-2">
-            <label htmlFor={feedbackId} className="text-xs font-black uppercase tracking-[0.1em] text-zinc-400">
+            <label htmlFor={feedbackId} className="text-sm font-bold text-zinc-300">
               Recado para o treinador
             </label>
             <span
-              className={cn('text-xs font-bold tabular-nums', feedback.length > FEEDBACK_MAX * 0.9 ? 'text-gold' : 'text-zinc-500')}
+              className={cn('text-xs font-bold tabular-nums', feedback.length > FEEDBACK_MAX * 0.9 ? 'text-gold' : 'text-zinc-400')}
               aria-hidden="true"
             >
               {feedback.length}/{FEEDBACK_MAX}
@@ -185,7 +185,7 @@ export function FinishSheet({
             rows={2}
             onChange={(event) => onFeedbackChange(event.target.value)}
             placeholder="Ex.: senti o ombro no supino, mas o resto foi tranquilo."
-            className="block max-h-40 w-full resize-none rounded-2xl border border-line-strong bg-black/40 px-3.5 py-3 text-white placeholder:text-zinc-600 [field-sizing:content] focus:border-brand focus:outline-none"
+            className="block max-h-40 w-full resize-none rounded-2xl border border-line-strong bg-black/40 px-3.5 py-3 text-white placeholder:text-zinc-500 [field-sizing:content] focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
           />
         </div>
 

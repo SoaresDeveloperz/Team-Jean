@@ -83,7 +83,7 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
             entry.previous &&
             onChange({ weight: formatKg(entry.previous.weight).replace('.', ''), reps: String(entry.previous.reps) })
           }
-          className="w-full truncate rounded-lg py-2 text-center text-xs font-semibold tabular-nums text-zinc-500 transition enabled:hover:text-zinc-200"
+          className="min-h-11 w-full truncate rounded-lg text-center text-sm font-semibold tabular-nums text-zinc-400 transition enabled:hover:text-zinc-200"
           title={entry.previous ? 'Usar os valores do último treino' : undefined}
         >
           {entry.previous ? (
@@ -118,7 +118,7 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
           }}
           placeholder={weightHint !== null ? formatKg(weightHint) : 'kg'}
           aria-label={`Carga da série ${entry.setNumber} em kg${entry.targetWeight !== null ? `, meta ${formatKg(entry.targetWeight)} kg` : ''}`}
-          className="h-11 w-full rounded-xl border border-line bg-black/40 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none disabled:border-transparent disabled:bg-transparent disabled:text-zinc-200"
+          className="h-11 w-full rounded-xl border border-line bg-black/40 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-500 focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 disabled:border-transparent disabled:bg-transparent disabled:text-zinc-200"
         />
       </div>
       <div role="cell">
@@ -142,11 +142,15 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
           }}
           placeholder={entry.previous ? String(entry.previous.reps) : entry.targetReps}
           aria-label={`Repetições da série ${entry.setNumber}, meta ${entry.targetReps}`}
-          className="h-11 w-full rounded-xl border border-line bg-black/40 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none disabled:border-transparent disabled:bg-transparent disabled:text-zinc-200"
+          className="h-11 w-full rounded-xl border border-line bg-black/40 text-center text-base font-bold tabular-nums text-white placeholder:text-zinc-500 focus:border-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 disabled:border-transparent disabled:bg-transparent disabled:text-zinc-200"
         />
       </div>
 
       <div role="cell" className="flex justify-center">
+        {/* Anuncia a conclusão sem mudar o nome do botão (os rótulos são usados nos testes). */}
+        <span role="status" className="sr-only">
+          {entry.completed ? `Série ${entry.setNumber} concluída` : ''}
+        </span>
         <m.button
           type="button"
           onClick={onToggle}
@@ -160,7 +164,7 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
             'relative grid h-11 w-11 place-items-center rounded-xl transition-colors',
             entry.completed
               ? 'bg-brand text-black shadow-[0_0_18px_rgba(52,211,153,0.35)]'
-              : 'bg-white/[0.07] text-zinc-500 hover:text-zinc-300',
+              : 'bg-white/[0.07] text-zinc-400 hover:text-zinc-200',
           )}
         >
           <AnimatePresence mode="wait" initial={false}>

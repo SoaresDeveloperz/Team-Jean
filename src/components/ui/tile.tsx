@@ -53,7 +53,7 @@ export function Tile({ className, children, onPointerMove, ...props }: TileProps
 
 export function Eyebrow({ icon: Icon, children, className }: { icon?: LucideIcon; children: ReactNode; className?: string }) {
   return (
-    <p className={cn('flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.12em] text-zinc-500', className)}>
+    <p className={cn('flex items-center gap-1.5 text-[13px] font-bold text-zinc-400', className)}>
       {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
       {children}
     </p>

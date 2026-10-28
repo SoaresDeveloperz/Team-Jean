@@ -39,7 +39,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (toast: ToastInput) => {
       const id = ++nextId
       setToasts((current) => [...current.slice(-2), { ...toast, id }])
-      window.setTimeout(() => dismiss(id), toast.duration ?? 3800)
+      window.setTimeout(() => dismiss(id), toast.duration ?? (toast.tone === 'error' ? 8000 : 3800))
     },
     [dismiss],
   )
@@ -75,7 +75,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm font-bold text-white">{toast.title}</span>
-                  {toast.description && <span className="block truncate text-xs text-zinc-400">{toast.description}</span>}
+                  {toast.description && <span className="block text-xs text-zinc-300">{toast.description}</span>}
                 </span>
               </m.div>
             )

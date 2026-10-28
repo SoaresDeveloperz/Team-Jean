@@ -238,14 +238,14 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
           <h2 id="weekly-training-title" className="mt-1 font-display text-3xl font-bold uppercase leading-none">
             {weekOffset === 0 ? 'Esta semana' : weekOffset === -1 ? 'Semana passada' : 'Semana'}
           </h2>
-          <p className="mt-1 text-xs text-zinc-500">{formatRange(weekStart)}</p>
+          <p className="mt-1 text-xs text-zinc-400">{formatRange(weekStart)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded-2xl border border-line bg-surface p-1">
           <button
             type="button"
             aria-label="Semana anterior"
             onClick={() => changeWeek(weekOffset - 1)}
-            className="grid h-9 w-9 place-items-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white"
+            className="grid h-11 w-11 place-items-center rounded-xl text-zinc-300 transition hover:bg-white/5 hover:text-white"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -253,7 +253,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             <button
               type="button"
               onClick={() => changeWeek(0)}
-              className="rounded-xl px-2 py-2 text-xs font-bold text-brand hover:bg-white/5"
+              className="min-h-11 rounded-xl px-3 text-sm font-bold text-brand hover:bg-white/5"
             >
               Hoje
             </button>
@@ -263,7 +263,7 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
             aria-label="Próxima semana"
             disabled={weekOffset >= 0}
             onClick={() => changeWeek(weekOffset + 1)}
-            className="grid h-9 w-9 place-items-center rounded-xl text-zinc-400 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
+            className="grid h-11 w-11 place-items-center rounded-xl text-zinc-300 transition hover:bg-white/5 hover:text-white disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>

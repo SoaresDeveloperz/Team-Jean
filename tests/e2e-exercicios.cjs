@@ -224,8 +224,10 @@ async function login(page, email, password = '123456') {
   await page.click('main button:has-text("Prancha")')
   await page.click('[role=dialog] button:has-text("Editar exercício")')
   await page.waitForSelector('#exercise-name')
-  await page.waitForSelector('[role=dialog] >> text=supabase/exercicios.sql')
-  check('sem o SQL: editor mostra o aviso no lugar do "Vincular GIF"', (await page.locator('[role=dialog] button', { hasText: 'Vincular GIF' }).count()) === 0 && (await page.textContent('[role=dialog]')).includes('supabase/exercicios.sql'))
+  // O diálogo de detalhe pode ainda estar saindo: confere só o diálogo do editor.
+  const editorDialog = page.locator('[role=dialog]', { has: page.locator('#exercise-name') })
+  await editorDialog.locator('text=supabase/exercicios.sql').waitFor()
+  check('sem o SQL: editor mostra o aviso no lugar do "Vincular GIF"', (await editorDialog.locator('button', { hasText: 'Vincular GIF' }).count()) === 0 && (await editorDialog.textContent()).includes('supabase/exercicios.sql'))
   await page.fill('#exercise-name', 'Prancha Frontal')
   await page.click('[role=dialog] button[type=submit]')
   await page.waitForSelector('text=Exercício atualizado', { timeout: 10000 })

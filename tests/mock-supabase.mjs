@@ -205,6 +205,11 @@ const MEDIA_ID = /^[A-Za-z0-9_-]{1,64}$/
 const GIF = Buffer.from('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64')
 const gifRequests = []
 
+// --- Versão curta do treino (supabase/treino-curto.sql) ---
+// /__curto/off simula o banco sem o treino-curto.sql (sem a coluna short_mode);
+// /__curto/longo cria o "Treino D - Longo" (6 exercícios, ~60 min) para a Maria.
+let curtoEnabled = true
+
 // /__community/off simula o banco sem o community.sql.
 let communityEnabled = true
 const COMMUNITY_TABLES = ['community_posts', 'community_likes', 'community_comments']
@@ -240,6 +245,7 @@ function columnsOf(table) {
   if (table === 'profiles' && profileEnabled) columns = [...columns, ...PROFILE_COLUMNS]
   if (gestaoEnabled && GESTAO_COLUMNS[table] && (table !== 'body_measurements' || profileEnabled)) columns = [...columns, ...GESTAO_COLUMNS[table]]
   if (table === 'exercises' && exerciciosEnabled) columns = [...columns, 'media_id']
+  if (table === 'workout_sessions' && curtoEnabled) columns = [...columns, 'short_mode']
   return columns
 }
 // Colunas que o banco real não teria sem o gestao.sql/profile.sql somem das respostas.
@@ -645,6 +651,20 @@ http
       exerciciosEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { exerciciosEnabled })
     }
+    if (url.pathname === '/__curto/off' || url.pathname === '/__curto/on') {
+      curtoEnabled = url.pathname.endsWith('/on')
+      return send(res, 200, { curtoEnabled })
+    }
+    if (url.pathname === '/__curto/longo') {
+      if (!exercises.some((item) => item.id === 'e6')) exercises.push(ex('e6', 'Remada Baixa', 'Costas'))
+      if (!assigned_workouts.some((item) => item.id === 'w-d')) {
+        assigned_workouts.push({ id: 'w-d', student_id: 'u-student', name: 'Treino D - Longo', is_current: true, created_at: iso(-2) })
+        ;['e1', 'e2', 'e3', 'e4', 'e5', 'e6'].forEach((exerciseId, index) =>
+          assigned_workout_exercises.push({ id: `awd${index + 1}`, assigned_workout_id: 'w-d', exercise_id: exerciseId, order: index + 1, sets_count: 4, target_reps: '10-12', planned_sets: null, notes: null }),
+        )
+      }
+      return send(res, 200, { ok: true })
+    }
     if (url.pathname === '/__exercises') return send(res, 200, exercises)
     if (url.pathname === '/__gifs') return send(res, 200, gifRequests.splice(0))
     // "CDN" dos GIFs (NEXT_PUBLIC_EXERCISE_MEDIA_BASE_URL=http://localhost:54321/__gif).
@@ -964,6 +984,7 @@ http
         student_billing: { due_day: 10, active: true, starts_on: monthISO(0), last_reminder_on: null, note: null, created_at: new Date().toISOString() },
         payments: { id: crypto.randomUUID(), paid_on: dayISO(0), method: 'pix', note: null, created_by: user?.id ?? null, created_at: new Date().toISOString() },
         coach_settings: { id: 1, pix_key: null, pix_name: null, pix_city: null, billing_reminders: false },
+        workout_sessions: curtoEnabled ? { short_mode: false } : {},
       })[table]
 
       if (req.method === 'POST') {

@@ -32,6 +32,8 @@ export function ShortWorkoutSheet({ open, onClose, rows, onConfirm }: ShortWorko
 
   const toggle = (id: string) =>
     setKept((current) => {
+      // Essencial (marcado pelo Jean) nunca sai.
+      if (rows.find((row) => row.id === id)?.essential) return current
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -54,6 +56,7 @@ export function ShortWorkoutSheet({ open, onClose, rows, onConfirm }: ShortWorko
             {rows.map((row) => {
               const checked = kept.has(row.id)
               const shown = visibleSetCount(row.sets, SHORT_SET_CAP)
+              const locked = Boolean(row.essential)
               return (
                 <li key={row.id}>
                   <label
@@ -65,13 +68,18 @@ export function ShortWorkoutSheet({ open, onClose, rows, onConfirm }: ShortWorko
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={locked}
                       onChange={() => toggle(row.id)}
                       className="h-5 w-5 shrink-0 accent-[#34d399]"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-white [overflow-wrap:anywhere]">{row.name}</span>
                       <span className="block text-xs text-zinc-300">
-                        {checked ? `${plural(shown, 'série', 'séries')} hoje` : 'Fica de fora hoje'}
+                        {locked
+                          ? `Essencial: o Jean pediu para manter · ${plural(shown, 'série', 'séries')} hoje`
+                          : checked
+                            ? `${plural(shown, 'série', 'séries')} hoje`
+                            : 'Fica de fora hoje'}
                       </span>
                     </span>
                   </label>

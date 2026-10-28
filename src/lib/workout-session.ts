@@ -11,6 +11,8 @@ type Supabase = ReturnType<typeof createClient>
 export type BundleExercise = PrescribedExercise & {
   exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null
 }
+// Biblioteca de exercícios (opções do "Trocar exercício"); sem ela, só não há troca.
+export type LibraryExercise = Pick<Exercise, 'id' | 'name' | 'muscle_group' | 'secondary_muscle' | 'image_url' | 'video_url' | 'media_id'>
 export type StoredSet = {
   id?: string
   assigned_exercise_id: string | null
@@ -27,6 +29,7 @@ export type WorkoutBundle = {
   previousSets: StoredSet[]
   // Séries de todos os treinos concluídos do aluno com estes exercícios (recordes).
   recordSets: RecordSet[]
+  library?: LibraryExercise[]
   savedAt: number
 }
 
@@ -41,8 +44,18 @@ function check(result: Result) {
   return result.data
 }
 
+const slimExercise = (item: LibraryExercise): LibraryExercise => ({
+  id: item.id,
+  name: item.name,
+  muscle_group: item.muscle_group ?? null,
+  secondary_muscle: item.secondary_muscle ?? null,
+  image_url: item.image_url ?? null,
+  video_url: item.video_url ?? null,
+  media_id: item.media_id ?? null,
+})
+
 export async function fetchWorkoutBundle(supabase: Supabase, userId: string, workoutId: string): Promise<WorkoutBundle> {
-  const [workoutResult, exercisesResult, completedResult] = (await Promise.all([
+  const [workoutResult, exercisesResult, completedResult, libraryResult] = (await Promise.all([
     supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
     // exercises(*): traz o media_id (GIF) quando o supabase/exercicios.sql já rodou,
     // sem quebrar enquanto a coluna não existe. Vai junto na cópia offline.
@@ -55,6 +68,7 @@ export async function fetchWorkoutBundle(supabase: Supabase, userId: string, wor
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .limit(100),
+    supabase.from('exercises').select('*').order('name', { ascending: true }).limit(1000),
   ])) as Result[]
 
   const workout = check(workoutResult) as AssignedWorkout | null
@@ -92,6 +106,8 @@ export async function fetchWorkoutBundle(supabase: Supabase, userId: string, wor
     rows,
     previousSets: (check(previousResult) ?? []) as StoredSet[],
     recordSets: (check(recordResult) ?? []) as RecordSet[],
+    // Falha ao ler a biblioteca não derruba o treino: só some o "Trocar".
+    library: libraryResult.error ? [] : ((libraryResult.data ?? []) as LibraryExercise[]).map(slimExercise),
     savedAt: Date.now(),
   }
 }

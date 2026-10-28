@@ -6,7 +6,8 @@
 // corte é calculado aqui e aplicado só na hora de desenhar.
 
 export type ShortSet = { type: string; completed: boolean; extra: boolean }
-export type ShortRow = { id: string; name: string; sets: ShortSet[] }
+// essential: o treinador marcou o exercício como essencial (nunca sai da versão curta).
+export type ShortRow = { id: string; name: string; sets: ShortSet[]; essential?: boolean }
 
 // Meta de duração da versão curta e a partir de quanto o treino "passa do tempo".
 export const SHORT_TARGET_MINUTES = 20
@@ -65,20 +66,30 @@ export function canOfferShort(rows: ShortRow[]) {
   return rows.length > MIN_EXERCISES && fullMinutes(rows) > SHORT_OFFER_MINUTES
 }
 
-// Regra padrão: mantém os exercícios na ordem do treino enquanto couberem na
-// meta (com `cap` séries de trabalho cada), no mínimo MIN_EXERCISES. O aluno
-// pode mudar a escolha no painel ("Manter").
+// Regra padrão: os essenciais (marcados pelo treinador) ficam sempre; depois os
+// exercícios entram na ordem do treino enquanto couberem na meta (com `cap`
+// séries de trabalho cada), no mínimo MIN_EXERCISES. O aluno pode mudar a
+// escolha no painel ("Manter"), menos os essenciais.
 export function planShort(rows: ShortRow[], targetMinutes = SHORT_TARGET_MINUTES, cap = SHORT_SET_CAP) {
   const keep: string[] = []
   const leave: string[] = []
-  let sets = 0
+  const essentials = rows.filter((row) => row.essential)
+  let sets = essentials.reduce((sum, row) => sum + visibleSetCount(row.sets, cap), 0)
+  let kept = essentials.length
+  let stopped = false
   for (const row of rows) {
+    if (row.essential) {
+      keep.push(row.id)
+      continue
+    }
     const next = sets + visibleSetCount(row.sets, cap)
-    const fits = (next * 130 + (keep.length + 1) * 60) / 60 <= targetMinutes
-    if (leave.length === 0 && (fits || keep.length < MIN_EXERCISES)) {
+    const fits = (next * 130 + (kept + 1) * 60) / 60 <= targetMinutes
+    if (!stopped && (fits || kept < MIN_EXERCISES)) {
       keep.push(row.id)
       sets = next
+      kept += 1
     } else {
+      stopped = true
       leave.push(row.id)
     }
   }

@@ -42,6 +42,17 @@ check('mantendo tudo, a estimativa é a do modo curto sem cortar exercício', sh
 const heavy = [row('a', ...Array.from({ length: 8 }, () => set())), row('b', ...Array.from({ length: 8 }, () => set())), row('c', set())]
 check('pelo menos 2 exercícios ficam, mesmo estourando a meta', short.planShort(heavy, 5).keep.length >= 2)
 
+// ------------------------------------------------------------ essenciais do treinador
+const withEssential = long.map((item) => (item.id === 'f' ? { ...item, essential: true } : item))
+const planEssential = short.planShort(withEssential)
+check('essencial do fim do treino fica na versão curta', planEssential.keep.includes('f') && !planEssential.leave.includes('f'), JSON.stringify(planEssential))
+check('o essencial ocupa o lugar: entram menos exercícios do começo', planEssential.keep.length <= plan.keep.length + 1 && planEssential.keep.filter((id) => id !== 'f').length <= plan.keep.length, JSON.stringify(planEssential))
+check('a ordem do treino é mantida (a, b, ..., f)', same(planEssential.keep, [...planEssential.keep].sort()), JSON.stringify(planEssential.keep))
+const allEssential = long.map((item) => ({ ...item, essential: true }))
+check('todos essenciais: nada sai', short.planShort(allEssential).leave.length === 0)
+const twoEssentials = long.map((item) => (item.id === 'd' || item.id === 'e' ? { ...item, essential: true } : item))
+check('dois essenciais estouram a meta sozinhos? os dois ficam mesmo assim', short.planShort(twoEssentials).keep.includes('d') && short.planShort(twoEssentials).keep.includes('e'))
+
 // ------------------------------------------------------------ quando oferecer
 check('treino de ~60 min: oferece a versão curta', short.canOfferShort(long))
 check('treino de ~20 min: não oferece', !short.canOfferShort([row('a', set(), set(), set()), row('b', set(), set()), row('c', set(), set(), set())]))

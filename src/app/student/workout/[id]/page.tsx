@@ -19,6 +19,7 @@ import {
   type ShortRow,
   type ShortState,
 } from '@/lib/short-workout'
+import { SWAP_STORAGE_KEY, canOfferSwap, parseSwapState, swapOptions, type SwapOption } from '@/lib/swap-exercise'
 import {
   clearActiveSession,
   readActiveSession,
@@ -47,6 +48,7 @@ import {
   cacheCurrentPage,
   fetchResumableSets,
   fetchWorkoutBundle,
+  type LibraryExercise,
   readCachedBundle,
   saveCachedBundle,
   type StoredSet,
@@ -67,6 +69,7 @@ import { ExerciseBlock } from '@/components/workout/session/ExerciseBlock'
 import { FinishSheet } from '@/components/workout/session/FinishSheet'
 import { RestTimerBar } from '@/components/workout/session/RestTimerBar'
 import { ShortWorkoutSheet } from '@/components/workout/session/ShortWorkoutSheet'
+import { SwapExerciseSheet } from '@/components/workout/session/SwapExerciseSheet'
 import { WorkoutSummary, type WorkoutSummaryData } from '@/components/workout/session/WorkoutSummary'
 import { parseNumber, type ExerciseRow, type PreviousSet, type RestState, type SetEntry } from '@/components/workout/session/types'
 
@@ -76,6 +79,16 @@ const IDLE_REST: RestState = { endsAt: null, pausedRemaining: null, total: 0 }
 
 function setKey(assignedExerciseId: string | null, setNumber: number) {
   return `${assignedExerciseId}:${setNumber}`
+}
+
+// Aplica as trocas de hoje: a linha do treino continua a mesma (mesmo id), só o
+// exercício muda. `swappedFrom` guarda o que o treinador prescreveu.
+function applySwaps(rows: ExerciseRow[], swaps: Record<string, string>, library: LibraryExercise[]): ExerciseRow[] {
+  const byId = new Map(library.map((item) => [item.id, item]))
+  return rows.map((row) => {
+    const to = swaps[row.id] ? byId.get(swaps[row.id]) : undefined
+    return to ? { ...row, exercise_id: to.id, exercises: to, swappedFrom: row.exercise_id } : row
+  })
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -92,7 +105,14 @@ export default function WorkoutExecutionPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [userId, setUserId] = useState<string | null>(null)
   const [workout, setWorkout] = useState<AssignedWorkout | null>(null)
-  const [exercises, setExercises] = useState<ExerciseRow[]>([])
+  const [baseExercises, setBaseExercises] = useState<ExerciseRow[]>([])
+  const [library, setLibrary] = useState<LibraryExercise[]>([])
+  // "Trocar exercício": linha do treino → exercício escolhido hoje (vale neste aparelho).
+  const [swaps, setSwaps] = useState<Record<string, string>>({})
+  const [swapRowId, setSwapRowId] = useState<string | null>(null)
+  const [swapKey, setSwapKey] = useState(0)
+  const originalSetsRef = useRef<Record<string, SetEntry[]>>({})
+  const exercises = useMemo(() => applySwaps(baseExercises, swaps, library), [baseExercises, swaps, library])
   const [sets, setSets] = useState<Record<string, SetEntry[]>>({})
   const [records, setRecords] = useState<Record<string, PreviousSet>>({})
   const [errorMessage, setErrorMessage] = useState('')
@@ -194,7 +214,21 @@ export default function WorkoutExecutionPage() {
         if (resumedSets === null) clearActiveSession(true)
       }
 
-      const rows = bundle.rows as ExerciseRow[]
+      const baseRows = bundle.rows as ExerciseRow[]
+      const libraryItems = bundle.library ?? []
+      let restoredSwaps: Record<string, string> = {}
+      try {
+        restoredSwaps = parseSwapState(
+          window.localStorage.getItem(SWAP_STORAGE_KEY),
+          workoutId,
+          localDay(),
+          baseRows.map((row) => row.id),
+          libraryItems.map((item) => item.id),
+        )
+      } catch {
+        restoredSwaps = {}
+      }
+      const rows = applySwaps(baseRows, restoredSwaps, libraryItems)
       const pastRecords: Record<string, PreviousSet> = {}
       for (const row of bundle.recordSets) {
         const weight = Number(row.weight_kg) || 0
@@ -216,10 +250,11 @@ export default function WorkoutExecutionPage() {
         extra: boolean,
       ): SetEntry => {
         const saved = resumedByKey.get(setKey(row.id, setNumber))
-        const previous = previousByKey.get(setKey(row.id, setNumber))
+        // Exercício trocado hoje: o "anterior" e a carga-alvo eram do outro exercício.
+        const previous = row.swappedFrom ? undefined : previousByKey.get(setKey(row.id, setNumber))
         const weight = Number(saved?.weight_kg) || 0
         const best = Math.max(pastRecords[row.exercise_id]?.weight ?? 0, bestInSession[row.exercise_id] ?? 0)
-        const isPR = Boolean(saved) && weight > 0 && weight > best
+        const isPR = !row.swappedFrom && Boolean(saved) && weight > 0 && weight > best
         if (saved) bestInSession[row.exercise_id] = Math.max(bestInSession[row.exercise_id] ?? 0, weight)
         return {
           setNumber,
@@ -237,13 +272,12 @@ export default function WorkoutExecutionPage() {
         }
       }
 
-      const initialSets: Record<string, SetEntry[]> = {}
-      for (const row of rows) {
+      const entriesFor = (row: ExerciseRow): SetEntry[] => {
         const planned = getPlannedSets(row).map((plan) => ({
           type: plan.type,
           reps: String(plan.reps || '8-12'),
           rir: normalizeRir(plan.rir),
-          weight: normalizeWeight(plan.weight),
+          weight: row.swappedFrom ? null : normalizeWeight(plan.weight),
         }))
         const entries = planned.map((plan, index) => buildEntry(row, index + 1, plan, false))
         // Séries extras já salvas (além do prescrito) voltam ao retomar.
@@ -255,8 +289,17 @@ export default function WorkoutExecutionPage() {
         for (const setNumber of extraNumbers) {
           entries.push(buildEntry(row, setNumber, { ...lastPlan, type: 'working' }, true))
         }
-        initialSets[row.id] = entries
+        return entries
       }
+      const initialSets: Record<string, SetEntry[]> = {}
+      const originalSets: Record<string, SetEntry[]> = {}
+      for (const row of rows) {
+        initialSets[row.id] = entriesFor(row)
+        // Para "Voltar ao original": como a linha ficaria sem a troca.
+        const base = row.swappedFrom ? baseRows.find((item) => item.id === row.id) : undefined
+        originalSets[row.id] = base ? entriesFor(base) : initialSets[row.id]
+      }
+      originalSetsRef.current = originalSets
 
       if (resumedSets !== null && resumeCandidate) {
         sessionIdRef.current = resumeCandidate.sessionId
@@ -277,6 +320,7 @@ export default function WorkoutExecutionPage() {
         const lite: ShortRow[] = rows.map((row) => ({
           id: row.id,
           name: row.exercises?.name ?? 'Exercício',
+          essential: Boolean(row.essential),
           sets: (initialSets[row.id] ?? []).map((entry) => ({ type: entry.type, completed: entry.completed, extra: entry.extra })),
         }))
         const anyDone = lite.some((row) => row.sets.some((entry) => entry.completed))
@@ -286,7 +330,9 @@ export default function WorkoutExecutionPage() {
         }
       }
       setWorkout(bundle.workout as AssignedWorkout)
-      setExercises(rows)
+      setBaseExercises(baseRows)
+      setLibrary(libraryItems)
+      setSwaps(restoredSwaps)
       setRecords(pastRecords)
       setSets(initialSets)
       setLoadState({ status: 'ready' })
@@ -379,7 +425,7 @@ export default function WorkoutExecutionPage() {
         .filter((item) => item.exercise_id === row.exercise_id)
         .flatMap((item) => (setsRef.current[item.id] ?? []).filter((other) => other.completed && other !== entry))
         .reduce((best, other) => Math.max(best, parseNumber(other.weight)), 0)
-      const isPR = weight > 0 && weight > Math.max(records[row.exercise_id]?.weight ?? 0, sameExerciseBest)
+      const isPR = !row.swappedFrom && weight > 0 && weight > Math.max(records[row.exercise_id]?.weight ?? 0, sameExerciseBest)
 
       const sessionId = ensureSession()
       if (!sessionId) return
@@ -525,6 +571,7 @@ export default function WorkoutExecutionPage() {
       exercises.map((row) => ({
         id: row.id,
         name: row.exercises?.name ?? 'Exercício',
+        essential: Boolean(row.essential),
         sets: (sets[row.id] ?? []).map((entry) => ({ type: entry.type, completed: entry.completed, extra: entry.extra })),
       })),
     [exercises, sets],
@@ -574,6 +621,79 @@ export default function WorkoutExecutionPage() {
     focusLater(() => shortOfferRef.current ?? document.getElementById(`exercise-${exercises[0]?.id}`))
   }
 
+  // ---- Trocar exercício (só para hoje, só antes da primeira série do exercício).
+  // Opções por linha: não mudam a cada tecla digitada, só quando a troca muda.
+  const swapOptionsByRow = useMemo(() => {
+    const taken = new Set(exercises.map((row) => row.exercise_id))
+    const byRow: Record<string, SwapOption[]> = {}
+    for (const base of baseExercises) {
+      byRow[base.id] = swapOptions({
+        original: { exercise_id: base.exercise_id, muscle_group: base.exercises?.muscle_group },
+        essential: base.essential,
+        alternatives: base.alternatives,
+        library,
+        taken,
+      })
+    }
+    return byRow
+  }, [baseExercises, exercises, library])
+
+  const openSwap = useCallback((rowId: string) => {
+    setSwapKey((value) => value + 1)
+    setSwapRowId(rowId)
+  }, [])
+
+  const saveSwaps = (next: Record<string, string>) => {
+    try {
+      if (Object.keys(next).length === 0) window.localStorage.removeItem(SWAP_STORAGE_KEY)
+      else window.localStorage.setItem(SWAP_STORAGE_KEY, JSON.stringify({ workoutId, day: localDay(), swaps: next }))
+    } catch {
+      // Sem armazenamento: a troca vale até fechar a tela.
+    }
+  }
+
+  const closeSwap = () => {
+    const rowId = swapRowId
+    setSwapRowId(null)
+    focusLater(() => document.querySelector<HTMLElement>(`#exercise-${rowId} [data-swap-button]`) ?? document.getElementById(`exercise-${rowId}`))
+  }
+
+  const pickSwap = (option: SwapOption, pain: boolean) => {
+    const rowId = swapRowId
+    if (!rowId || (setsRef.current[rowId] ?? []).some((entry) => entry.completed)) return
+    const next = { ...swaps, [rowId]: option.id }
+    setSwaps(next)
+    saveSwaps(next)
+    // O "anterior" e a carga-alvo eram do outro exercício.
+    setSets((previous) => ({
+      ...previous,
+      [rowId]: (previous[rowId] ?? []).map((entry) => ({ ...entry, previous: null, targetWeight: null })),
+    }))
+    // Troca por dor: o recado "Senti dor" já vem marcado ao finalizar (o Jean fica sabendo).
+    if (pain) setFeedbackTags((tags) => (tags.includes('Senti dor') ? tags : [...tags, 'Senti dor']))
+    setSwapRowId(null)
+    toast({
+      tone: 'info',
+      title: `Trocado por ${option.name}`,
+      description: pain ? 'O Jean vai receber o aviso de dor quando você finalizar.' : 'Vale só para hoje.',
+      duration: 4000,
+    })
+    focusLater(() => document.getElementById(`exercise-${rowId}`))
+  }
+
+  const restoreSwap = () => {
+    const rowId = swapRowId
+    if (!rowId || (setsRef.current[rowId] ?? []).some((entry) => entry.completed)) return
+    const next = { ...swaps }
+    delete next[rowId]
+    setSwaps(next)
+    saveSwaps(next)
+    const original = originalSetsRef.current[rowId]
+    if (original) setSets((previous) => ({ ...previous, [rowId]: original }))
+    setSwapRowId(null)
+    toast({ tone: 'info', title: 'Exercício original de volta', duration: 3000 })
+    focusLater(() => document.getElementById(`exercise-${rowId}`))
+  }
 
   const scrollToExercise = (rowId: string) => {
     document.getElementById(`exercise-${rowId}`)?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
@@ -589,6 +709,7 @@ export default function WorkoutExecutionPage() {
 
     setFinishing(true)
     const completedAt = new Date()
+    const swappedDone = exercises.filter((row) => row.swappedFrom && (sets[row.id] ?? []).some((entry) => entry.completed)).length
     const note = feedback.trim()
     const withFeedback = note.length > 0 || feedbackTags.length > 0
     const patch: FinishPatch = {
@@ -598,6 +719,8 @@ export default function WorkoutExecutionPage() {
       ...(withFeedback ? { feedback: note || null, feedback_tags: feedbackTags } : {}),
       // Só quando o aluno fez a versão curta (o treinador vê no histórico).
       ...(shortState ? { short_mode: true } : {}),
+      // Quantos exercícios foram trocados (e feitos) hoje; o Jean vê no histórico.
+      ...(swappedDone > 0 ? { swaps: swappedDone } : {}),
     }
     const sending = enqueueWorkoutOp(supabase, userId, { kind: 'finish', sessionId, patch })
     // Com internet, espera o envio (até 8 s) para confirmar. Sem internet, o
@@ -895,6 +1018,11 @@ export default function WorkoutExecutionPage() {
             onToggleSet={toggleSet}
             onAddSet={addSet}
             onRemoveExtra={removeExtra}
+            onSwap={
+              canOfferSwap(swapOptionsByRow[row.id] ?? [], (sets[row.id] ?? []).filter((entry) => entry.completed).length)
+                ? openSwap
+                : undefined
+            }
           />
         ))}
 
@@ -919,6 +1047,19 @@ export default function WorkoutExecutionPage() {
       </div>
 
       <ShortWorkoutSheet key={shortKey} open={shortOpen} onClose={closeShort} rows={shortRows} onConfirm={applyShort} />
+
+      {swapRowId && (
+        <SwapExerciseSheet
+          key={swapKey}
+          open
+          onClose={closeSwap}
+          originalName={baseExercises.find((row) => row.id === swapRowId)?.exercises?.name ?? 'exercício'}
+          swapped={Boolean(swaps[swapRowId])}
+          options={swapOptionsByRow[swapRowId] ?? []}
+          onPick={pickSwap}
+          onRestore={restoreSwap}
+        />
+      )}
 
       <RestTimerBar
         rest={rest}

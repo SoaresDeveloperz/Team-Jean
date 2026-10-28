@@ -1,5 +1,6 @@
 import { RESUME_WINDOW_MS } from './workouts'
 import { SHORT_STORAGE_KEY } from './short-workout'
+import { SWAP_STORAGE_KEY } from './swap-exercise'
 
 // Treino em andamento guardado no aparelho. A tabela workout_sessions não tem
 // coluna com a hora de início, então é aqui que fica o horário usado para
@@ -44,7 +45,10 @@ export function clearActiveSession(keepShort = false) {
   try {
     window.localStorage.removeItem(STORAGE_KEY)
     window.localStorage.removeItem(JOURNAL_KEY)
-    if (!keepShort) window.localStorage.removeItem(SHORT_STORAGE_KEY)
+    if (!keepShort) {
+      window.localStorage.removeItem(SHORT_STORAGE_KEY)
+      window.localStorage.removeItem(SWAP_STORAGE_KEY)
+    }
   } catch {
     // Ignora: nada a limpar.
   }

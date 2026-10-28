@@ -18,6 +18,14 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-28 — Mais dez agentes e a skill de direção de arte
+- **Pergunta:** instalar agentes e skill de repositórios públicos ([agency-agents](https://github.com/msitarzewski/agency-agents) e [taste-skill](https://github.com/Leonxlnx/taste-skill)) no projeto.
+- **Opções:** A) instalar tudo como está (mais de 250 agentes, em inglês); B) escolher e adaptar só o que falta; C) instalar no computador do dono, fora do Git.
+- **Decisão (pedido do dono):** B para os agentes e instalar a skill no projeto. Dos mais de 250 agentes, dez preenchem lacunas dos catorze que já existem (acessibilidade manual, verificação com evidência, adesão do aluno, feedback, priorização, LGPD, desempenho, dados, cobrança, Instagram). Foram reescritos em português com as regras do Team Jean e o crédito ao original (licença MIT). Os de modelo forte são `encarregado-lgpd` e `engenheiro-de-cobranca` (dinheiro e saúde).
+- **Skill:** instalada com `npx skills add Leonxlnx/taste-skill` (só `design-taste-frontend`, 2,5 MB, `skills-lock.json` guarda a versão). Os scripts só falam com bancos de imagem abertos e com um servidor local, e guardam histórico em `~/.taste-skill`. Foi pensada para páginas públicas; no app, as regras do projeto mandam (paleta, WCAG, 12 px, sem foto de banco de imagens de pessoas).
+- **Cuidados:** skill roda com as permissões do agente, então fica fixa em uma versão (o lock) e só atualiza por PR. Agentes só aparecem numa sessão nova do Claude Code.
+- **Rever quando:** a skill puxar o app para fora da identidade Team Jean ou algum dos dez agentes quase não for usado (aí sai).
+
 ## 2026-10-25 — GIFs de exercícios (biblioteca da Gym visual)
 - **Pergunta:** mostrar GIFs do movimento no treino e na biblioteca do treinador usando o dataset público [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (1.324 exercícios, GIFs 180 × 180).
 - **Licença:** o README e o LICENSE do repositório dizem que a mídia é © Gym visual, usada com permissão, e que quem reusa precisa da própria licença ([termos](https://gymvisual.com/content/3-terms-and-conditions-of-use)) e manter o crédito "© Gym visual — https://gymvisual.com/".

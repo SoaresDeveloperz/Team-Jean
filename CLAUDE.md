@@ -46,6 +46,18 @@
 - `mesa-de-design`: discute uma ideia de interface com as vozes dos especialistas de front e da voz-do-usuario antes de implementar. Passe as opções sem dizer qual você prefere. Decisão de rumo vai para o `DECISOES.md`.
 - `especialista-ciber`: segurança. Só lê e aponta. Chame antes de lançar função que mexa em login, permissões, dados de saúde, fotos, mensalidade ou push, e de tempos em tempos para auditar o app, o banco e as dependências.
 - `ajudante-rapido`, `especialista`, `front-leve` e `front-dificil`: ver "Economia de tokens".
+- `auditor-acessibilidade`: WCAG além do axe (leitor de tela, teclado, zoom, alvos de toque). Chame depois de mudar uma tela e antes de lançar.
+- `verificador-de-realidade`: começa em "AINDA NÃO" e exige evidência. Chame antes de mesclar PR grande, de aplicar SQL em produção e de dizer ao dono que algo funciona.
+- `engenheiro-de-motivacao`: lembretes, avisos e comemorações que mantêm o aluno treinando sem culpa. Chame ao mexer em notificações, tela Hoje, conquistas e mensagem para quem sumiu.
+- `sintetizador-de-feedback`: transforma recados e pedidos dos alunos em temas e prioridades, sem expor ninguém.
+- `priorizador`: ordena o que fazer primeiro por impacto, esforço e risco. Chame quando houver mais coisas do que tempo.
+- `encarregado-lgpd`: dado de saúde, consentimento, terceiros, exclusão de conta e incidente. Só lê e aponta. Chame antes de coletar ou mostrar dado novo e ao incluir serviço externo.
+- `medidor-de-desempenho`: mede a velocidade no celular fraco, com números. Chame antes de lançar 3D, imagens ou GIFs e quando o app parecer pesado.
+- `analista-de-dados`: métricas e painéis do treinador (adesão, quem sumiu, mensalidades). Não consulta o banco de produção.
+- `engenheiro-de-cobranca`: mensalidade e PIX (dinheiro contado uma vez só, sem constrangimento). Só lê e aponta. Chame ao mexer em valores, vencimentos e financeiro.
+- `curador-de-instagram`: conteúdo para o Jean divulgar a consultoria. Não mexe no app.
+- Os dez últimos vêm do [agency-agents](https://github.com/msitarzewski/agency-agents) (MIT), adaptados.
+- Skill `design-taste-frontend` ([taste-skill](https://github.com/Leonxlnx/taste-skill), MIT): direção de arte para páginas públicas e telas novas. Use para páginas de divulgação e para rever telas, mas as regras do projeto mandam: paleta Team Jean, WCAG 2.1 AA, letra de pelo menos 12 px, fundo escuro, e nunca foto de banco de imagens de pessoas (LGPD e confiança). Rode sempre os roteiros axe depois de mudar uma tela.
 
 ## Como tomar uma decisão importante
 Vale para decisões que mudam o rumo do app ou são difíceis de desfazer (preço, serviço externo, tecnologia, banco de dados, funções grandes). Decisão pequena não precisa disso.

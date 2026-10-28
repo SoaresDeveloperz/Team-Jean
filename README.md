@@ -272,11 +272,20 @@ treino aberto fica guardado no aparelho e pode ser reaberto offline.
 
 ## Claude Code: agentes e Supabase
 
-- [`.claude/agents/`](.claude/agents) traz catorze agentes (revisor, testador,
-  conselheiro, advogado do diabo, voz do usuário, ajudante rápido, especialista,
-  front leve, front difícil, animador, animador pro, revisor visual, mesa de
-  design e especialista em cibersegurança). O [`CLAUDE.md`](CLAUDE.md) diz quando usar cada um, e as
+- [`.claude/agents/`](.claude/agents) traz vinte e quatro agentes. Os catorze
+  primeiros: revisor, testador, conselheiro, advogado do diabo, voz do usuário,
+  ajudante rápido, especialista, front leve, front difícil, animador, animador
+  pro, revisor visual, mesa de design e especialista em cibersegurança. Os dez
+  novos (adaptados do [agency-agents](https://github.com/msitarzewski/agency-agents),
+  licença MIT): auditor de acessibilidade, verificador de realidade, engenheiro
+  de motivação, sintetizador de feedback, priorizador, encarregado de LGPD,
+  medidor de desempenho, analista de dados, engenheiro de cobrança e curador de
+  Instagram. O [`CLAUDE.md`](CLAUDE.md) diz quando usar cada um, e as
   decisões importantes ficam em [`DECISOES.md`](DECISOES.md).
+- [`.claude/skills/design-taste-frontend`](.claude/skills/design-taste-frontend)
+  é a skill de direção de arte [taste-skill](https://github.com/Leonxlnx/taste-skill)
+  (licença MIT). No Team Jean as regras do projeto (paleta, WCAG, letra mínima,
+  LGPD) valem sempre mais que ela.
 - [`.mcp.json`](.mcp.json) liga o MCP oficial do Supabase ao projeto, em modo só
   leitura e **sem SQL**: dá para ver a estrutura do banco, os logs e os alertas
   de segurança, mas não as fichas de saúde, medidas, fotos e recados dos alunos

@@ -23,6 +23,8 @@ const eslintConfig = defineConfig([
     // (o scripts/gerar-biblioteca-exercicios.mjs é do app e entra no lint)
     "scripts/src/**",
     "attached_assets/**",
+    // Agentes e skills de terceiros (ex.: taste-skill) não fazem parte do app.
+    ".claude/**",
   ]),
 ]);
 

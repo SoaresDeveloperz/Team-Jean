@@ -33,6 +33,7 @@ import { Body3D } from '@/components/fitness/Body3D'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { BuilderExerciseCard, type BuilderExercise, type BuilderSet } from '@/components/admin/BuilderExerciseCard'
 import { ExercisePicker } from '@/components/admin/ExercisePicker'
+import { SWAP_MAX_ALTERNATIVES } from '@/lib/swap-exercise'
 import { ReorderList } from '@/components/admin/ReorderList'
 import { WorkoutHistory, groupHistory, type HistorySession, type HistorySet } from '@/components/admin/WorkoutHistory'
 import { Alert } from '@/components/ui/alert'
@@ -47,6 +48,8 @@ import { useToast } from '@/components/ui/toast'
 import { Eyebrow } from '@/components/ui/tile'
 
 type TemplateWithMeta = { id: string; name: string }
+const NO_EXERCISES: ReadonlySet<string> = new Set()
+
 type BuilderMode = { kind: 'workout' | 'template'; editingId: string | null }
 type Tab = 'students' | 'templates'
 type SummaryRow = Pick<PrescribedExercise, 'id' | 'planned_sets' | 'sets_count' | 'target_reps' | 'exercises'> & {
@@ -169,6 +172,9 @@ export default function AdminWorkoutsPage() {
   const [openingId, setOpeningId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showExPicker, setShowExPicker] = useState(false)
+  // supabase/trocar-exercicio.sql já rodou? (colunas "essential" e "alternatives")
+  const [swapSql, setSwapSql] = useState(false)
+  const [altKey, setAltKey] = useState<string | null>(null)
   const keyCounter = useRef(0)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -183,6 +189,20 @@ export default function AdminWorkoutsPage() {
   const [confirmBusy, setConfirmBusy] = useState(false)
 
   const reload = () => setReloadKey((key) => key + 1)
+
+  useEffect(() => {
+    let active = true
+    void supabase
+      .from('workout_template_exercises')
+      .select('essential, alternatives')
+      .limit(1)
+      .then(({ error }) => {
+        if (active) setSwapSql(!error)
+      })
+    return () => {
+      active = false
+    }
+  }, [supabase])
 
   useEffect(() => {
     if (searchParams.get('aluno') || searchParams.get('novo')) router.replace(pathname, { scroll: false })
@@ -388,6 +408,8 @@ export default function AdminWorkoutsPage() {
           secondary: typeof secondary === 'string' ? secondary : null,
           notes: row.notes || '',
           planned_sets: toBuilderSets(plannedSets.length > 0 ? plannedSets : createDefaultPlannedSets()),
+          essential: Boolean(row.essential),
+          alternatives: Array.isArray(row.alternatives) ? row.alternatives : [],
         }
       }),
     )
@@ -415,6 +437,8 @@ export default function AdminWorkoutsPage() {
       secondary: typeof exercise.secondary_muscle === 'string' ? exercise.secondary_muscle : null,
       notes: '',
       planned_sets: toBuilderSets(createDefaultPlannedSets()),
+      essential: false,
+      alternatives: [],
     }))
     setSelectedExercises((items) => [...items, ...added])
     setReordering(false)
@@ -427,6 +451,24 @@ export default function AdminWorkoutsPage() {
           ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 260)
     }
+  }
+
+  const exerciseNames = useMemo(() => new Map(exerciseLibrary.map((exercise) => [exercise.id, exercise.name])), [exerciseLibrary])
+  const altItem = altKey ? (selectedExercises.find((item) => item.key === altKey) ?? null) : null
+  // Fora da lista: o próprio exercício e os que já são alternativas.
+  const altLibrary = useMemo(
+    () => (altItem ? exerciseLibrary.filter((exercise) => exercise.id !== altItem.exercise_id && !altItem.alternatives.includes(exercise.id)) : exerciseLibrary),
+    [exerciseLibrary, altItem],
+  )
+  const closeAltPicker = useCallback(() => setAltKey(null), [])
+  const handleAddAlternatives = (picked: Exercise[]) => {
+    if (altKey) {
+      updateExercise(altKey, (item) => ({
+        ...item,
+        alternatives: [...new Set([...item.alternatives, ...picked.map((exercise) => exercise.id)])].slice(0, SWAP_MAX_ALTERNATIVES),
+      }))
+    }
+    setAltKey(null)
   }
 
   const handleMoveExercise = useCallback((index: number, direction: -1 | 1) => {
@@ -486,6 +528,8 @@ export default function AdminWorkoutsPage() {
       target_reps: plannedSets[0]?.reps || '8-12',
       planned_sets: plannedSets,
       notes: item.notes.trim() || null,
+      // Só depois do trocar-exercicio.sql: sem as colunas o salvamento falharia.
+      ...(swapSql ? { essential: item.essential, alternatives: item.alternatives } : {}),
     }
   }
 
@@ -741,6 +785,7 @@ export default function AdminWorkoutsPage() {
             target_reps: row.target_reps,
             planned_sets: row.planned_sets,
             notes: row.notes,
+            ...(swapSql ? { essential: Boolean(row.essential), alternatives: row.alternatives ?? [] } : {}),
           })),
         )
         if (error) {
@@ -1320,6 +1365,9 @@ export default function AdminWorkoutsPage() {
                         onChange={updateExercise}
                         onRemove={removeExercise}
                         createKey={createKey}
+                        swapEnabled={swapSql}
+                        exerciseNames={exerciseNames}
+                        onPickAlternatives={setAltKey}
                       />
                     </m.div>
                   ))}
@@ -1367,6 +1415,18 @@ export default function AdminWorkoutsPage() {
         library={exerciseLibrary}
         inWorkout={inWorkout}
         onAdd={handleAddExercises}
+      />
+
+      <ExercisePicker
+        open={altKey !== null}
+        onClose={closeAltPicker}
+        library={altLibrary}
+        inWorkout={NO_EXERCISES}
+        onAdd={handleAddAlternatives}
+        title="Alternativas de troca"
+        description="Exercícios que o aluno pode fazer no lugar, se precisar trocar."
+        confirmLabel="Usar como alternativa"
+        max={SWAP_MAX_ALTERNATIVES - (altItem?.alternatives.length ?? 0)}
       />
 
       {/* Atribuir modelo */}

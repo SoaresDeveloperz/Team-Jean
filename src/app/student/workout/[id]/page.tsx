@@ -763,7 +763,7 @@ export default function WorkoutExecutionPage() {
       // Quantos exercícios foram trocados (e feitos) hoje; o Jean vê no histórico.
       ...(swappedDone > 0 ? { swaps: swappedDone } : {}),
     }
-    const sending = enqueueWorkoutOp(supabase, userId, { kind: 'finish', sessionId, patch })
+    const sending = enqueueWorkoutOp(supabase, userId, { kind: 'finish', sessionId, patch, workoutId })
     // Com internet, espera o envio (até 8 s) para confirmar. Sem internet, o
     // treino fica na fila e sobe sozinho depois.
     await Promise.race([sending, wait(8000)])

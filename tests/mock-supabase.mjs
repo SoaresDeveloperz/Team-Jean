@@ -215,6 +215,11 @@ let curtoEnabled = true
 // /__trocar/seed prepara o Treino A (alternativa do Jean, essencial sem alternativa) e o D (essencial).
 let trocarEnabled = true
 
+// --- Rotina da semana (supabase/rotina-semanal.sql) ---
+// /__rotina/off simula o banco sem o SQL (sem weekday e position);
+// /__rotina/seed?a=N&b=N&c=N marca o dia (0 = domingo ... 6) dos treinos A, B e C da Maria.
+let rotinaEnabled = true
+
 // --- Sinal fraco ---
 // /__lento/on faz o servidor "pendurar" a leitura do treino (conecta e não responde).
 let lentoEnabled = false
@@ -258,6 +263,7 @@ function columnsOf(table) {
   if (table === 'workout_sessions' && curtoEnabled) columns = [...columns, 'short_mode']
   if (table === 'workout_sessions' && trocarEnabled) columns = [...columns, 'swaps']
   if (SWAP_TABLES.includes(table) && trocarEnabled) columns = [...columns, 'essential', 'alternatives']
+  if (table === 'assigned_workouts' && rotinaEnabled) columns = [...columns, 'weekday', 'position']
   return columns
 }
 // Colunas que o banco real não teria sem o gestao.sql/profile.sql somem das respostas.
@@ -667,6 +673,24 @@ http
       curtoEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { curtoEnabled })
     }
+    if (url.pathname === '/__rotina/off' || url.pathname === '/__rotina/on') {
+      rotinaEnabled = url.pathname.endsWith('/on')
+      return send(res, 200, { rotinaEnabled })
+    }
+    if (url.pathname === '/__rotina/seed') {
+      // limpar=1: nada concluído nesta semana (os treinos antigos da Maria vão para 30 dias atrás).
+      if (url.searchParams.get('limpar') === '1') {
+        for (const session of workout_sessions) if (session.student_id === 'u-student' && session.status === 'completed') session.completed_at = iso(-30)
+      }
+      for (const [id, key] of [['w-a', 'a'], ['w-b', 'b'], ['w-c', 'c']]) {
+        const workout = assigned_workouts.find((item) => item.id === id)
+        if (!workout) continue
+        const value = url.searchParams.get(key)
+        workout.weekday = value === null || value === '' ? null : Number(value)
+        workout.position = ['w-a', 'w-b', 'w-c'].indexOf(id) + 1
+      }
+      return send(res, 200, { ok: true })
+    }
     if (url.pathname === '/__lento/on' || url.pathname === '/__lento/off') {
       lentoEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { lentoEnabled })
@@ -786,6 +810,7 @@ http
         notifications,
         workout_sessions,
         session_sets,
+        assigned_workouts,
         assigned_workout_exercises,
         push_subscriptions,
         anamneses,

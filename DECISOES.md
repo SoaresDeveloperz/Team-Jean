@@ -18,6 +18,13 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-29 — Rotina da semana: dia de cada treino, reinício semanal e ordem editável (pedido do Jean)
+- **Pergunta:** o Jean pediu (1) treino ligado ao dia da semana, (2) a rotação reiniciar na virada da semana (quem não fez o último treino volta ao primeiro, o de segunda, em vez de seguir do último) e (3) poder mudar a ordem dos treinos no app.
+- **Opções:** A) só dia da semana; B) só reinício semanal da rotação + ordem editável; C) dois modos; D) uma regra só, com ordem (`position`) e dia opcional (`weekday`) no mesmo treino.
+- **O que cada agente disse:** conselheiro: D (uma regra só; o treino perdido não some nem vira "atrasado"; qualquer treino pode ser feito fora do dia; semana começa na segunda pelo dia local; antes do SQL vale a regra atual com reinício semanal). Voz do usuário: textos sem culpa ("Hoje é dia de descansar", "Descansar também conta.", "Semana nova!"), botão "Adiantar" no descanso, botões subir/descer no construtor. Advogado do diabo: contar "feito na semana" por id E por nome (o treinador refaz o treino e o id muda), copiar dia e ordem ao refazer, tratar coluna ausente sem quebrar a tela Hoje, uma só função pura para decidir o "próximo" (Hoje e Semana), contar o que está na fila do aparelho, nunca comparar datas por texto.
+- **Decisão:** D, em `src/lib/week-plan.ts` (pura, 38 verificações em `tests/contas-semana.mjs`) e `supabase/rotina-semanal.sql` (`weekday`, `position`, idempotente). Regras: em andamento primeiro; treino marcado para hoje ainda não feito na semana; em dia sem treino marcado, descanso com "Adiantar" (próximo dia marcado, depois os sem dia, por último os de dias que passaram); sem dias marcados, o primeiro da ordem ainda não feito na semana; semana completa vira "bônus". Perdido = "Ainda dá tempo esta semana", some na segunda.
+- **Rever quando:** o Jean tiver aluno que treina menos vezes do que tem treinos (o último nunca aparece com o reinício na segunda: aí vale uma chave por aluno), ou pedir agenda rígida (perdeu, perdeu).
+
 ## 2026-10-29 — Animações em CSS e acesso da IA ao banco
 - **Pergunta (animações):** o app parece "sem animação"; o que deve virar CSS e o que fica no Framer Motion?
 - **Opções:** A) microinterações simples em CSS, Framer só para arrastar, reordenar, layout e saídas; B) manter tudo; C) migrar tudo.

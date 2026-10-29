@@ -6,7 +6,8 @@ import { m } from 'framer-motion'
 import { ArrowUpRight, Dumbbell } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
-import { pickNextWorkout } from '@/lib/workouts'
+import { WEEKDAY_NAMES, WEEKDAY_SHORT, buildLastDone, completionOf, isWeekday, orderWorkouts, planWeek, workoutWeekState } from '@/lib/week-plan'
+import { queuedCompletions } from '@/lib/workout-sync'
 import { readActiveSession } from '@/lib/active-session'
 import { relativeDay } from '@/lib/stats'
 import { cn } from '@/lib/cn'
@@ -21,12 +22,14 @@ type RoutineWorkout = AssignedWorkout & {
   muscles: string[]
   lastDoneAt: string | null
   inProgress: boolean
+  weekState: 'done' | 'today' | 'pending' | 'missed'
 }
 
 export default function StudentWeekPage() {
   const [supabase] = useState(() => createClient())
   const [workouts, setWorkouts] = useState<RoutineWorkout[] | null>(null)
   const [nextWorkoutId, setNextWorkoutId] = useState<string | null>(null)
+  const [hasAgenda, setHasAgenda] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
 
@@ -50,7 +53,7 @@ export default function StudentWeekPage() {
           .order('name', { ascending: true }),
         supabase
           .from('workout_sessions')
-          .select('assigned_workout_id, completed_at')
+          .select('assigned_workout_id, completed_at, assigned_workouts(name)')
           .eq('student_id', user.id)
           .eq('status', 'completed')
           .order('completed_at', { ascending: false })
@@ -87,24 +90,29 @@ export default function StudentWeekPage() {
         }
       }
 
-      const lastDone = new Map<string, string>()
-      for (const session of (sessionsResult.data ?? []) as { assigned_workout_id: string; completed_at: string | null }[]) {
-        if (session.completed_at && !lastDone.has(session.assigned_workout_id)) {
-          lastDone.set(session.assigned_workout_id, session.completed_at)
-        }
-      }
+      // Servidor + o que foi finalizado no aparelho e ainda não subiu.
+      const lastDone = buildLastDone([
+        ...((sessionsResult.data ?? []) as unknown as { assigned_workout_id: string; completed_at: string | null; assigned_workouts?: { name: string } | null }[]).flatMap((session) =>
+          session.completed_at ? [{ workoutId: session.assigned_workout_id, completedAt: session.completed_at, workoutName: session.assigned_workouts?.name }] : [],
+        ),
+        ...queuedCompletions(user.id).map((item) => ({ ...item, workoutName: workoutRows.find((workout) => workout.id === item.workoutId)?.name })),
+      ])
       const inProgressId = readActiveSession(user.id)?.workoutId ?? null
+      const now = new Date()
 
-      const rows = workoutRows.map((workout) => ({
+      const rows = orderWorkouts(workoutRows).map((workout) => ({
         ...workout,
         exerciseCount: exercisesByWorkout.get(workout.id)?.count ?? 0,
         muscles: [...(exercisesByWorkout.get(workout.id)?.muscles ?? [])],
-        lastDoneAt: lastDone.get(workout.id) ?? null,
+        lastDoneAt: completionOf(workout, lastDone) ?? null,
         inProgress: workout.id === inProgressId,
+        weekState: workoutWeekState(workout, lastDone, now),
       }))
+      const plan = planWeek(rows, lastDone, now, inProgressId)
       setLoadError('')
       setWorkouts(rows)
-      setNextWorkoutId(pickNextWorkout(rows, lastDone, inProgressId)?.id ?? null)
+      setHasAgenda(rows.some((workout) => isWeekday(workout.weekday)))
+      setNextWorkoutId(plan ? (plan.kind === 'rest' ? plan.suggestion.id : plan.workout.id) : null)
     }
 
     void load()
@@ -126,7 +134,11 @@ export default function StudentWeekPage() {
           <h1 id="routine-title" className="mt-1 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">
             Seus treinos
           </h1>
-          <p className="mt-2 text-sm text-zinc-400">Siga a ordem: o próximo da rotina fica em destaque.</p>
+          <p className="mt-2 text-sm text-zinc-400">
+            {hasAgenda
+              ? 'A semana começa na segunda. O treino da vez fica em destaque; qualquer um pode ser feito fora do dia.'
+              : 'Siga a ordem: o próximo da rotina fica em destaque. A semana começa na segunda.'}
+          </p>
         </div>
 
         {loadError && (
@@ -169,7 +181,7 @@ export default function StudentWeekPage() {
                       )}
                       aria-hidden="true"
                     >
-                      {letter}
+                      {isWeekday(workout.weekday) ? WEEKDAY_SHORT[workout.weekday] : letter}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
@@ -184,7 +196,12 @@ export default function StudentWeekPage() {
                           </span>
                         )}
                         <span className="text-xs font-semibold text-zinc-500">
-                          {workout.lastDoneAt ? `Feito ${relativeDay(new Date(workout.lastDoneAt))}` : 'Ainda não feito'}
+                          {isWeekday(workout.weekday) ? `${WEEKDAY_NAMES[workout.weekday]} · ` : ''}
+                          {workout.lastDoneAt
+                            ? `Feito ${relativeDay(new Date(workout.lastDoneAt))}`
+                            : workout.weekState === 'missed'
+                              ? 'Ainda dá tempo esta semana'
+                              : 'Ainda não feito'}
                         </span>
                       </span>
                       <span className="mt-1 block font-display text-2xl font-bold uppercase leading-[0.95] text-white">

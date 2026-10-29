@@ -41,6 +41,8 @@ const SUITES = {
   medir: ['tests/medir-treino.cjs'],
   // Sinal fraco: servidor pendurado, treino abre pela cópia do aparelho.
   lento: ['tests/e2e-lento.cjs'],
+  // Rotina da semana: dia de cada treino, reinício semanal, ordem editável (contas puras + telas).
+  rotina: ['tests/contas-semana.mjs', 'tests/e2e-rotina.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],
@@ -55,6 +57,7 @@ const SUITES = {
   'exercicios-a11y': ['tests/a11y/exercicios-a11y.cjs'],
   'curto-a11y': ['tests/a11y/curto-a11y.cjs'],
   'trocar-a11y': ['tests/a11y/trocar-a11y.cjs'],
+  'rotina-a11y': ['tests/a11y/rotina-a11y.cjs'],
 }
 
 const vapid = webpush.generateVAPIDKeys()

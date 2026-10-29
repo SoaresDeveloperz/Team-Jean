@@ -296,6 +296,25 @@ exercício não aparecem, e não há "recorde" falso.
 - **Contas:** `src/lib/swap-exercise.ts` (puras, `tests/contas-trocar.mjs`).
   Telas: roteiros `trocar` e `trocar-a11y`; banco: `tests/sql/rls-trocar.sql`.
 
+### Rotina da semana
+
+O treinador escolhe, para cada treino do aluno, o **dia da semana** (ou "sem dia fixo") e a
+**ordem**, em Treinos → aluno (seletor de dia e botões subir/descer; no construtor também há
+o dia). A tela Hoje do aluno segue uma regra só:
+
+- A semana começa na **segunda** e o "já fez nesta semana" zera na virada: quem não fez o
+  último treino volta ao primeiro da ordem (nada de "atrasado").
+- Dia marcado: Hoje mostra o treino do dia; em dia sem treino marcado, "Hoje é dia de
+  descansar" com **Adiantar este treino**. Qualquer treino pode ser feito fora do dia.
+- Sem dias marcados: o primeiro da ordem ainda não feito nesta semana. Semana completa vira
+  "Treinar de novo (bônus)".
+- Conta o que foi feito no servidor e o que ainda está na fila do aparelho, por id e por nome
+  (se o treinador refizer o treino, o que já foi feito na semana continua valendo).
+- **Banco:** rode [`supabase/rotina-semanal.sql`](supabase/rotina-semanal.sql) (idempotente).
+  Antes disso o reinício semanal já vale (pela ordem do nome); o construtor só não mostra dia
+  e ordem. **Contas:** `src/lib/week-plan.ts` (`tests/contas-semana.mjs`); telas: roteiros
+  `rotina` e `rotina-a11y`; banco: `tests/sql/rls-rotina.sql`.
+
 ## Testes e CI
 
 - `pnpm test:build && pnpm test:e2e`: sobe um Supabase falso

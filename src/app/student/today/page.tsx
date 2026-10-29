@@ -6,7 +6,9 @@ import { m } from 'framer-motion'
 import { Check, ChevronDown, ChevronRight, Clock, Dumbbell, Flame, Hourglass, Megaphone, Moon, Play, RotateCcw, Sparkles, Target } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
-import { getPlannedSets, getSetsCount, pickNextWorkout } from '@/lib/workouts'
+import { getPlannedSets, getSetsCount } from '@/lib/workouts'
+import { WEEKDAY_NAMES, WEEKDAY_SHORT, buildLastDone, completionOf, doneThisWeek, isWeekday, orderWorkouts, planWeek, workoutWeekState, type WeekPlan } from '@/lib/week-plan'
+import { queuedCompletions } from '@/lib/workout-sync'
 import { readActiveSession } from '@/lib/active-session'
 import { canOfferShort } from '@/lib/short-workout'
 import { REGION_LABELS, computeRecovery, loadFill, muscleLoad, recoveryFill, splitSecondary, type MuscleRegion } from '@/lib/muscles'
@@ -30,6 +32,8 @@ type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { seco
 type TodayData = {
   firstName: string
   workouts: AssignedWorkout[]
+  // Plano da semana (qual treino mostrar agora); `next` é o treino do cartão principal.
+  plan: WeekPlan<AssignedWorkout> | null
   next: AssignedWorkout | null
   inProgress: boolean
   lastDoneByWorkout: Map<string, string>
@@ -83,7 +87,7 @@ export default function StudentTodayPage() {
           .order('name', { ascending: true }),
         supabase
           .from('workout_sessions')
-          .select('id, assigned_workout_id, completed_at')
+          .select('id, assigned_workout_id, completed_at, assigned_workouts(name)')
           .eq('student_id', user.id)
           .eq('status', 'completed')
           .order('completed_at', { ascending: false })
@@ -100,17 +104,17 @@ export default function StudentTodayPage() {
 
       const workouts = (workoutsResult.data ?? []) as AssignedWorkout[]
       const sessions = (
-        (sessionsResult.data ?? []) as { id: string; assigned_workout_id: string; completed_at: string | null }[]
-      ).filter((session): session is { id: string; assigned_workout_id: string; completed_at: string } => Boolean(session.completed_at))
+        (sessionsResult.data ?? []) as unknown as { id: string; assigned_workout_id: string; completed_at: string | null; assigned_workouts?: { name: string } | null }[]
+      ).filter((session): session is { id: string; assigned_workout_id: string; completed_at: string; assigned_workouts?: { name: string } | null } => Boolean(session.completed_at))
 
-      const lastDoneByWorkout = new Map<string, string>()
-      for (const session of sessions) {
-        if (!lastDoneByWorkout.has(session.assigned_workout_id)) {
-          lastDoneByWorkout.set(session.assigned_workout_id, session.completed_at)
-        }
-      }
+      // Servidor + o que foi finalizado no aparelho e ainda não subiu (conta como feito na semana).
+      const lastDoneByWorkout = buildLastDone([
+        ...sessions.map((session) => ({ workoutId: session.assigned_workout_id, completedAt: session.completed_at, workoutName: session.assigned_workouts?.name })),
+        ...queuedCompletions(user.id).map((item) => ({ ...item, workoutName: workouts.find((workout) => workout.id === item.workoutId)?.name })),
+      ])
       const inProgressWorkoutId = readActiveSession(user.id)?.workoutId ?? null
-      const next = workouts.length > 0 ? pickNextWorkout(workouts, lastDoneByWorkout, inProgressWorkoutId) : null
+      const plan = planWeek(workouts, lastDoneByWorkout, new Date(), inProgressWorkoutId)
+      const next = plan ? (plan.kind === 'rest' ? plan.suggestion : plan.workout) : null
       const recentSessions = sessions.filter((session) => Date.now() - new Date(session.completed_at).getTime() < RECOVERY_WINDOW_MS)
 
       const [exercisesResult, recentSetsResult] = await Promise.all([
@@ -153,8 +157,9 @@ export default function StudentTodayPage() {
       setData({
         firstName: profile?.full_name?.trim().split(' ')[0] || 'Atleta',
         workouts,
+        plan,
         next,
-        inProgress: next !== null && next.id === inProgressWorkoutId,
+        inProgress: plan?.kind === 'in-progress',
         lastDoneByWorkout,
         completedDates: sessions.map((session) => new Date(session.completed_at)),
         exercises: (exercisesResult.data ?? []) as ExerciseRow[],
@@ -252,14 +257,24 @@ export default function StudentTodayPage() {
 
   const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
   const next = data.next
-  const lastDone = next ? data.lastDoneByWorkout.get(next.id) : undefined
+  const lastDone = next ? completionOf(next, data.lastDoneByWorkout) : undefined
   const latestNotice = unseen[0] ?? notices[0]
   const goalProgress = Math.min(1, derived.weekCount / Math.max(1, weeklyGoal))
-  const doneForToday = derived.trainedToday && !data.inProgress
+  // "Repetir" só faz sentido na rotação sem dias (o próximo treino já tem dia, ou é descanso, nos outros casos).
+  const doneForToday = derived.trainedToday && !data.inProgress && data.plan?.kind === 'next'
+  // Dia de descanso (ou semana completa): o cartão mostra o que dá para adiantar, com botão discreto.
+  const restPlan = data.plan?.kind === 'rest' && !data.inProgress ? data.plan : null
+  const weekDone = data.plan?.kind === 'week-done' && !data.inProgress
+  const softCta = doneForToday || Boolean(restPlan) || weekDone
+  const suggestionDay = restPlan && isWeekday(restPlan.suggestion.weekday) ? WEEKDAY_NAMES[restPlan.suggestion.weekday] : null
 
   let subtitle = 'Seu treinador ainda não liberou um treino. Aproveite para recuperar.'
   if (data.inProgress) subtitle = 'Você tem um treino em andamento. Quer terminar?'
-  else if (derived.trainedToday) subtitle = 'Treino de hoje feito. Descansar também é treinar.'
+  else if (data.plan?.kind === 'rest') subtitle = data.plan.doneToday ? 'Treino de hoje feito. Descansar também é treinar.' : 'Hoje não tem treino marcado.'
+  else if (derived.trainedToday && data.plan?.kind === 'next') subtitle = 'Treino de hoje feito. Descansar também é treinar.'
+  else if (data.plan?.kind === 'week-done') subtitle = 'Semana completa! Parabéns.'
+  else if (data.plan?.kind === 'today' && next) subtitle = `Hoje é dia de ${next.name}.`
+  else if (next && data.workouts.every((workout) => !doneThisWeek(completionOf(workout, data.lastDoneByWorkout), new Date()))) subtitle = `Semana nova! Começa pelo ${next.name}.`
   else if (next) subtitle = `Bora pro ${next.name}?`
 
   return (
@@ -286,7 +301,7 @@ export default function StudentTodayPage() {
                   'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-black uppercase tracking-[0.1em]',
                   data.inProgress
                     ? 'border-gold/30 bg-gold-soft text-gold'
-                    : doneForToday
+                    : softCta
                       ? 'border-line-strong bg-white/5 text-zinc-300'
                       : 'border-brand/30 bg-brand-soft text-brand',
                 )}
@@ -294,6 +309,14 @@ export default function StudentTodayPage() {
                 {data.inProgress ? (
                   <>
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" /> Em andamento
+                  </>
+                ) : restPlan ? (
+                  <>
+                    <Moon className="h-3 w-3" aria-hidden="true" /> {restPlan.doneToday ? 'Treino de hoje feito' : 'Dia de descanso'}
+                  </>
+                ) : weekDone ? (
+                  <>
+                    <Sparkles className="h-3 w-3" aria-hidden="true" /> Semana completa!
                   </>
                 ) : doneForToday ? (
                   <>
@@ -306,8 +329,14 @@ export default function StudentTodayPage() {
                 )}
               </span>
               <h2 className="mt-3 font-display text-[2.1rem] font-bold uppercase leading-[0.92]">{next.name}</h2>
-              <p className="mt-2 text-xs text-zinc-500">
-                {lastDone ? `Feito pela última vez ${relativeDay(new Date(lastDone))}` : 'Hoje é um bom dia para este treino'}
+              <p className="mt-2 text-xs text-zinc-400">
+                {restPlan
+                  ? `Descansar também conta.${suggestionDay ? ` Próximo: ${suggestionDay}.` : ''}`
+                  : weekDone
+                    ? 'Você fez todos os treinos desta semana. Treinar de novo é bônus.'
+                    : lastDone
+                      ? `Feito pela última vez ${relativeDay(new Date(lastDone))}`
+                      : 'Hoje é um bom dia para este treino'}
               </p>
             </div>
             <div className="w-[40%] max-w-[160px] shrink-0">
@@ -347,7 +376,7 @@ export default function StudentTodayPage() {
                 href={`/student/workout/${next.id}`}
                 className={cn(
                   'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-base font-bold transition',
-                  doneForToday
+                  softCta
                     ? 'border border-line-strong bg-white/5 text-white hover:bg-white/10'
                     : 'bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,0.12)] hover:bg-zinc-200',
                 )}
@@ -355,6 +384,14 @@ export default function StudentTodayPage() {
                 {data.inProgress ? (
                   <>
                     <RotateCcw className="h-5 w-5" aria-hidden="true" /> Continuar treino
+                  </>
+                ) : restPlan ? (
+                  <>
+                    <Play className="h-5 w-5 fill-current" aria-hidden="true" /> Adiantar este treino
+                  </>
+                ) : weekDone ? (
+                  <>
+                    <RotateCcw className="h-5 w-5" aria-hidden="true" /> Treinar de novo (bônus)
                   </>
                 ) : doneForToday ? (
                   <>
@@ -367,7 +404,7 @@ export default function StudentTodayPage() {
                 )}
               </Link>
             </m.div>
-            {derived.offerShort && !data.inProgress && !doneForToday && (
+            {derived.offerShort && !data.inProgress && !doneForToday && !weekDone && !restPlan && (
               <Link
                 href={`/student/workout/${next.id}?curto=1`}
                 className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line-strong text-sm font-bold text-zinc-200 transition hover:bg-white/5"
@@ -484,9 +521,10 @@ export default function StudentTodayPage() {
             </Link>
           </div>
           <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">
-            {data.workouts.map((workout, index) => {
+            {orderWorkouts(data.workouts).map((workout, index) => {
               const isNext = workout.id === next?.id
-              const done = data.lastDoneByWorkout.get(workout.id)
+              const done = completionOf(workout, data.lastDoneByWorkout)
+              const weekState = workoutWeekState(workout, data.lastDoneByWorkout, new Date())
               return (
                 <li key={workout.id} className="w-[62%] max-w-[220px] shrink-0 snap-start">
                   <Link
@@ -498,16 +536,19 @@ export default function StudentTodayPage() {
                   >
                     <span
                       className={cn(
-                        'grid h-10 w-10 place-items-center rounded-xl font-display text-xl font-bold',
+                        'grid h-10 min-w-10 place-items-center self-start rounded-xl px-2 font-display text-xl font-bold',
                         isNext ? 'bg-brand text-black' : 'bg-white/[0.06] text-zinc-300',
                       )}
                       aria-hidden="true"
                     >
-                      {workoutLetter(index)}
+                      {isWeekday(workout.weekday) ? WEEKDAY_SHORT[workout.weekday] : workoutLetter(index)}
                     </span>
-                    <span className="line-clamp-2 text-sm font-bold leading-snug text-white">{workout.name}</span>
-                    <span className="mt-auto text-xs text-zinc-500">
-                      {done ? `Feito ${relativeDay(new Date(done))}` : 'Ainda não feito'}
+                    <span className="line-clamp-2 text-sm font-bold leading-snug text-white">
+                      {isWeekday(workout.weekday) && <span className="sr-only">{WEEKDAY_NAMES[workout.weekday]}: </span>}
+                      {workout.name}
+                    </span>
+                    <span className="mt-auto text-xs text-zinc-400">
+                      {done ? `Feito ${relativeDay(new Date(done))}` : weekState === 'missed' ? 'Ainda dá tempo esta semana' : 'Ainda não feito'}
                     </span>
                   </Link>
                 </li>

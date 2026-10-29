@@ -45,6 +45,9 @@ export type AssignedWorkout = {
   student_id: string
   name: string
   is_current: boolean
+  // supabase/rotina-semanal.sql: dia da semana (0 = domingo ... 6 = sábado) e ordem; ausentes antes do SQL.
+  weekday?: number | null
+  position?: number | null
   created_at: string
   profiles?: Pick<Profile, 'full_name' | 'email'> | null
 }

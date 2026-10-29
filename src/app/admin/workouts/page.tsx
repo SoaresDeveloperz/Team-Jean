@@ -7,7 +7,9 @@ import { AnimatePresence, m } from 'framer-motion'
 import {
   Archive,
   ArchiveRestore,
+  ArrowDown,
   ArrowDownUp,
+  ArrowUp,
   Check,
   ChevronDown,
   FolderKanban,
@@ -21,6 +23,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { WEEKDAY_NAMES, WEEKDAY_ORDER, isWeekday, orderWorkouts } from '@/lib/week-plan'
 import type { AssignedWorkout, Exercise, PlannedSet, PrescribedExercise, Profile, WorkoutSession } from '@/lib/types'
 import { avatarUrlOf } from '@/lib/profile'
 import { createDefaultPlannedSets, getPlannedSets, normalizeRir, normalizeWeight } from '@/lib/workouts'
@@ -88,12 +91,15 @@ function IconButton({
   onClick,
   disabled,
   tone = 'default',
+  dataMove,
   children,
 }: {
   label: string
   onClick: () => void
   disabled?: boolean
   tone?: 'default' | 'brand' | 'danger'
+  // Identifica o botão de ordem para devolver o foco a ele depois de mover.
+  dataMove?: string
   children: ReactNode
 }) {
   return (
@@ -101,10 +107,11 @@ function IconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-move={dataMove}
       aria-label={label}
       title={label}
       className={cn(
-        'grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-black/30 transition disabled:opacity-40',
+        'grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-line bg-black/30 transition disabled:opacity-40',
         tone === 'brand' && 'text-brand hover:border-brand/40 hover:bg-brand-soft',
         tone === 'danger' && 'text-zinc-500 hover:border-danger/40 hover:bg-danger-soft hover:text-danger',
         tone === 'default' && 'text-zinc-300 hover:border-line-strong hover:text-white',
@@ -175,6 +182,14 @@ export default function AdminWorkoutsPage() {
   // supabase/trocar-exercicio.sql já rodou? (colunas "essential" e "alternatives")
   const [swapSql, setSwapSql] = useState(false)
   const [altKey, setAltKey] = useState<string | null>(null)
+  // supabase/rotina-semanal.sql já rodou? (colunas "weekday" e "position")
+  const [rotinaSql, setRotinaSql] = useState(false)
+  // Dia da semana do treino aberto no construtor ('' = sem dia fixo).
+  const [workoutDay, setWorkoutDay] = useState('')
+  // Aluno cujos treinos estão sendo reordenados (trava os botões até salvar).
+  const [movingStudent, setMovingStudent] = useState<string | null>(null)
+  // Dia escolhido no seletor: salva depois de uma pausa (setas do teclado não salvam cada dia que passam).
+  const dayTimers = useRef(new Map<string, { before: number | null; timer: number }>())
   const keyCounter = useRef(0)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -189,6 +204,20 @@ export default function AdminWorkoutsPage() {
   const [confirmBusy, setConfirmBusy] = useState(false)
 
   const reload = () => setReloadKey((key) => key + 1)
+
+  useEffect(() => {
+    let active = true
+    void supabase
+      .from('assigned_workouts')
+      .select('weekday, position')
+      .limit(1)
+      .then(({ error }) => {
+        if (active) setRotinaSql(!error)
+      })
+    return () => {
+      active = false
+    }
+  }, [supabase])
 
   useEffect(() => {
     let active = true
@@ -363,8 +392,9 @@ export default function AdminWorkoutsPage() {
   // ---------------------------------------------------------------------------
   // Construtor de treino / modelo
   // ---------------------------------------------------------------------------
-  const openBuilder = async (mode: BuilderMode, options: { studentId?: string; name?: string } = {}) => {
+  const openBuilder = async (mode: BuilderMode, options: { studentId?: string; name?: string; weekday?: number | null } = {}) => {
     setBuilderError('')
+    setWorkoutDay(isWeekday(options.weekday) ? String(options.weekday) : '')
     setSelectedStudent(options.studentId ?? '')
     setWorkoutName(options.name ?? '')
     setSelectedExercises([])
@@ -598,13 +628,19 @@ export default function AdminWorkoutsPage() {
       } else if (parentId) {
         const { error } = await supabase
           .from('assigned_workouts')
-          .update({ name, student_id: selectedStudent })
+          .update({ name, student_id: selectedStudent, ...(rotinaSql ? { weekday: workoutDay === '' ? null : Number(workoutDay) } : {}) })
           .eq('id', parentId)
         if (error) throw new Error(friendlyError(error, 'Não foi possível salvar o treino'))
       } else {
         const { data, error } = await supabase
           .from('assigned_workouts')
-          .insert({ student_id: selectedStudent, name, is_current: true })
+          .insert({
+            student_id: selectedStudent,
+            name,
+            is_current: true,
+            // Treino novo entra no fim da ordem do aluno, com o dia escolhido (se houver).
+            ...(rotinaSql ? { weekday: workoutDay === '' ? null : Number(workoutDay), position: nextPositionFor(selectedStudent) } : {}),
+          })
           .select('id')
           .single()
         if (error || !data) throw new Error(friendlyError(error, 'Não foi possível criar o treino'))
@@ -769,7 +805,13 @@ export default function AdminWorkoutsPage() {
 
       const { data: newWorkout, error: workoutError } = await supabase
         .from('assigned_workouts')
-        .insert({ student_id: assignStudentId, name: templateToAssign.name, is_current: true })
+        .insert({
+          student_id: assignStudentId,
+          name: templateToAssign.name,
+          is_current: true,
+          // Refazer um treino que o aluno já tem mantém o dia e a ordem dele; senão entra no fim.
+          ...(rotinaSql ? sameNameSchedule(assignStudentId, templateToAssign.name) : {}),
+        })
         .select('id')
         .single()
       if (workoutError || !newWorkout) throw new Error(friendlyError(workoutError, 'Não foi possível lançar o treino'))
@@ -827,10 +869,91 @@ export default function AdminWorkoutsPage() {
     }
   }
 
+  // ---- Rotina da semana: ordem e dia de cada treino (supabase/rotina-semanal.sql).
+  // Treino novo entra depois dos que o aluno já tem (os sem posição contam pela ordem do nome).
+  const nextPositionFor = (studentId: string) =>
+    orderWorkouts(workouts.filter((workout) => workout.student_id === studentId && workout.is_current)).reduce(
+      (max, workout, index) => Math.max(max, workout.position ?? index + 1),
+      0,
+    ) + 1
+
+  const sameNameSchedule = (studentId: string, name: string) => {
+    const same = workouts.find((workout) => workout.student_id === studentId && workout.is_current && normalizeText(workout.name.trim()) === normalizeText(name.trim()))
+    return same ? { weekday: same.weekday ?? null, position: same.position ?? nextPositionFor(studentId) } : { weekday: null, position: nextPositionFor(studentId) }
+  }
+
+  const rotinaError = (error: { message?: string; code?: string } | null) =>
+    error?.code === 'PGRST204' || error?.code === '42703'
+      ? 'Rode o arquivo supabase/rotina-semanal.sql no Supabase para usar dia e ordem.'
+      : friendlyError(error, 'Não foi possível salvar')
+
+  const changeWorkoutDay = (workout: AssignedWorkout, value: string) => {
+    const weekday = value === '' ? null : Number(value)
+    const pending = dayTimers.current.get(workout.id)
+    const before = pending ? pending.before : (workout.weekday ?? null)
+    if (pending) window.clearTimeout(pending.timer)
+    setWorkouts((items) => items.map((item) => (item.id === workout.id ? { ...item, weekday } : item)))
+    const timer = window.setTimeout(async () => {
+      dayTimers.current.delete(workout.id)
+      const { error } = await supabase.from('assigned_workouts').update({ weekday }).eq('id', workout.id)
+      if (error) {
+        setWorkouts((items) => items.map((item) => (item.id === workout.id ? { ...item, weekday: before } : item)))
+        toast({ tone: 'error', title: 'Não foi possível salvar o dia', description: rotinaError(error) })
+        return
+      }
+      toast({
+        tone: 'success',
+        title: weekday === null ? `${workout.name}: sem dia fixo` : `${workout.name}: ${WEEKDAY_NAMES[weekday]}`,
+        description: 'O aluno já vê a semana atualizada.',
+        duration: 5000,
+      })
+    }, 700)
+    dayTimers.current.set(workout.id, { before, timer })
+  }
+
+  const moveWorkout = async (workout: AssignedWorkout, direction: -1 | 1) => {
+    if (movingStudent) return
+    const active = orderWorkouts(workouts.filter((item) => item.student_id === workout.student_id && item.is_current))
+    const index = active.findIndex((item) => item.id === workout.id)
+    const target = index + direction
+    if (index < 0 || target < 0 || target >= active.length) return
+    const reordered = [...active]
+    ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
+    const changes = reordered.map((item, position) => ({ id: item.id, position: position + 1 })).filter((change) => change.position !== (workouts.find((item) => item.id === change.id)?.position ?? null))
+    const positions = new Map(changes.map((change) => [change.id, change.position]))
+    setMovingStudent(workout.student_id)
+    setWorkouts((items) => items.map((item) => (positions.has(item.id) ? { ...item, position: positions.get(item.id) as number } : item)))
+    const results = await Promise.all(changes.map((change) => supabase.from('assigned_workouts').update({ position: change.position }).eq('id', change.id)))
+    setMovingStudent(null)
+    const failed = results.find((result) => result.error)?.error
+    if (failed) {
+      // Pode ter salvado só uma parte: recarrega o que está no banco em vez de adivinhar.
+      toast({ tone: 'error', title: 'Não foi possível mudar a ordem', description: rotinaError(failed) })
+      reload()
+      return
+    }
+    toast({
+      tone: 'success',
+      title: `${workout.name} ${direction < 0 ? 'subiu' : 'desceu'}: agora é o ${target + 1}º de ${active.length}`,
+      description: 'O aluno já vê a semana atualizada.',
+      duration: 5000,
+    })
+    // O botão que acabou de ser usado pode ter ficado desligado (topo ou fim): o foco vai para ele ou para o oposto.
+    window.setTimeout(() => {
+      const same = document.querySelector<HTMLButtonElement>(`[data-move="${workout.id}:${direction}"]`)
+      const other = document.querySelector<HTMLButtonElement>(`[data-move="${workout.id}:${-direction}"]`)
+      ;(same && !same.disabled ? same : other)?.focus()
+    }, 60)
+  }
+
   const term = normalizeText(search.trim())
   const studentGroups = students
     .filter((student) => !term || normalizeText(`${student.full_name ?? ''} ${student.email ?? ''}`).includes(term))
-    .map((student) => ({ student, workouts: workouts.filter((workout) => workout.student_id === student.id) }))
+    .map((student) => {
+      const own = workouts.filter((workout) => workout.student_id === student.id)
+      // Ativos na ordem da rotina (a do treinador, senão a do nome); arquivados depois.
+      return { student, workouts: [...orderWorkouts(own.filter((workout) => workout.is_current)), ...own.filter((workout) => !workout.is_current)] }
+    })
 
   const assignTerm = normalizeText(assignSearch.trim())
   const assignOptions = students.filter(
@@ -1033,6 +1156,43 @@ export default function AdminWorkoutsPage() {
                                       </div>
                                     </div>
 
+                                    {rotinaSql && workout.is_current && (
+                                      <div className="mt-3 flex items-center gap-1.5">
+                                        <label htmlFor={`day-${workout.id}`} className="sr-only">
+                                          Dia da semana de {workout.name}
+                                        </label>
+                                        <select
+                                          id={`day-${workout.id}`}
+                                          value={isWeekday(workout.weekday) ? String(workout.weekday) : ''}
+                                          onChange={(event) => changeWorkoutDay(workout, event.target.value)}
+                                          className={cn(inputClassName, 'h-11 min-w-0 flex-1 py-0')}
+                                        >
+                                          <option value="">Sem dia fixo</option>
+                                          {WEEKDAY_ORDER.map((day) => (
+                                            <option key={day} value={day}>
+                                              {WEEKDAY_NAMES[day]}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <IconButton
+                                          label={`Subir ${workout.name} na ordem`}
+                                          dataMove={`${workout.id}:-1`}
+                                          disabled={movingStudent !== null || studentWorkouts.filter((item) => item.is_current).findIndex((item) => item.id === workout.id) === 0}
+                                          onClick={() => void moveWorkout(workout, -1)}
+                                        >
+                                          <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                                        </IconButton>
+                                        <IconButton
+                                          label={`Descer ${workout.name} na ordem`}
+                                          dataMove={`${workout.id}:1`}
+                                          disabled={movingStudent !== null || studentWorkouts.filter((item) => item.is_current).findIndex((item) => item.id === workout.id) === studentWorkouts.filter((item) => item.is_current).length - 1}
+                                          onClick={() => void moveWorkout(workout, 1)}
+                                        >
+                                          <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                                        </IconButton>
+                                      </div>
+                                    )}
+
                                     <div className="mt-3 flex gap-1.5">
                                       <button
                                         type="button"
@@ -1049,7 +1209,7 @@ export default function AdminWorkoutsPage() {
                                         onClick={() =>
                                           openBuilder(
                                             { kind: 'workout', editingId: workout.id },
-                                            { studentId: workout.student_id, name: workout.name },
+                                            { studentId: workout.student_id, name: workout.name, weekday: workout.weekday },
                                           )
                                         }
                                       >
@@ -1256,6 +1416,23 @@ export default function AdminWorkoutsPage() {
               </div>
             )}
           </div>
+
+          {rotinaSql && builder?.kind === 'workout' && (
+            <div>
+              <label htmlFor="builder-day" className={labelClassName}>
+                Dia da semana (opcional)
+              </label>
+              <select id="builder-day" aria-describedby="builder-day-hint" value={workoutDay} onChange={(event) => setWorkoutDay(event.target.value)} className={inputClassName}>
+                <option value="">Sem dia fixo</option>
+                {WEEKDAY_ORDER.map((day) => (
+                  <option key={day} value={day}>
+                    {WEEKDAY_NAMES[day]}
+                  </option>
+                ))}
+              </select>
+              <p id="builder-day-hint" className="mt-1.5 text-xs text-zinc-400">Com dia marcado, a tela Hoje do aluno mostra este treino nesse dia. A semana começa na segunda.</p>
+            </div>
+          )}
 
           {selectedExercises.length > 0 && (
             <div className="rounded-3xl border border-line bg-surface p-4">

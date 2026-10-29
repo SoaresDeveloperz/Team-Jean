@@ -38,7 +38,8 @@ export type SyncOp =
   | { kind: 'session'; row: QueuedSession }
   | { kind: 'set'; row: QueuedSet }
   | { kind: 'unset'; id: string; sessionId: string }
-  | { kind: 'finish'; sessionId: string; patch: FinishPatch }
+  // workoutId: para a tela Hoje contar o treino como feito na semana mesmo antes de subir.
+  | { kind: 'finish'; sessionId: string; patch: FinishPatch; workoutId?: string }
 
 type Snapshot = {
   userId: string | null
@@ -279,6 +280,17 @@ export function useOnlineStatus() {
 }
 
 // O que a fila ainda tem desta sessão (para retomar o treino sem internet).
+// Treinos finalizados no aparelho que ainda não chegaram ao servidor.
+export function queuedCompletions(userId: string): { workoutId: string; completedAt: string }[] {
+  bindUser(userId)
+  const workoutBySession = new Map(snapshot.ops.flatMap((op) => (op.kind === 'session' ? [[op.row.id, op.row.assigned_workout_id] as const] : [])))
+  return snapshot.ops.flatMap((op) => {
+    if (op.kind !== 'finish') return []
+    const workoutId = op.workoutId ?? workoutBySession.get(op.sessionId)
+    return workoutId ? [{ workoutId, completedAt: op.patch.completed_at }] : []
+  })
+}
+
 export function queuedSessionState(userId: string, sessionId: string) {
   bindUser(userId)
   const created = snapshot.ops.some((op) => op.kind === 'session' && op.row.id === sessionId)

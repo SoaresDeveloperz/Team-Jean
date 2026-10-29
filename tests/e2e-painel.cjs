@@ -43,6 +43,8 @@ async function login(page, who) {
   check('menu do aluno não tem mais "Semana" (abre pelo Hoje)', (await student.locator('nav[aria-label="Menu do aluno"] a[href="/student/week"]').count()) === 0)
   const week = student.locator('a', { hasText: 'Ver minha semana' })
   check('Hoje tem "Ver minha semana" de 44 px ou mais', (await week.count()) === 1 && ((await week.boundingBox())?.height ?? 0) >= 43.5)
+  // Fonte mais larga que a do aparelho de teste: se aqui não corta, em qualquer celular não corta.
+  await student.addStyleTag({ content: 'nav a span { font-family: "DejaVu Sans", sans-serif !important; }' })
   const clipped = await student.evaluate(() => [...document.querySelectorAll('nav[aria-label="Menu do aluno"] a span:last-child')].filter((element) => element.scrollWidth > element.clientWidth + 1).map((element) => element.textContent))
   check('nenhum nome de aba do aluno é cortado em 360 px', clipped.length === 0)
   await week.click()
@@ -67,6 +69,7 @@ async function login(page, who) {
   check('no celular o Financeiro vem antes do Radar', order.finance < order.radar)
   const adminLinks = coach.locator('nav[aria-label="Menu do treinador"]:visible a')
   check('menu do treinador no celular tem 5 abas com nome inteiro', (await adminLinks.count()) === 5)
+  await coach.addStyleTag({ content: 'nav a span { font-family: "DejaVu Sans", sans-serif !important; }' })
   const adminClipped = await coach.evaluate(() => [...document.querySelectorAll('nav[aria-label="Menu do treinador"].fixed a span:last-child')].filter((element) => element.scrollWidth > element.clientWidth + 1).map((element) => element.textContent))
   check('nenhum nome de aba do treinador é cortado em 360 px', adminClipped.length === 0)
   const overlap = await coach.evaluate(() => {

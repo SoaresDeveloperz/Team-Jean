@@ -61,7 +61,8 @@ export function BottomNav({ items, label, className }: { items: NavItem[]; label
                 </span>
                 <span
                   className={cn(
-                    'max-w-full truncate px-0.5 text-xs font-semibold tracking-wide transition-colors',
+                    // Sem truncate: com fonte larga ou zoom o nome quebra em vez de ser cortado (WCAG 1.4.4).
+                    'max-w-full px-0.5 text-center text-xs font-semibold leading-tight transition-colors [overflow-wrap:anywhere]',
                     active ? 'text-white' : 'text-zinc-500',
                   )}
                 >

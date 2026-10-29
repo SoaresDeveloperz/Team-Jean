@@ -716,7 +716,8 @@ http
     if (url.pathname === '/__curto/longo') {
       if (!exercises.some((item) => item.id === 'e6')) exercises.push(ex('e6', 'Remada Baixa', 'Costas'))
       if (!assigned_workouts.some((item) => item.id === 'w-d')) {
-        assigned_workouts.push({ id: 'w-d', student_id: 'u-student', name: 'Treino D - Longo', is_current: true, created_at: iso(-2) })
+        // position 0: o treino longo é o primeiro da ordem (a rotação começa por ele, como antes do plano semanal).
+        assigned_workouts.push({ id: 'w-d', student_id: 'u-student', name: 'Treino D - Longo', is_current: true, created_at: iso(-2), position: 0 })
         ;['e1', 'e2', 'e3', 'e4', 'e5', 'e6'].forEach((exerciseId, index) =>
           assigned_workout_exercises.push({ id: `awd${index + 1}`, assigned_workout_id: 'w-d', exercise_id: exerciseId, order: index + 1, sets_count: 4, target_reps: '10-12', planned_sets: null, notes: null }),
         )

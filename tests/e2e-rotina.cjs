@@ -101,7 +101,7 @@ async function login(page, who) {
   const after = (await state()).assigned_workouts
   check('"Descer" troca a ordem: A fica depois do B', after.find((row) => row.id === 'w-a').position > after.find((row) => row.id === 'w-b').position)
   await select.selectOption('')
-  await page.waitForFunction(async () => (await (await fetch('http://localhost:54321/__state')).json()).assigned_workouts.find((row) => row.id === 'w-a').weekday === null, null, { timeout: 8000 }).catch(() => {})
+  await page.waitForSelector('text=Treino A - Peito e Tríceps: sem dia fixo')
   stored = (await state()).assigned_workouts.find((row) => row.id === 'w-a')
   check('"Sem dia fixo" volta para vazio', stored.weekday === null)
 

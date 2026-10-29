@@ -66,7 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 exit={{ opacity: 0, y: -12, scale: 0.96, transition: { duration: 0.18 } }}
                 className={cn(
                   // O aviso não captura o toque: o botão por baixo (ex.: "Concluir") continua tocável.
-                  'pointer-events-none flex w-full max-w-sm items-center gap-3 rounded-2xl border bg-surface-2/95 p-3 pr-4 shadow-2xl shadow-black/60 backdrop-blur-xl',
+                  'pointer-events-none flex w-full max-w-sm items-center gap-3 rounded-2xl border bg-surface-2 p-3 pr-4 shadow-2xl shadow-black/60',
                   tone.className,
                 )}
               >

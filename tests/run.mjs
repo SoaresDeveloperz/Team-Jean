@@ -33,6 +33,8 @@ const SUITES = {
   trocar: ['tests/contas-trocar.mjs', 'tests/contas-curto.mjs', 'tests/e2e-trocar.cjs'],
   // Fluxo central do aluno em 320 px com letra grande: ✓ à vista, toques de 44 px, foco e textos simples.
   toque: ['tests/e2e-toque.cjs'],
+  // Animações em CSS e movimento reduzido.
+  movimento: ['tests/e2e-movimento.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],

@@ -14,6 +14,7 @@ import { WEEKDAY_INITIALS, countInMonth, isSameDay, relativeDay, startOfWeek, we
 import { usePreferences } from '@/lib/preferences'
 import { openNotifications, useNotifications } from '@/lib/notifications'
 import { cn } from '@/lib/cn'
+import { BarFill } from '@/components/ui/bar-fill'
 import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { PageSkeleton } from '@/components/ui/skeleton'
@@ -542,12 +543,7 @@ export default function StudentTodayPage() {
                             </span>
                           </div>
                           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                            <m.div
-                              className={cn('h-full rounded-full', value < 0.5 ? 'bg-danger' : 'bg-gold')}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.max(6, value * 100)}%` }}
-                              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                            />
+                            <BarFill value={Math.max(0.06, value)} className={value < 0.5 ? 'bg-danger' : 'bg-gold'} />
                           </div>
                         </li>
                       ))}

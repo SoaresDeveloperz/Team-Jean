@@ -30,22 +30,14 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
   return (
     <m.div
       layout="position"
-      animate={{ backgroundColor: entry.completed ? 'rgba(52, 211, 153, 0.10)' : 'rgba(0, 0, 0, 0)' }}
-      transition={{ duration: 0.25 }}
       role="row"
-      className="set-grid items-center rounded-2xl px-2 py-1.5"
+      className={cn('set-grid items-center rounded-2xl px-2 py-1.5 transition-colors duration-300', entry.completed ? 'bg-brand/10' : 'bg-transparent')}
     >
       <div role="cell" className="flex flex-col items-center leading-none">
         {entry.isPR && entry.completed ? (
-          <m.span
-            initial={{ scale: 0, rotate: -30 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 14 }}
-            className="grid h-8 w-8 place-items-center rounded-xl bg-gold text-black"
-            title="Novo recorde pessoal"
-          >
+          <span className="pr-pop grid h-8 w-8 place-items-center rounded-xl bg-gold text-black" title="Novo recorde pessoal">
             <Trophy className="h-4 w-4" aria-label="Novo recorde" />
-          </m.span>
+          </span>
         ) : (
           <span
             className={cn(
@@ -151,33 +143,25 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
         <span role="status" className="sr-only">
           {entry.completed ? `Série ${entry.setNumber} concluída` : ''}
         </span>
-        <m.button
+        <button
           type="button"
           onClick={onToggle}
-          whileTap={{ scale: 0.86 }}
           aria-pressed={entry.completed}
           aria-label={
             entry.completed ? `Desmarcar série ${entry.setNumber}` : `Marcar série ${entry.setNumber} como concluída`
           }
           aria-describedby={pending ? pendingId : undefined}
           className={cn(
-            'relative grid h-11 w-11 place-items-center rounded-xl transition-colors',
+            'relative grid h-11 w-11 place-items-center rounded-xl transition-[background-color,color,transform]',
             entry.completed
               ? 'bg-brand text-black shadow-[0_0_18px_rgba(52,211,153,0.35)]'
               : 'bg-white/[0.07] text-zinc-400 hover:text-zinc-200',
           )}
         >
-          <AnimatePresence mode="wait" initial={false}>
-            <m.span
-              key={entry.completed ? 'done' : 'todo'}
-              initial={{ scale: 0.4, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.4, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 520, damping: 18 }}
-            >
-              <Check className="h-5 w-5 stroke-[3]" aria-hidden="true" />
-            </m.span>
-          </AnimatePresence>
+          {/* key: ao marcar, o ✓ remonta e faz o pop (CSS); desmarcar é troca de cor. */}
+          <span key={entry.completed ? 'done' : 'todo'} className={entry.completed ? 'check-pop' : undefined}>
+            <Check className="h-5 w-5 stroke-[3]" aria-hidden="true" />
+          </span>
           <AnimatePresence>
             {pending && (
               <m.span
@@ -192,7 +176,7 @@ export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pendin
               </m.span>
             )}
           </AnimatePresence>
-        </m.button>
+        </button>
         {pending && (
           <span id={pendingId} className="sr-only">
             Salva no aparelho, aguardando internet para enviar

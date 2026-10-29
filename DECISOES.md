@@ -18,6 +18,19 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-29 — Animações em CSS e acesso da IA ao banco
+- **Pergunta (animações):** o app parece "sem animação"; o que deve virar CSS e o que fica no Framer Motion?
+- **Opções:** A) microinterações simples em CSS, Framer só para arrastar, reordenar, layout e saídas; B) manter tudo; C) migrar tudo.
+- **O que cada agente disse:** animador e medidor de desempenho: A (C custa muito e não tira o Framer do pacote). Acessibilidade: ainda não até ajustar a base (movimento reduzido sem atrasos, aurora e borda giratória em loop, resumo atrasando informação). Voz do usuário: feedback curto, sem esperar para tocar, nada que enjoe o Seu Wilson.
+- **Decisão:** A. Só `transform` e `opacity`; toque até 200 ms; entrada até 320 ms; nada em loop na tela de treino; sem `backdrop-blur` no painel e no aviso; com "reduzir movimento" ficam só trocas de cor e opacidade (150 ms), sem atrasos e sem confete. Barras de progresso passam a `scaleX` (`BarFill`).
+- **Rever quando:** o INP no treino passar de 200 ms em celular fraco, ou o dono pedir mais movimento em alguma tela.
+
+## 2026-10-29 — Acesso da IA ao banco de produção
+- **Pergunta:** a IA pode ter acesso total ao Supabase de produção (conector da sessão)?
+- **Decisão do dono:** sim, acesso total. A IA usa para aplicar os `supabase/*.sql` e conferir o resultado (colunas, avisos de segurança, erros).
+- **Limites que a IA mantém por conta própria:** dados de alunos (saúde, medidas, fotos, mensalidade) só se a tarefa exigir e nunca em commits, logs ou mensagens; nada que apague ou altere dados existentes sem avisar o dono. O `.mcp.json` do repositório segue só leitura e sem SQL.
+- **Rever quando:** houver outra pessoa com acesso ao repositório ou à conta, ou um incidente com dados de alunos.
+
 ## 2026-10-28 — "Trocar exercício" e a marca "Essencial" do Jean
 - **Pergunta:** o que entra depois da versão curta: trocar um exercício na hora (máquina ocupada, dor) e deixar o Jean marcar o que não pode sair.
 - **Decisão:** o dono pediu os dois ("faz aí"). Troca só para hoje, antes da primeira série do exercício, até 3 opções (alternativas do Jean primeiro, depois mesmo grupo muscular); essencial fica na versão curta e só troca por alternativa do Jean. A troca por dor só pré-marca a tag "Senti dor" do recado, sem texto livre.

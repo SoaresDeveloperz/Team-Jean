@@ -65,9 +65,13 @@ body {
   outline-offset: 2px;
 }
 
+button {
+  /* A volta do toque também anima (antes só a ida). */
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 button:active {
   transform: scale(0.97);
-  transition: transform 0.1s ease;
+  transition-duration: 0.1s;
 }
 
 input, select, textarea {
@@ -204,14 +208,79 @@ input, select, textarea {
   transform: translate(-50%, -50%);
 }
 
-/* Respeita "reduzir movimento" do sistema (WCAG 2.3.3). */
+/* ------------------------------------------------------------------------
+   Animações em CSS (só transform e opacity, no compositor). Limites do time:
+   toque até 200 ms, entrada de tela até 320 ms, nada em loop na tela de treino,
+   conteúdo sempre visível (o estado final é o estilo normal do elemento).
+   O movimento só existe com "no-preference"; com "reduzir movimento" ficam só
+   as trocas de cor e de opacidade. */
+
+/* Barra de progresso: cresce e muda por transform (nunca width). */
+.bar-fill {
+  transform: scaleX(var(--v, 0));
+  transform-origin: left center;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar-fill {
+    animation: bar-grow 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--bar-delay, 0ms) both;
+  }
+  /* Entrada de tela (template.tsx remonta a cada navegação). */
+  .page-in {
+    animation: rise 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  /* ✓ da série: um pop curto, sem sobressalto. */
+  .check-pop {
+    animation: pop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  /* Selo de recorde: aparece uma vez e fica. */
+  .pr-pop {
+    animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+/* Respeita "reduzir movimento" do sistema (WCAG 2.3.3, 2.2.2): sem movimento,
+   sem animação em loop e sem atraso; as trocas de cor e de opacidade continuam
+   suaves (150 ms) para o app não ficar "seco". */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 0.15s !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+  /* Fundos decorativos em loop (WCAG 2.2.2) e o toque que encolhe o botão. */
+  .aurora,
+  .challenge-border {
+    animation: none !important;
+  }
+  button:active {
+    transform: none;
+  }
+  .bar-fill {
+    transform: scaleX(var(--v, 0));
   }
 }

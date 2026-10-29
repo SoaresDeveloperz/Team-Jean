@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { m } from 'framer-motion'
+import { m, useReducedMotion } from 'framer-motion'
 import { Check, Clock, Download, Gauge, Layers, LoaderCircle, MessageCircleHeart, Share2, Trophy, Weight } from 'lucide-react'
 import type { PostDraft } from '@/lib/community'
 import type { MuscleRegion } from '@/lib/muscles'
@@ -35,6 +35,9 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => {
 
 export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onDone: () => void }) {
   const toast = useToast()
+  const reduceMotion = useReducedMotion()
+  // Com "reduzir movimento" a informação aparece na hora (sem atrasos escalonados).
+  const wait = (seconds: number) => (reduceMotion ? 0 : seconds)
   const mapRef = useRef<SVGSVGElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const [generating, setGenerating] = useState(false)
@@ -126,14 +129,15 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
     <div className="space-y-4 pb-10 pt-[calc(1rem+env(safe-area-inset-top))]">
       <div className="relative flex flex-col items-center pt-6 text-center">
         <div className="relative grid h-28 w-28 place-items-center">
-          {PARTICLES.map((particle, index) => (
+          {/* Com "reduzir movimento" não há confete: só pontos piscando seriam ruído. */}
+          {(reduceMotion ? [] : PARTICLES).map((particle, index) => (
             <m.span
               key={index}
               className="absolute h-2 w-2 rounded-full"
               style={{ backgroundColor: particle.gold ? '#fbbf24' : '#34d399' }}
               initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
               animate={{ x: particle.x, y: particle.y, opacity: [0, 1, 0], scale: [0, 1.2, 0.4] }}
-              transition={{ duration: 1.1, delay: 0.25, ease: 'easeOut' }}
+              transition={{ duration: 0.9, delay: 0.15, ease: 'easeOut' }}
             />
           ))}
           <m.div
@@ -148,7 +152,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
         <m.p
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
+          transition={{ delay: wait(0.15) }}
           className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-brand"
         >
           Treino concluído
@@ -158,7 +162,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           tabIndex={-1}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
+          transition={{ delay: wait(0.2) }}
           className="mt-2 font-display text-[2.6rem] font-bold uppercase leading-[0.9]"
         >
           {data.workoutName}
@@ -171,7 +175,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
             key={stat.label}
             initial={{ opacity: 0, y: 16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.55 + index * 0.06 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: wait(0.2 + Math.min(index, 6) * 0.05) }}
             className="rounded-3xl border border-line bg-surface p-4"
           >
             <dt className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
@@ -190,7 +194,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
         <m.section
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.85 }}
+          transition={{ delay: wait(0.35) }}
           className="rounded-3xl border border-gold/25 bg-gold-soft p-4"
           aria-label="Novos recordes"
         >
@@ -214,7 +218,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
       <m.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.95 }}
+        transition={{ delay: wait(0.4) }}
         className="rounded-3xl border border-line bg-surface p-4"
         aria-label="Músculos trabalhados"
       >
@@ -224,7 +228,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
         </div>
       </m.section>
 
-      <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.05 }} className="space-y-2.5 pt-1">
+      <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: wait(0.45) }} className="space-y-2.5 pt-1">
         {posted ? (
           <Link
             href="/student/community"

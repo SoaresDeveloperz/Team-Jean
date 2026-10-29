@@ -20,6 +20,7 @@ import {
 import { publicImageUrl } from '@/lib/profile'
 import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { BarFill } from '@/components/ui/bar-fill'
 import { friendlyError } from '@/lib/errors'
 import { Avatar } from '@/components/ui/avatar'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -157,11 +158,10 @@ function ChallengeCard({
               aria-valuenow={Math.round(percent * 100)}
               className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/10"
             >
-              <m.span
-                className={cn('block h-full rounded-full', done ? 'bg-gold' : 'bg-gradient-to-r from-brand-deep via-brand to-gold')}
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(3, percent * 100)}%` }}
-                transition={{ type: 'spring', stiffness: 80, damping: 18, delay: 0.2 }}
+              <BarFill
+                value={Math.max(0.03, percent)}
+                delay={200}
+                className={done ? 'bg-gold' : 'bg-gradient-to-r from-brand-deep via-brand to-gold'}
               />
             </div>
           </div>
@@ -190,11 +190,10 @@ function ChallengeCard({
                       </span>
                     </span>
                     <span aria-hidden="true" className="mt-1 block h-1 overflow-hidden rounded-full bg-white/[0.07]">
-                      <m.span
-                        className={cn('block h-full rounded-full', row.progress >= challenge.goal ? 'bg-gold' : 'bg-brand/80')}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.max(2, share * 100)}%` }}
-                        transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.25 + index * 0.06 }}
+                      <BarFill
+                        value={Math.max(0.02, share)}
+                        delay={250 + Math.min(index, 8) * 50}
+                        className={row.progress >= challenge.goal ? 'bg-gold' : 'bg-brand/80'}
                       />
                     </span>
                   </span>

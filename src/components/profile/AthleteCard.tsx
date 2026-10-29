@@ -6,6 +6,7 @@ import { levelFor } from '@/lib/levels'
 import { goalInfo, publicImageUrl, type ProfileDetails, type ProfileImageKind } from '@/lib/profile'
 import { initialsOf } from '@/components/ui/avatar'
 import { AnimatedNumber } from '@/components/ui/animated-number'
+import { BarFill } from '@/components/ui/bar-fill'
 import { Tile } from '@/components/ui/tile'
 import { LevelBadge } from '@/components/community/LevelBadge'
 
@@ -167,12 +168,7 @@ export function AthleteCard({ profile, email, stats, uploading, onEditImage, onE
             </span>
             {/* Dentro do botão a barra é só visual; o texto abaixo diz quanto falta. */}
             <span aria-hidden="true" className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10">
-              <m.span
-                className="block h-full rounded-full bg-gradient-to-r from-brand-deep via-brand to-gold"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.max(4, level.progress * 100)}%` }}
-                transition={{ type: 'spring', stiffness: 90, damping: 20, delay: 0.3 }}
-              />
+              <BarFill value={Math.max(0.04, level.progress)} delay={300} className="bg-gradient-to-r from-brand-deep via-brand to-gold" />
             </span>
             <span className="mt-2 block text-xs text-zinc-400">
               {level.next

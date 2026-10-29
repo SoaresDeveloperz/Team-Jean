@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { m } from 'framer-motion'
 import { ChevronRight, Wallet } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
 import { FinanceError, OPEN_STATUSES, dueDate, formatBRL, loadFinance, monthOf, monthTitle, shortDay, statusFor, todaySP, type FinanceData } from '@/lib/finance'
 import { plural } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { BarFill } from '@/components/ui/bar-fill'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Tile } from '@/components/ui/tile'
 
@@ -84,12 +84,7 @@ export function FinanceSummaryTile({ students }: { students: Profile[] }) {
             </p>
             <p className="mt-1 text-xs text-zinc-400">recebidos de {formatBRL(summary.expected)} previstos</p>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.07]" aria-hidden="true">
-              <m.div
-                className="h-full rounded-full bg-brand"
-                initial={{ width: 0 }}
-                animate={{ width: `${summary.expected > 0 ? Math.min(100, (summary.received / summary.expected) * 100) : 0}%` }}
-                transition={{ type: 'spring', stiffness: 120, damping: 22, delay: 0.2 }}
-              />
+              <BarFill value={summary.expected > 0 ? summary.received / summary.expected : 0} delay={200} className="bg-brand" />
             </div>
             <p className={summary.overdue.length > 0 ? 'mt-3 text-xs font-bold text-danger' : 'mt-3 text-xs text-zinc-400'}>
               {summary.overdue.length > 0

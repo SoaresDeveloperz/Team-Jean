@@ -8,6 +8,7 @@ import { REGION_LABELS, loadFill, muscleLoad, regionsForExercise, splitSecondary
 import { WEEKDAY_SHORT, startOfWeek } from '@/lib/stats'
 import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/cn'
+import { BarFill } from '@/components/ui/bar-fill'
 import { friendlyError } from '@/lib/errors'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -468,12 +469,10 @@ export function WeeklyTrainingInsights({ mode }: WeeklyTrainingInsightsProps) {
                           <span className="text-zinc-500">{Math.round(item.share * 100)}%</span>
                         </div>
                         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                          <m.div
-                            className="h-full rounded-full bg-brand"
-                            style={{ opacity: 0.45 + 0.55 * (item.sets / insights.ranking[0].sets) }}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.max(6, (item.sets / insights.ranking[0].sets) * 100)}%` }}
-                            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+                          <BarFill
+                            value={Math.max(0.06, item.sets / insights.ranking[0].sets)}
+                            delay={Math.min(index, 8) * 50}
+                            className="bg-brand"
                           />
                         </div>
                       </li>

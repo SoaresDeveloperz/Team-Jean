@@ -114,7 +114,7 @@ export function Modal({ open, onClose, title, description, children, variant = '
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className={cn(
-            'fixed inset-0 z-[60] flex bg-black/80 backdrop-blur-sm',
+            'fixed inset-0 z-[60] flex bg-black/80',
             isSheet ? 'items-stretch' : 'items-end justify-center sm:items-center sm:p-4',
           )}
           onMouseDown={(event) => {

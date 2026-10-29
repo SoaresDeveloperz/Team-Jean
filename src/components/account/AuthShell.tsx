@@ -9,11 +9,9 @@ export function AuthShell({ subtitle, children, footer }: { subtitle: string; ch
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-black px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))] text-white">
       <div className="glow-brand pointer-events-none absolute inset-0" aria-hidden="true" />
-      <m.div
+      <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
-        animate={{ scale: [1, 1.12, 1], opacity: [0.6, 1, 0.6] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+        className="glow-drift pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-brand/10 blur-3xl"
       />
 
       <m.main

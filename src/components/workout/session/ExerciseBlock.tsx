@@ -134,9 +134,9 @@ export const ExerciseBlock = memo(function ExerciseBlock({
             )}
           >
             <Video className="h-4 w-4" aria-hidden="true" />
-            <m.span animate={{ rotate: showMedia ? 180 : 0 }}>
+            <span className={cn('transition-transform duration-200', showMedia && 'rotate-180')}>
               <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-            </m.span>
+            </span>
           </button>
         )}
         {warmupAvailable && (

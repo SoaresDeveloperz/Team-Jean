@@ -59,6 +59,7 @@ import { loadFill, muscleLoad, splitSecondary, type MuscleRegion, type MuscleWor
 import { usePreferences } from '@/lib/preferences'
 import { haptic } from '@/lib/haptics'
 import { cn } from '@/lib/cn'
+import { BarFill } from '@/components/ui/bar-fill'
 import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -932,12 +933,7 @@ export default function WorkoutExecutionPage() {
           aria-valuemax={100}
           aria-valuenow={progressPercent}
         >
-          <m.div
-            className="h-full rounded-full bg-brand"
-            initial={false}
-            animate={{ width: `${progressPercent}%` }}
-            transition={{ type: 'spring', stiffness: 160, damping: 24 }}
-          />
+          <BarFill value={progressPercent / 100} className="bg-brand" />
         </div>
 
         <nav aria-label="Exercícios do treino" className="no-scrollbar -mx-4 overflow-x-auto px-4 py-2.5">

@@ -14,8 +14,9 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/admin/finance', label: 'Financeiro', icon: Wallet },
 ]
 
-// No celular cabem 6: o Financeiro fica no painel e nos atalhos (+).
-const MOBILE_ITEMS = ADMIN_NAV_ITEMS.filter((item) => item.href !== '/admin/finance')
+// No celular cabem 5 com o nome inteiro: o Financeiro fica no painel e os Avisos
+// nos atalhos (+) e no painel; no computador o menu lateral tem tudo.
+const MOBILE_ITEMS = ADMIN_NAV_ITEMS.filter((item) => item.href !== '/admin/finance' && item.href !== '/admin/announcements')
 
 export function AdminNav() {
   return <BottomNav items={MOBILE_ITEMS} label="Menu do treinador" className="lg:hidden" />

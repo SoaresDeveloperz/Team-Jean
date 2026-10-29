@@ -35,6 +35,8 @@ const SUITES = {
   toque: ['tests/e2e-toque.cjs'],
   // Animações em CSS e movimento reduzido.
   movimento: ['tests/e2e-movimento.cjs'],
+  // Menu do aluno com 5 abas, painel do treinador no celular e lista de alunos em colunas no computador.
+  painel: ['tests/e2e-painel.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],

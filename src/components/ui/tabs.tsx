@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { m } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -21,6 +21,11 @@ type TabsProps<T extends string> = {
 // pílula que desliza até a aba ativa.
 export function Tabs<T extends string>({ id: baseId, items, value, onChange, label, className }: TabsProps<T>) {
   const listRef = useRef<HTMLDivElement>(null)
+
+  // Com muitas abas a barra rola de lado: a aba ativa sempre fica à vista.
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>(`[data-tab="${value}"]`)?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+  }, [value])
 
   const focusTab = (index: number) => {
     const item = items[(index + items.length) % items.length]
@@ -61,7 +66,8 @@ export function Tabs<T extends string>({ id: baseId, items, value, onChange, lab
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={cn(
-              'relative flex h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors',
+              // flex-auto + min-w-max: cada aba tem pelo menos a largura do texto (antes, flex-1 com base 0 sobrepunha os rótulos).
+              'relative flex h-11 min-w-max flex-auto shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors',
               selected ? 'text-black' : 'text-zinc-400 hover:text-white',
             )}
           >
@@ -72,7 +78,7 @@ export function Tabs<T extends string>({ id: baseId, items, value, onChange, lab
                 transition={{ type: 'spring', stiffness: 520, damping: 40 }}
               />
             )}
-            {Icon && <Icon className="relative h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+            {Icon && <Icon className="relative h-3.5 w-3.5 shrink-0 max-[420px]:hidden" aria-hidden="true" />}
             <span className="relative whitespace-nowrap">{item.label}</span>
             {item.badge !== undefined && item.badge > 0 && (
               <span

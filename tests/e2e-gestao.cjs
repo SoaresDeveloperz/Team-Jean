@@ -559,8 +559,9 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   await page.goto(`${BASE}/admin/students`)
   await page.waitForSelector('text=Carlos Lima')
   await page.waitForTimeout(1200)
-  const cards = await page.locator('main button:has(span:text("na semana"))').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top))
-  check('computador: alunos em grade', cards.length >= 2 && Math.abs(cards[0] - cards[1]) < 2)
+  // No computador a lista vira linhas com colunas (uma por aluno, na largura toda).
+  const rows = await page.locator('main button:has(span:text("na semana"))').evaluateAll((items) => items.map((item) => item.getBoundingClientRect()))
+  check('computador: alunos em linhas com colunas', rows.length >= 2 && rows[1].top > rows[0].top + rows[0].height - 2 && rows[0].width > 900)
   await shot(page, 'g11-alunos-desktop')
   await page.setViewportSize({ width: 390, height: 844 })
 

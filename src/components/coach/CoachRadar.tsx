@@ -207,14 +207,9 @@ export function CoachRadar({ students }: { students: Profile[] }) {
             </h2>
             <p className="mt-1.5 text-xs text-zinc-400">O que merece uma mensagem sua agora.</p>
           </div>
-          <m.span
-            aria-hidden="true"
-            className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-brand/30"
-            animate={{ boxShadow: ['0 0 0 0 rgba(52,211,153,0.35)', '0 0 0 10px rgba(52,211,153,0)'] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeOut' }}
-          >
+          <span aria-hidden="true" className="pulse-ring relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-brand/30">
             <RadarIcon className="h-4 w-4 text-brand" />
-          </m.span>
+          </span>
         </div>
         <Tabs id={tabsId} items={tabs} value={tab} onChange={setTab} label="Tipos de alerta" className="mt-4" />
       </div>

@@ -65,13 +65,17 @@ body {
   outline-offset: 2px;
 }
 
-button {
-  /* A volta do toque também anima (antes só a ida). */
-  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-button:active {
-  transform: scale(0.97);
-  transition-duration: 0.1s;
+/* No layer base, para as classes do Tailwind (transition-colors, duration-*)
+   continuarem valendo por cima desta regra. */
+@layer base {
+  button {
+    /* A volta do toque também anima (antes só a ida). */
+    transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  button:active {
+    transform: scale(0.97);
+    transition-duration: 0.1s;
+  }
 }
 
 input, select, textarea {
@@ -140,7 +144,8 @@ input, select, textarea {
   }
 }
 
-/* Aurora suave atrás do cabeçalho do painel. */
+/* Aurora suave atrás do cabeçalho do painel. Os movimentos decorativos rodam poucos
+   ciclos e param (WCAG 2.2.2: nada em loop sem pausa). */
 .aurora {
   position: absolute;
   inset: -48px -24px auto -24px;
@@ -151,7 +156,7 @@ input, select, textarea {
     radial-gradient(42% 60% at 18% 32%, rgb(52 211 153 / 0.13), transparent 70%),
     radial-gradient(36% 55% at 82% 18%, rgb(251 191 36 / 0.08), transparent 70%);
   filter: blur(20px);
-  animation: aurora-drift 16s ease-in-out infinite alternate;
+  animation: aurora-drift 16s ease-in-out 2 alternate forwards;
 }
 
 @keyframes aurora-drift {
@@ -166,7 +171,7 @@ input, select, textarea {
 /* Borda em gradiente girando (cartões de desafio). */
 .challenge-border {
   background: conic-gradient(from 0deg, rgb(251 191 36 / 0.95), rgb(52 211 153 / 0.7), transparent 35%, transparent 65%, rgb(251 191 36 / 0.95));
-  animation: border-spin 7s linear infinite;
+  animation: border-spin 7s linear 3 forwards;
 }
 
 @keyframes border-spin {
@@ -223,23 +228,49 @@ input, select, textarea {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  /* Pulso do ícone do radar e brilho do login: poucos ciclos, depois param. */
+  .pulse-ring {
+    animation: pulse-ring 2.2s ease-out 3;
+  }
+  .glow-drift {
+    animation: glow-drift 8s ease-in-out 2;
+  }
   .bar-fill {
-    animation: bar-grow 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--bar-delay, 0ms) both;
+    animation: bar-grow 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--bar-delay, 0ms) backwards;
   }
   /* Entrada de tela (template.tsx remonta a cada navegação). */
   .page-in {
-    animation: rise 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: rise 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
   /* ✓ da série: um pop curto, sem sobressalto. */
   .check-pop {
-    animation: pop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation: pop 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   }
   /* Selo de recorde: aparece uma vez e fica. */
   .pr-pop {
-    animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   }
 }
 
+@keyframes pulse-ring {
+  from {
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 10px rgb(52 211 153 / 0);
+  }
+}
+@keyframes glow-drift {
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+}
 @keyframes bar-grow {
   from {
     transform: scaleX(0);
@@ -268,19 +299,25 @@ input, select, textarea {
     animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
+    /* Só cor e opacidade seguem suaves; nenhum transform (escala, giro) em transição. */
+    transition-property: color, background-color, border-color, opacity !important;
     transition-duration: 0.15s !important;
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
   /* Fundos decorativos em loop (WCAG 2.2.2) e o toque que encolhe o botão. */
   .aurora,
-  .challenge-border {
+  .challenge-border,
+  .pulse-ring,
+  .glow-drift {
     animation: none !important;
+  }
+  /* Indicador de carregamento é essencial: continua girando (devagar). */
+  .animate-spin {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
   }
   button:active {
     transform: none;
-  }
-  .bar-fill {
-    transform: scaleX(var(--v, 0));
   }
 }

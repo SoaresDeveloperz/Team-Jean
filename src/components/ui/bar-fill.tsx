@@ -7,7 +7,8 @@ export function BarFill({ value, className, delay = 0 }: { value: number; classN
   const clamped = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0))
   return (
     <span
-      className={cn('bar-fill block h-full w-full rounded-full', className)}
+      // Sem rounded-full: o pai já arredonda (overflow-hidden) e scaleX deformaria a ponta.
+      className={cn('bar-fill block h-full w-full', className)}
       style={{ '--v': clamped, '--bar-delay': `${delay}ms` } as CSSProperties}
     />
   )

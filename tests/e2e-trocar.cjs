@@ -48,6 +48,8 @@ async function login(page, email, password = '123456') {
   const open = async (id, firstRow) => {
     await page.goto(`${BASE}/student/workout/${id}`)
     await page.waitForSelector(`section#exercise-${firstRow}`)
+    // A biblioteca (opções do "Trocar") carrega logo depois do treino, fora do caminho crítico.
+    await page.waitForSelector('[data-swap-button]', { timeout: 10000 }).catch(() => {})
   }
   const finish = async () => {
     await page.click('button:has-text("Concluir")')

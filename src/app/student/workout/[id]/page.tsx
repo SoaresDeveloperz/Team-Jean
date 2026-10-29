@@ -47,7 +47,10 @@ import {
   OfflineError,
   cacheCurrentPage,
   fetchResumableSets,
+  fetchLibrary,
   fetchWorkoutBundle,
+  readCachedLibrary,
+  saveCachedLibrary,
   type LibraryExercise,
   readCachedBundle,
   saveCachedBundle,
@@ -171,10 +174,19 @@ export default function WorkoutExecutionPage() {
       let bundle: WorkoutBundle | null = null
       let serverSets: StoredSet[] | null = null
       let cached = false
+      // Com a cópia do treino neste aparelho, sinal fraco (conecta mas não responde) espera pouco.
+      const slowAfter = readCachedBundle(user.id, workoutId) ? 6000 : undefined
       try {
         ;[bundle, serverSets] = await Promise.all([
-          fetchWorkoutBundle(supabase, user.id, workoutId),
-          resumeCandidate ? fetchResumableSets(supabase, user.id, resumeCandidate.sessionId) : Promise.resolve(null),
+          fetchWorkoutBundle(supabase, user.id, workoutId, slowAfter),
+          resumeCandidate
+            ? slowAfter
+              ? Promise.race([
+                  fetchResumableSets(supabase, user.id, resumeCandidate.sessionId),
+                  new Promise<never>((_, reject) => setTimeout(() => reject(new OfflineError('a conexão está lenta demais')), slowAfter)),
+                ])
+              : fetchResumableSets(supabase, user.id, resumeCandidate.sessionId)
+            : Promise.resolve(null),
         ])
         saveCachedBundle(user.id, workoutId, bundle)
         cacheCurrentPage()
@@ -216,7 +228,8 @@ export default function WorkoutExecutionPage() {
       }
 
       const baseRows = bundle.rows as ExerciseRow[]
-      const libraryItems = bundle.library ?? []
+      // Biblioteca do "Trocar": a cópia do aparelho agora e a atualizada logo depois (fora do caminho crítico).
+      const libraryItems = readCachedLibrary()
       let restoredSwaps: Record<string, string> = {}
       try {
         restoredSwaps = parseSwapState(
@@ -224,7 +237,7 @@ export default function WorkoutExecutionPage() {
           workoutId,
           localDay(),
           baseRows.map((row) => row.id),
-          libraryItems.map((item) => item.id),
+          null,
         )
       } catch {
         restoredSwaps = {}
@@ -344,6 +357,11 @@ export default function WorkoutExecutionPage() {
       setRecords(pastRecords)
       setSets(initialSets)
       setLoadState({ status: 'ready' })
+      void fetchLibrary(supabase).then((items) => {
+        if (!active || items.length === 0) return
+        saveCachedLibrary(items)
+        setLibrary(items)
+      })
     }
 
     void load()

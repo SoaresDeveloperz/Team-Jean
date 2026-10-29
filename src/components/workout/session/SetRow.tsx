@@ -13,12 +13,17 @@ type SetRowProps = {
   inputIdPrefix: string
   // Marcada no aparelho, ainda não chegou ao servidor (sem internet).
   pending: boolean
-  onChange: (patch: Partial<SetEntry>) => void
-  onToggle: () => void
+  rowId: string
+  setIndex: number
+  // Estáveis (do pai): com o memo, só a linha editada renderiza a cada tecla.
+  onChangeSet: (rowId: string, setIndex: number, patch: Partial<SetEntry>) => void
+  onToggleSet: (rowId: string, setIndex: number) => void
 }
 
 // Uma linha da tabela estilo Hevy: SÉRIE | ANTERIOR | KG | REPS | ✓
-export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pending, onChange, onToggle }: SetRowProps) {
+export const SetRow = memo(function SetRow({ entry, label, inputIdPrefix, pending, rowId, setIndex, onChangeSet, onToggleSet }: SetRowProps) {
+  const onChange = (patch: Partial<SetEntry>) => onChangeSet(rowId, setIndex, patch)
+  const onToggle = () => onToggleSet(rowId, setIndex)
   const repsRef = useRef<HTMLInputElement>(null)
   const pendingId = useId()
   const typeInfo = getSetTypeInfo(entry.type)

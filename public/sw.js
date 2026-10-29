@@ -65,9 +65,20 @@ function isPage(response) {
   return response.ok && !response.redirected && (response.headers.get('content-type') || '').includes('text/html');
 }
 
+// Sinal fraco (conecta mas não responde): com a página guardada, espera pouco e usa a cópia.
+const NAVIGATION_TIMEOUT_MS = 5000
+
+function fetchWithTimeout(request, ms) {
+  return Promise.race([
+    fetch(request),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ])
+}
+
 async function networkWithOfflineFallback(request, url) {
   try {
-    const response = await fetch(request);
+    const saved = OFFLINE_PAGES.test(url.pathname) ? await caches.match(url.pathname, { cacheName: PAGES_CACHE }) : null
+    const response = saved ? await fetchWithTimeout(request, NAVIGATION_TIMEOUT_MS) : await fetch(request);
     if (OFFLINE_PAGES.test(url.pathname) && isPage(response)) {
       const cache = await caches.open(PAGES_CACHE);
       cache.put(url.pathname, response.clone());

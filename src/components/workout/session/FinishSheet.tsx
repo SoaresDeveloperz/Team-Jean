@@ -93,13 +93,16 @@ export function FinishSheet({
 
         {missing > 0 && done > 0 && (
           <Alert variant="info">
-            {missing === 1 ? 'Falta 1 série.' : `Faltam ${missing} séries.`} Você pode finalizar mesmo assim.
+            Você fez {done} de {total} séries. Quer encerrar agora?
           </Alert>
         )}
 
         <fieldset>
           <legend className="mb-3 flex w-full items-end justify-between">
-            <span className="text-sm font-bold text-white">Qual foi o esforço (RPE)?</span>
+            <span className="text-sm font-bold text-white">
+              Qual foi o esforço (RPE)?
+              <span className="block text-xs font-semibold text-zinc-400">1 é leve, 10 é no limite</span>
+            </span>
             <span className="text-right">
               <span className="font-display text-3xl font-bold leading-none" style={{ color: rpeColor(rpe) }}>
                 {rpe}
@@ -107,7 +110,7 @@ export function FinishSheet({
               <span className="block text-xs font-semibold text-zinc-400">{RPE_LABELS[rpe]}</span>
             </span>
           </legend>
-          <div className="grid grid-cols-10 items-end gap-1" role="radiogroup" aria-label="Esforço de 1 a 10">
+          <div className="grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Esforço de 1 a 10">
             {Array.from({ length: 10 }, (_, index) => {
               const value = index + 1
               const selected = value === rpe
@@ -123,20 +126,16 @@ export function FinishSheet({
                   whileTap={{ scale: 0.88 }}
                   animate={{ backgroundColor: filled ? rpeColor(value) : 'rgba(255,255,255,0.06)', y: selected ? -3 : 0 }}
                   className={cn(
-                    'flex items-end justify-center rounded-lg pb-1 text-xs font-black',
+                    'flex h-12 items-center justify-center rounded-xl font-display text-xl font-bold',
                     filled ? 'text-black' : 'text-zinc-400',
                   )}
-                  style={{ height: `${28 + value * 2.4}px` }}
                 >
                   {value}
                 </m.button>
               )
             })}
           </div>
-          <div className="mt-2 flex justify-between text-xs font-bold text-zinc-400">
-            <span>Leve</span>
-            <span>Máximo</span>
-          </div>
+
         </fieldset>
 
         <fieldset>
@@ -213,7 +212,14 @@ export function FinishSheet({
             whileTap={{ scale: 0.97 }}
             className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-black uppercase tracking-[0.16em] text-black disabled:opacity-60"
           >
-            {finishing ? <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Salvando" /> : 'Salvar treino'}
+            {finishing ? (
+              <>
+                <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
+                <span className="sr-only">Salvando…</span>
+              </>
+            ) : (
+              'Salvar treino'
+            )}
           </m.button>
         </div>
       </div>

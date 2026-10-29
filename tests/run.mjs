@@ -31,6 +31,8 @@ const SUITES = {
   curto: ['tests/contas-curto.mjs', 'tests/e2e-curto.cjs'],
   // "Trocar exercício" e marca "Essencial": contas puras + telas, com e sem o SQL.
   trocar: ['tests/contas-trocar.mjs', 'tests/contas-curto.mjs', 'tests/e2e-trocar.cjs'],
+  // Fluxo central do aluno em 320 px com letra grande: ✓ à vista, toques de 44 px, foco e textos simples.
+  toque: ['tests/e2e-toque.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],

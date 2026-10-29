@@ -303,7 +303,7 @@ export default function StudentTodayPage() {
               </span>
               <h2 className="mt-3 font-display text-[2.1rem] font-bold uppercase leading-[0.92]">{next.name}</h2>
               <p className="mt-2 text-xs text-zinc-500">
-                {lastDone ? `Feito pela última vez ${relativeDay(new Date(lastDone))}` : 'Você ainda não fez este treino'}
+                {lastDone ? `Feito pela última vez ${relativeDay(new Date(lastDone))}` : 'Hoje é um bom dia para este treino'}
               </p>
             </div>
             <div className="w-[40%] max-w-[160px] shrink-0">
@@ -315,7 +315,7 @@ export default function StudentTodayPage() {
             {[
               { label: 'Exercícios', value: String(data.exercises.length) },
               { label: 'Séries', value: String(derived.totalSets) },
-              { label: 'Duração', value: `~${derived.estimatedMinutes}′` },
+              { label: 'Duração', value: `~${derived.estimatedMinutes} min` },
             ].map((stat) => (
               <div key={stat.label} className="px-3 py-2.5 text-center">
                 <dt className="text-xs font-bold text-zinc-400">{stat.label}</dt>

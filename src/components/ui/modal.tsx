@@ -68,10 +68,12 @@ export function Modal({ open, onClose, title, description, children, variant = '
         if (focusable.length === 0) return
         const first = focusable[0]
         const last = focusable[focusable.length - 1]
-        if (event.shiftKey && document.activeElement === first) {
+        const active = document.activeElement
+        // O foco começa no próprio diálogo: Shift+Tab ali (ou fora dele) vai para o último item.
+        if (event.shiftKey && (active === first || active === dialogRef.current || !dialogRef.current.contains(active))) {
           event.preventDefault()
           last.focus()
-        } else if (!event.shiftKey && document.activeElement === last) {
+        } else if (!event.shiftKey && (active === last || !dialogRef.current.contains(active))) {
           event.preventDefault()
           first.focus()
         }

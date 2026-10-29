@@ -82,7 +82,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
       await navigator.clipboard.writeText(pix)
       setCopied(true)
       haptic(15)
-      toast({ tone: 'success', title: 'PIX copiado', description: 'Abra o app do seu banco e escolha "PIX copia e cola".' })
+      toast({ tone: 'success', title: 'PIX copiado', description: 'Abra o app do seu banco, escolha "PIX copia e cola" e cole o código.' })
       window.setTimeout(() => setCopied(false), 2500)
     } catch {
       setShowCode(true)
@@ -144,7 +144,7 @@ export function BillingCard({ userId, highlight = false }: { userId: string; hig
                     {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
                   </m.span>
                 </AnimatePresence>
-                {copied ? 'PIX copiado' : 'Copiar PIX copia e cola'}
+                {copied ? 'PIX copiado' : 'Copiar código PIX'}
               </m.button>
               <button
                 type="button"

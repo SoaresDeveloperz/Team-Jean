@@ -48,7 +48,14 @@ export function ConfirmDialog({
             tone === 'danger' ? 'bg-danger' : 'bg-white',
           )}
         >
-          {busy ? <LoaderCircle className="h-4 w-4 animate-spin" aria-label="Aguarde" /> : confirmLabel}
+          {busy ? (
+            <>
+              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              <span className="sr-only">Aguarde…</span>
+            </>
+          ) : (
+            confirmLabel
+          )}
         </m.button>
       </div>
     </Modal>

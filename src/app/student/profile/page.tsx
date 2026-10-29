@@ -300,7 +300,7 @@ export default function StudentProfilePage() {
               onClick={() => setPreferences({ weeklyGoal: Math.max(1, preferences.weeklyGoal - 1) })}
               disabled={preferences.weeklyGoal <= 1}
               aria-label="Diminuir meta"
-              className="grid h-9 w-9 place-items-center rounded-xl text-zinc-300 hover:bg-white/5 disabled:opacity-30"
+              className="grid h-11 w-11 place-items-center rounded-xl text-zinc-300 hover:bg-white/5 disabled:opacity-30"
             >
               <Minus className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -312,7 +312,7 @@ export default function StudentProfilePage() {
               onClick={() => setPreferences({ weeklyGoal: Math.min(7, preferences.weeklyGoal + 1) })}
               disabled={preferences.weeklyGoal >= 7}
               aria-label="Aumentar meta"
-              className="grid h-9 w-9 place-items-center rounded-xl text-zinc-300 hover:bg-white/5 disabled:opacity-30"
+              className="grid h-11 w-11 place-items-center rounded-xl text-zinc-300 hover:bg-white/5 disabled:opacity-30"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
             </button>

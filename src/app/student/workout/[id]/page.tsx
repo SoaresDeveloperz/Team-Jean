@@ -613,7 +613,7 @@ export default function WorkoutExecutionPage() {
     } catch {
       // Sem armazenamento: a versão curta vale até fechar a tela.
     }
-    toast({ tone: 'info', title: 'Versão curta ligada', description: 'Dá para desfazer logo acima dos exercícios.', duration: 4000 })
+    toast({ tone: 'info', title: 'Versão curta ligada', description: 'Dá para desfazer logo acima dos exercícios.', duration: 8000 })
     focusLater(() => shortStripRef.current)
   }
 
@@ -690,7 +690,7 @@ export default function WorkoutExecutionPage() {
       tone: 'info',
       title: `Trocado por ${option.name}`,
       description: pain ? 'O Jean vai receber o aviso de dor quando você finalizar.' : 'Vale só para hoje.',
-      duration: 4000,
+      duration: pain ? 10000 : 5000,
     })
     focusLater(() => document.querySelector<HTMLElement>(`#exercise-${rowId} h2`))
   }
@@ -952,7 +952,7 @@ export default function WorkoutExecutionPage() {
                     onClick={() => scrollToExercise(item.id)}
                     aria-current={current ? 'step' : undefined}
                     className={cn(
-                      'flex h-10 items-center gap-2 rounded-full border pl-1 pr-3 text-xs font-bold transition',
+                      'flex h-11 items-center gap-2 rounded-full border pl-1 pr-3 text-xs font-bold transition',
                       current ? 'border-white/30 bg-white/10 text-white' : 'border-line text-zinc-400',
                     )}
                   >

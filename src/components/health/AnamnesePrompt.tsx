@@ -39,7 +39,7 @@ export function AnamnesePrompt({ studentId }: { studentId: string }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-bold text-white">Responda sua ficha de saúde</span>
-          <span className="block text-xs text-zinc-400">PAR-Q em 2 minutos: ajuda o treinador a montar um treino seguro.</span>
+          <span className="block text-xs text-zinc-400">Conte sobre sua saúde em 2 minutos para o Jean montar um treino seguro. Só você e ele veem.</span>
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden="true" />
       </Link>

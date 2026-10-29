@@ -61,7 +61,8 @@ export function Tabs<T extends string>({ id: baseId, items, value, onChange, lab
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={cn(
-              'relative flex h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors',
+              // flex-auto + min-w-max: cada aba tem pelo menos a largura do texto (antes, flex-1 com base 0 sobrepunha os rótulos).
+              'relative flex h-11 min-w-max flex-auto shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors',
               selected ? 'text-black' : 'text-zinc-400 hover:text-white',
             )}
           >

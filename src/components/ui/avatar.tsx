@@ -3,16 +3,9 @@
 import { useState } from 'react'
 import { cn } from '@/lib/cn'
 
-// Gradientes discretos dentro da paleta (esmeralda, âmbar, grafite) para
-// diferenciar alunos nas listas sem fugir da identidade visual.
-const GRADIENTS = [
-  'from-emerald-400 to-emerald-700',
-  'from-amber-300 to-amber-600',
-  'from-zinc-200 to-zinc-500',
-  'from-teal-300 to-emerald-600',
-  'from-lime-300 to-emerald-600',
-  'from-orange-300 to-amber-600',
-]
+// Tons lisos da paleta (esmeralda, âmbar, grafite) para diferenciar alunos nas
+// listas sem degradê e sem sair da identidade visual (preto legível em todos).
+const TONES = ['bg-emerald-400', 'bg-amber-300', 'bg-zinc-300', 'bg-teal-300', 'bg-lime-300', 'bg-emerald-300']
 
 function hash(text: string) {
   let value = 0
@@ -45,15 +38,15 @@ const SIZES = {
 
 export function Avatar({ name, seed, src, size = 'md', className }: AvatarProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const gradient = GRADIENTS[hash(seed ?? name ?? '') % GRADIENTS.length]
+  const tone = TONES[hash(seed ?? name ?? '') % TONES.length]
   const showPhoto = Boolean(src) && failedSrc !== src
 
   return (
     <span
       aria-hidden="true"
       className={cn(
-        'grid shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br font-display font-bold text-black',
-        gradient,
+        'grid shrink-0 place-items-center overflow-hidden rounded-2xl font-display font-bold text-black',
+        tone,
         SIZES[size],
         className,
       )}

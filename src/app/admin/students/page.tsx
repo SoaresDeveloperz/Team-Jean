@@ -351,7 +351,7 @@ export default function AdminStudentsPage() {
             aria-checked={filter === option.value}
             onClick={() => setFilter(option.value)}
             className={cn(
-              'h-9 shrink-0 rounded-full border px-3.5 text-xs font-bold transition',
+              'h-11 shrink-0 rounded-full border px-3.5 text-xs font-bold transition',
               filter === option.value
                 ? 'border-white bg-white text-black'
                 : 'border-line bg-surface text-zinc-400 hover:text-white',
@@ -390,55 +390,74 @@ export default function AdminStudentsPage() {
           </p>
         </div>
       ) : (
-        <Stagger className="grid gap-2.5 lg:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((student) => {
-            const studentStats = statsOf(student.id)
-            const readiness = readinessTone(student.readiness_score)
-            return (
-              <m.div key={student.id} variants={tileVariants} layout className="flex h-full flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setDetailId(student.id)}
-                  className="flex w-full flex-1 items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
-                >
-                  <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-white">{student.full_name || 'Aluno sem nome'}</span>
-                    <span className="block truncate text-xs text-zinc-500">{student.email}</span>
-                    <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-bold">
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5',
-                          studentStats.week > 0 ? 'bg-brand-soft text-brand' : 'bg-white/[0.06] text-zinc-400',
-                        )}
-                      >
-                        {studentStats.week} na semana
+        <>
+          {/* No computador a lista vira linhas com colunas (uma só marcação: a mesma lista do celular). */}
+          <div
+            aria-hidden="true"
+            className="hidden px-4 text-xs font-black uppercase tracking-wider text-zinc-500 lg:grid lg:grid-cols-[2.75rem_minmax(0,1fr)_8rem_12rem_7rem_6rem_1rem] lg:items-center lg:gap-4"
+          >
+            <span />
+            <span>Aluno</span>
+            <span>Na semana</span>
+            <span>Último treino</span>
+            <span>Saúde</span>
+            <span className="text-right">Prontidão</span>
+            <span />
+          </div>
+          <Stagger className="grid gap-2.5">
+            {filtered.map((student) => {
+              const studentStats = statsOf(student.id)
+              const readiness = readinessTone(student.readiness_score)
+              return (
+                <m.div key={student.id} variants={tileVariants} layout className="flex h-full flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDetailId(student.id)}
+                    className="flex w-full flex-1 items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong lg:grid lg:grid-cols-[2.75rem_minmax(0,1fr)_8rem_12rem_7rem_6rem_1rem] lg:gap-4"
+                  >
+                    <Avatar name={student.full_name ?? student.email} seed={student.id} src={avatarUrlOf(student)} size="md" />
+                    <span className="min-w-0 flex-1 lg:contents">
+                      <span className="min-w-0 lg:block">
+                        <span className="block truncate text-sm font-bold text-white">{student.full_name || 'Aluno sem nome'}</span>
+                        <span className="block truncate text-xs text-zinc-500">{student.email}</span>
                       </span>
-                      <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-zinc-400">
-                        {studentStats.last ? `Treinou ${relativeDayPhrase(studentStats.last)}` : 'Sem treinos'}
-                      </span>
-                      {parqAlerts?.get(student.id) && (
-                        <span className="flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-danger">
-                          <ShieldAlert className="h-3 w-3" aria-hidden="true" /> PAR-Q
-                          <span className="sr-only">com alerta</span>
+                      <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-bold lg:contents">
+                        <span
+                          className={cn(
+                            'self-center justify-self-start rounded-full px-2 py-0.5',
+                            studentStats.week > 0 ? 'bg-brand-soft text-brand' : 'bg-white/[0.06] text-zinc-400',
+                          )}
+                        >
+                          {studentStats.week} na semana
                         </span>
-                      )}
+                        <span className="self-center justify-self-start rounded-full bg-white/[0.06] px-2 py-0.5 text-zinc-400">
+                          {studentStats.last ? `Treinou ${relativeDayPhrase(studentStats.last)}` : 'Sem treinos'}
+                        </span>
+                        {parqAlerts?.get(student.id) ? (
+                          <span className="flex items-center gap-1 self-center justify-self-start rounded-full bg-danger-soft px-2 py-0.5 text-danger">
+                            <ShieldAlert className="h-3 w-3" aria-hidden="true" /> PAR-Q
+                            <span className="sr-only">com alerta</span>
+                          </span>
+                        ) : (
+                          <span aria-hidden="true" className="hidden lg:block" />
+                        )}
+                      </span>
                     </span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1">
-                    <span className={cn('font-display text-xl font-bold leading-none', readiness.className)}>{readiness.label}</span>
-                    <span className="text-xs font-black uppercase tracking-wider text-zinc-500">Prontidão</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
-                </button>
-                {/* Filtro "Sem treinar": chamar de volta pelo WhatsApp (fora do botão do cartão). */}
-                {filter === 'inactive' && (
-                  <WhatsAppComeback fullName={student.full_name} last={studentStats.last} className="self-end" />
-                )}
-              </m.div>
-            )
-          })}
-        </Stagger>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={cn('font-display text-xl font-bold leading-none', readiness.className)}>{readiness.label}</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-zinc-500 lg:hidden">Prontidão</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+                  </button>
+                  {/* Filtro "Sem treinar": chamar de volta pelo WhatsApp (fora do botão do cartão). */}
+                  {filter === 'inactive' && (
+                    <WhatsAppComeback fullName={student.full_name} last={studentStats.last} className="self-end" />
+                  )}
+                </m.div>
+              )
+            })}
+          </Stagger>
+        </>
       )}
 
       {/* Ficha do aluno */}

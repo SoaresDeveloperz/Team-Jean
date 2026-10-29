@@ -1,12 +1,12 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Calendar, Dumbbell, History, MessageCircleHeart, TrendingUp, User } from 'lucide-react'
+import { Dumbbell, History, MessageCircleHeart, TrendingUp, User } from 'lucide-react'
 import { BottomNav, type NavItem } from './BottomNav'
 
+// 5 abas (cada uma com um trabalho só). A Semana abre pelo "Ver minha semana" da tela Hoje.
 const items: NavItem[] = [
   { href: '/student/today', label: 'Hoje', icon: Dumbbell },
-  { href: '/student/week', label: 'Semana', icon: Calendar },
   { href: '/student/community', label: 'Equipe', icon: MessageCircleHeart },
   { href: '/student/history', label: 'Histórico', icon: History },
   { href: '/student/progress', label: 'Evolução', icon: TrendingUp },

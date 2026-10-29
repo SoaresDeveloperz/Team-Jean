@@ -271,6 +271,9 @@ export default function StudentTodayPage() {
           Fala, {data.firstName}!
         </h1>
         <p className="mt-2 text-sm text-zinc-400">{subtitle}</p>
+        <Link href="/student/week" className="-ml-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-bold text-brand hover:text-white">
+          Ver minha semana
+        </Link>
       </m.header>
 
       {/* Treino do dia */}

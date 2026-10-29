@@ -320,13 +320,17 @@ export default function AdminDashboardPage() {
         </m.div>
 
         {/* No computador: radar e atividade à esquerda; dinheiro e alertas à direita. */}
-        <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-4 lg:space-y-0">
-          <div className="space-y-4">
+        {/* No celular os dois blocos "se desmancham" (contents) e as peças se ordenam
+            pela prioridade: dinheiro e quem precisa de atenção primeiro, depois o radar. */}
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+          <div className="contents lg:block lg:space-y-4">
             {/* Radar: recados, recordes, progressões e cansaço */}
-            <CoachRadar students={data.students} />
+            <div className="order-3">
+              <CoachRadar students={data.students} />
+            </div>
 
             {/* Atividade recente */}
-            <Tile className="p-0">
+            <Tile className="order-4 p-0">
               <div className="flex items-center justify-between px-5 pb-1 pt-5">
                 <Eyebrow>Atividade recente</Eyebrow>
                 <span className="text-xs font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
@@ -366,12 +370,14 @@ export default function AdminDashboardPage() {
             </Tile>
           </div>
 
-          <div className="space-y-4">
-            <FinanceSummaryTile students={data.students} />
+          <div className="contents lg:block lg:space-y-4">
+            <div className="order-1">
+              <FinanceSummaryTile students={data.students} />
+            </div>
 
             {/* Atenção */}
             {(derived.inactive.length > 0 || derived.lowReadiness.length > 0) && (
-              <Tile className="space-y-4">
+              <Tile className="order-2 space-y-4">
                 <Eyebrow className="text-gold/90">Precisam de atenção</Eyebrow>
                 {derived.inactive.length > 0 && (
                   <div>
@@ -428,7 +434,9 @@ export default function AdminDashboardPage() {
               </Tile>
             )}
 
-            <PushNotificationsTile coach />
+            <div className="order-5">
+              <PushNotificationsTile coach />
+            </div>
           </div>
         </div>
       </Stagger>

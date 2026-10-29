@@ -79,7 +79,7 @@ const box = async (locator) => (await locator.boundingBox()) ?? { x: 0, y: 0, wi
   await page.waitForSelector('[role=dialog]')
   const dialog = page.locator('[role=dialog]')
   const text = await dialog.textContent()
-  check('painel de finalizar diz "Quão pesado foi o treino?" e explica a escala', text.includes('Quão pesado foi o treino?') && text.includes('1 é leve, 10 é no limite'))
+  check('painel de finalizar mantém "esforço (RPE)" e explica a escala', text.includes('Qual foi o esforço (RPE)?') && text.includes('1 é leve, 10 é no limite'))
   check('painel não cobra: "Você fez N de M séries. Quer encerrar agora?"', /Você fez \d+ de \d+ séries\. Quer encerrar agora\?/.test(text) && !text.includes('Faltam'))
   const rpe = dialog.locator('[role=radio]')
   let rpeBig = (await rpe.count()) === 10

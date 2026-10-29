@@ -100,7 +100,7 @@ export function FinishSheet({
         <fieldset>
           <legend className="mb-3 flex w-full items-end justify-between">
             <span className="text-sm font-bold text-white">
-              Quão pesado foi o treino?
+              Qual foi o esforço (RPE)?
               <span className="block text-xs font-semibold text-zinc-400">1 é leve, 10 é no limite</span>
             </span>
             <span className="text-right">

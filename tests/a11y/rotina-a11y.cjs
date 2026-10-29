@@ -39,7 +39,7 @@ const day = (offset) => (today + offset + 7) % 7
   await audit('Hoje no dia marcado')
   await seed({ limpar: '1', a: String(day(1)), b: String(day(2)) })
   await page.goto(BASE + '/student/today')
-  await page.waitForSelector('text=Hoje é dia de descansar')
+  await page.waitForSelector('text=Dia de descanso')
   await audit('Hoje em dia de descanso ("Adiantar este treino")')
   await seed({ limpar: '1', a: '', b: '' })
   await page.goto(BASE + '/student/today')

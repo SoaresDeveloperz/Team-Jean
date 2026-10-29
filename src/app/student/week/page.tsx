@@ -195,7 +195,7 @@ export default function StudentWeekPage() {
                             {workout.inProgress ? 'Em andamento' : 'Próximo'}
                           </span>
                         )}
-                        <span className="text-xs font-semibold text-zinc-500">
+                        <span className="text-xs font-semibold text-zinc-400">
                           {isWeekday(workout.weekday) ? `${WEEKDAY_NAMES[workout.weekday]} · ` : ''}
                           {workout.lastDoneAt
                             ? `Feito ${relativeDay(new Date(workout.lastDoneAt))}`

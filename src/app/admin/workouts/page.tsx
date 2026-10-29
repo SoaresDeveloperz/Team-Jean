@@ -91,12 +91,15 @@ function IconButton({
   onClick,
   disabled,
   tone = 'default',
+  dataMove,
   children,
 }: {
   label: string
   onClick: () => void
   disabled?: boolean
   tone?: 'default' | 'brand' | 'danger'
+  // Identifica o botão de ordem para devolver o foco a ele depois de mover.
+  dataMove?: string
   children: ReactNode
 }) {
   return (
@@ -104,6 +107,7 @@ function IconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-move={dataMove}
       aria-label={label}
       title={label}
       className={cn(
@@ -182,6 +186,10 @@ export default function AdminWorkoutsPage() {
   const [rotinaSql, setRotinaSql] = useState(false)
   // Dia da semana do treino aberto no construtor ('' = sem dia fixo).
   const [workoutDay, setWorkoutDay] = useState('')
+  // Aluno cujos treinos estão sendo reordenados (trava os botões até salvar).
+  const [movingStudent, setMovingStudent] = useState<string | null>(null)
+  // Dia escolhido no seletor: salva depois de uma pausa (setas do teclado não salvam cada dia que passam).
+  const dayTimers = useRef(new Map<string, { before: number | null; timer: number }>())
   const keyCounter = useRef(0)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -862,8 +870,12 @@ export default function AdminWorkoutsPage() {
   }
 
   // ---- Rotina da semana: ordem e dia de cada treino (supabase/rotina-semanal.sql).
+  // Treino novo entra depois dos que o aluno já tem (os sem posição contam pela ordem do nome).
   const nextPositionFor = (studentId: string) =>
-    workouts.filter((workout) => workout.student_id === studentId && workout.is_current).reduce((max, workout) => Math.max(max, workout.position ?? 0), 0) + 1
+    orderWorkouts(workouts.filter((workout) => workout.student_id === studentId && workout.is_current)).reduce(
+      (max, workout, index) => Math.max(max, workout.position ?? index + 1),
+      0,
+    ) + 1
 
   const sameNameSchedule = (studentId: string, name: string) => {
     const same = workouts.find((workout) => workout.student_id === studentId && workout.is_current && normalizeText(workout.name.trim()) === normalizeText(name.trim()))
@@ -875,38 +887,63 @@ export default function AdminWorkoutsPage() {
       ? 'Rode o arquivo supabase/rotina-semanal.sql no Supabase para usar dia e ordem.'
       : friendlyError(error, 'Não foi possível salvar')
 
-  const changeWorkoutDay = async (workout: AssignedWorkout, value: string) => {
+  const changeWorkoutDay = (workout: AssignedWorkout, value: string) => {
     const weekday = value === '' ? null : Number(value)
-    const before = workout.weekday ?? null
+    const pending = dayTimers.current.get(workout.id)
+    const before = pending ? pending.before : (workout.weekday ?? null)
+    if (pending) window.clearTimeout(pending.timer)
     setWorkouts((items) => items.map((item) => (item.id === workout.id ? { ...item, weekday } : item)))
-    const { error } = await supabase.from('assigned_workouts').update({ weekday }).eq('id', workout.id)
-    if (error) {
-      setWorkouts((items) => items.map((item) => (item.id === workout.id ? { ...item, weekday: before } : item)))
-      toast({ tone: 'error', title: 'Não foi possível salvar o dia', description: rotinaError(error) })
-      return
-    }
-    toast({ tone: 'success', title: weekday === null ? 'Sem dia fixo' : `${workout.name}: ${WEEKDAY_NAMES[weekday]}`, description: 'O aluno já vê a semana atualizada.', duration: 3000 })
+    const timer = window.setTimeout(async () => {
+      dayTimers.current.delete(workout.id)
+      const { error } = await supabase.from('assigned_workouts').update({ weekday }).eq('id', workout.id)
+      if (error) {
+        setWorkouts((items) => items.map((item) => (item.id === workout.id ? { ...item, weekday: before } : item)))
+        toast({ tone: 'error', title: 'Não foi possível salvar o dia', description: rotinaError(error) })
+        return
+      }
+      toast({
+        tone: 'success',
+        title: weekday === null ? `${workout.name}: sem dia fixo` : `${workout.name}: ${WEEKDAY_NAMES[weekday]}`,
+        description: 'O aluno já vê a semana atualizada.',
+        duration: 5000,
+      })
+    }, 700)
+    dayTimers.current.set(workout.id, { before, timer })
   }
 
   const moveWorkout = async (workout: AssignedWorkout, direction: -1 | 1) => {
+    if (movingStudent) return
     const active = orderWorkouts(workouts.filter((item) => item.student_id === workout.student_id && item.is_current))
     const index = active.findIndex((item) => item.id === workout.id)
     const target = index + direction
     if (index < 0 || target < 0 || target >= active.length) return
     const reordered = [...active]
     ;[reordered[index], reordered[target]] = [reordered[target], reordered[index]]
-    const changes = reordered.map((item, position) => ({ id: item.id, position: position + 1, before: item.position ?? null })).filter((change) => change.position !== change.before)
+    const changes = reordered.map((item, position) => ({ id: item.id, position: position + 1 })).filter((change) => change.position !== (workouts.find((item) => item.id === change.id)?.position ?? null))
     const positions = new Map(changes.map((change) => [change.id, change.position]))
+    setMovingStudent(workout.student_id)
     setWorkouts((items) => items.map((item) => (positions.has(item.id) ? { ...item, position: positions.get(item.id) as number } : item)))
     const results = await Promise.all(changes.map((change) => supabase.from('assigned_workouts').update({ position: change.position }).eq('id', change.id)))
+    setMovingStudent(null)
     const failed = results.find((result) => result.error)?.error
     if (failed) {
-      const before = new Map(changes.map((change) => [change.id, change.before]))
-      setWorkouts((items) => items.map((item) => (before.has(item.id) ? { ...item, position: before.get(item.id) } : item)))
+      // Pode ter salvado só uma parte: recarrega o que está no banco em vez de adivinhar.
       toast({ tone: 'error', title: 'Não foi possível mudar a ordem', description: rotinaError(failed) })
+      reload()
       return
     }
-    toast({ tone: 'success', title: 'Ordem salva', description: 'O aluno já vê a semana atualizada.', duration: 2500 })
+    toast({
+      tone: 'success',
+      title: `${workout.name} ${direction < 0 ? 'subiu' : 'desceu'}: agora é o ${target + 1}º de ${active.length}`,
+      description: 'O aluno já vê a semana atualizada.',
+      duration: 5000,
+    })
+    // O botão que acabou de ser usado pode ter ficado desligado (topo ou fim): o foco vai para ele ou para o oposto.
+    window.setTimeout(() => {
+      const same = document.querySelector<HTMLButtonElement>(`[data-move="${workout.id}:${direction}"]`)
+      const other = document.querySelector<HTMLButtonElement>(`[data-move="${workout.id}:${-direction}"]`)
+      ;(same && !same.disabled ? same : other)?.focus()
+    }, 60)
   }
 
   const term = normalizeText(search.trim())
@@ -1127,7 +1164,7 @@ export default function AdminWorkoutsPage() {
                                         <select
                                           id={`day-${workout.id}`}
                                           value={isWeekday(workout.weekday) ? String(workout.weekday) : ''}
-                                          onChange={(event) => void changeWorkoutDay(workout, event.target.value)}
+                                          onChange={(event) => changeWorkoutDay(workout, event.target.value)}
                                           className={cn(inputClassName, 'h-11 min-w-0 flex-1 py-0')}
                                         >
                                           <option value="">Sem dia fixo</option>
@@ -1137,12 +1174,18 @@ export default function AdminWorkoutsPage() {
                                             </option>
                                           ))}
                                         </select>
-                                        <IconButton label={`Subir ${workout.name} na ordem`} disabled={studentWorkouts.filter((item) => item.is_current).findIndex((item) => item.id === workout.id) === 0} onClick={() => void moveWorkout(workout, -1)}>
+                                        <IconButton
+                                          label={`Subir ${workout.name} na ordem`}
+                                          dataMove={`${workout.id}:-1`}
+                                          disabled={movingStudent !== null || studentWorkouts.filter((item) => item.is_current).findIndex((item) => item.id === workout.id) === 0}
+                                          onClick={() => void moveWorkout(workout, -1)}
+                                        >
                                           <ArrowUp className="h-4 w-4" aria-hidden="true" />
                                         </IconButton>
                                         <IconButton
                                           label={`Descer ${workout.name} na ordem`}
-                                          disabled={studentWorkouts.filter((item) => item.is_current).findIndex((item) => item.id === workout.id) === studentWorkouts.filter((item) => item.is_current).length - 1}
+                                          dataMove={`${workout.id}:1`}
+                                          disabled={movingStudent !== null || studentWorkouts.filter((item) => item.is_current).findIndex((item) => item.id === workout.id) === studentWorkouts.filter((item) => item.is_current).length - 1}
                                           onClick={() => void moveWorkout(workout, 1)}
                                         >
                                           <ArrowDown className="h-4 w-4" aria-hidden="true" />
@@ -1379,7 +1422,7 @@ export default function AdminWorkoutsPage() {
               <label htmlFor="builder-day" className={labelClassName}>
                 Dia da semana (opcional)
               </label>
-              <select id="builder-day" value={workoutDay} onChange={(event) => setWorkoutDay(event.target.value)} className={inputClassName}>
+              <select id="builder-day" aria-describedby="builder-day-hint" value={workoutDay} onChange={(event) => setWorkoutDay(event.target.value)} className={inputClassName}>
                 <option value="">Sem dia fixo</option>
                 {WEEKDAY_ORDER.map((day) => (
                   <option key={day} value={day}>
@@ -1387,7 +1430,7 @@ export default function AdminWorkoutsPage() {
                   </option>
                 ))}
               </select>
-              <p className="mt-1.5 text-xs text-zinc-400">Com dia marcado, a tela Hoje do aluno mostra este treino nesse dia. A semana começa na segunda.</p>
+              <p id="builder-day-hint" className="mt-1.5 text-xs text-zinc-400">Com dia marcado, a tela Hoje do aluno mostra este treino nesse dia. A semana começa na segunda.</p>
             </div>
           )}
 

@@ -260,7 +260,8 @@ export default function StudentTodayPage() {
   const lastDone = next ? completionOf(next, data.lastDoneByWorkout) : undefined
   const latestNotice = unseen[0] ?? notices[0]
   const goalProgress = Math.min(1, derived.weekCount / Math.max(1, weeklyGoal))
-  const doneForToday = derived.trainedToday && !data.inProgress
+  // "Repetir" só faz sentido na rotação sem dias (o próximo treino já tem dia, ou é descanso, nos outros casos).
+  const doneForToday = derived.trainedToday && !data.inProgress && data.plan?.kind === 'next'
   // Dia de descanso (ou semana completa): o cartão mostra o que dá para adiantar, com botão discreto.
   const restPlan = data.plan?.kind === 'rest' && !data.inProgress ? data.plan : null
   const weekDone = data.plan?.kind === 'week-done' && !data.inProgress
@@ -269,8 +270,8 @@ export default function StudentTodayPage() {
 
   let subtitle = 'Seu treinador ainda não liberou um treino. Aproveite para recuperar.'
   if (data.inProgress) subtitle = 'Você tem um treino em andamento. Quer terminar?'
-  else if (derived.trainedToday) subtitle = 'Treino de hoje feito. Descansar também é treinar.'
-  else if (data.plan?.kind === 'rest') subtitle = 'Hoje é dia de descansar.'
+  else if (data.plan?.kind === 'rest') subtitle = data.plan.doneToday ? 'Treino de hoje feito. Descansar também é treinar.' : 'Hoje não tem treino marcado.'
+  else if (derived.trainedToday && data.plan?.kind === 'next') subtitle = 'Treino de hoje feito. Descansar também é treinar.'
   else if (data.plan?.kind === 'week-done') subtitle = 'Semana completa! Parabéns.'
   else if (data.plan?.kind === 'today' && next) subtitle = `Hoje é dia de ${next.name}.`
   else if (next && data.workouts.every((workout) => !doneThisWeek(completionOf(workout, data.lastDoneByWorkout), new Date()))) subtitle = `Semana nova! Começa pelo ${next.name}.`
@@ -311,7 +312,7 @@ export default function StudentTodayPage() {
                   </>
                 ) : restPlan ? (
                   <>
-                    <Moon className="h-3 w-3" aria-hidden="true" /> {restPlan.doneToday ? 'Treino de hoje feito' : 'Hoje é dia de descansar'}
+                    <Moon className="h-3 w-3" aria-hidden="true" /> {restPlan.doneToday ? 'Treino de hoje feito' : 'Dia de descanso'}
                   </>
                 ) : weekDone ? (
                   <>
@@ -403,7 +404,7 @@ export default function StudentTodayPage() {
                 )}
               </Link>
             </m.div>
-            {derived.offerShort && !data.inProgress && !doneForToday && !weekDone && (
+            {derived.offerShort && !data.inProgress && !doneForToday && !weekDone && !restPlan && (
               <Link
                 href={`/student/workout/${next.id}?curto=1`}
                 className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line-strong text-sm font-bold text-zinc-200 transition hover:bg-white/5"
@@ -535,15 +536,18 @@ export default function StudentTodayPage() {
                   >
                     <span
                       className={cn(
-                        'grid h-10 w-10 place-items-center rounded-xl font-display text-xl font-bold',
+                        'grid h-10 min-w-10 place-items-center self-start rounded-xl px-2 font-display text-xl font-bold',
                         isNext ? 'bg-brand text-black' : 'bg-white/[0.06] text-zinc-300',
                       )}
                       aria-hidden="true"
                     >
                       {isWeekday(workout.weekday) ? WEEKDAY_SHORT[workout.weekday] : workoutLetter(index)}
                     </span>
-                    <span className="line-clamp-2 text-sm font-bold leading-snug text-white">{workout.name}</span>
-                    <span className="mt-auto text-xs text-zinc-500">
+                    <span className="line-clamp-2 text-sm font-bold leading-snug text-white">
+                      {isWeekday(workout.weekday) && <span className="sr-only">{WEEKDAY_NAMES[workout.weekday]}: </span>}
+                      {workout.name}
+                    </span>
+                    <span className="mt-auto text-xs text-zinc-400">
                       {done ? `Feito ${relativeDay(new Date(done))}` : weekState === 'missed' ? 'Ainda dá tempo esta semana' : 'Ainda não feito'}
                     </span>
                   </Link>

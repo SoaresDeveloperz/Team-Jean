@@ -21,6 +21,9 @@ check('treino de ontem conta como feito nesta semana', plan.doneThisWeek(at(TUE,
 check('treino do domingo passado não conta (virada na segunda)', !plan.doneThisWeek(at(-1, 20).toISOString(), at(MON, 8)))
 check('sem data ou data inválida: não feito', !plan.doneThisWeek(undefined, at(WED)) && !plan.doneThisWeek('xx', at(WED)))
 
+check('conclusão com data um pouco no futuro (relógio mudado) ainda conta na semana', plan.doneThisWeek(at(WED, 18).toISOString(), at(WED, 12)))
+check('conclusão da semana que vem não conta nesta', !plan.doneThisWeek(at(MON + 7, 9).toISOString(), at(WED)))
+
 // ------------------------------------------------ ordem
 check('sem posição, a ordem é a do nome', plan.orderWorkouts([C, A, B]).map((x) => x.id).join('') === 'abc')
 check('com posição, vale a do treinador (nulos por último)', plan.orderWorkouts([w('a', 'Treino A', null, 2), w('b', 'Treino B', null, 1), w('c', 'Treino C')]).map((x) => x.id).join('') === 'bac')

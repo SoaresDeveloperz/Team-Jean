@@ -74,7 +74,13 @@ export function completionOf(workout: PlanWorkout, lastDone: Map<string, string>
 export function doneThisWeek(completedAt: string | null | undefined, now: Date) {
   if (!completedAt) return false
   const done = new Date(completedAt)
-  return !Number.isNaN(done.getTime()) && done >= weekStart(now) && done <= now
+  if (Number.isNaN(done.getTime())) return false
+  // Até o fim da semana (não só até "agora"): se o relógio do aparelho mudou depois de
+  // finalizar, o treino continua contando como feito.
+  const start = weekStart(now)
+  const nextStart = new Date(start)
+  nextStart.setDate(nextStart.getDate() + 7)
+  return done >= start && done < nextStart
 }
 
 // Ordem do treinador (`position`); sem ela, ordem do nome (Treino A, B, C...).

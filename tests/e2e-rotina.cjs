@@ -63,7 +63,7 @@ async function login(page, who) {
   // ------------------------------------------------ descanso: hoje não tem treino marcado
   await seed({ limpar: '1', a: String(day(1)), b: String(day(2)) })
   text = await hoje()
-  check('descanso: "Hoje é dia de descansar"', text.includes('Hoje é dia de descansar'))
+  check('descanso: "Dia de descanso" e "Hoje não tem treino marcado."', text.includes('Dia de descanso') && text.includes('Hoje não tem treino marcado.'))
   check('descanso: botão "Adiantar este treino" (não "Começar treino")', text.includes('Adiantar este treino') && !text.includes('Começar treino'))
   check('descanso: o texto não culpa ("Descansar também conta.")', text.includes('Descansar também conta.') && !/atrasad|perdeu|faltou/i.test(text))
   if (today !== 0) check(`descanso: mostra "Próximo: ${NAMES[day(1)]}."`, text.includes(`Próximo: ${NAMES[day(1)]}.`))
@@ -97,7 +97,7 @@ async function login(page, who) {
   let stored = (await state()).assigned_workouts.find((row) => row.id === 'w-a')
   check('escolher "Quarta" grava weekday = 3', stored.weekday === 3)
   await page.click('button[aria-label^="Descer Treino A"]')
-  await page.waitForSelector('text=Ordem salva')
+  await page.waitForSelector('text=desceu: agora é o 2º de 2')
   const after = (await state()).assigned_workouts
   check('"Descer" troca a ordem: A fica depois do B', after.find((row) => row.id === 'w-a').position > after.find((row) => row.id === 'w-b').position)
   await select.selectOption('')

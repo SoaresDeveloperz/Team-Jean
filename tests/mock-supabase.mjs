@@ -214,6 +214,10 @@ let curtoEnabled = true
 // /__trocar/off simula o banco sem o trocar-exercicio.sql (sem essential, alternatives e swaps);
 // /__trocar/seed prepara o Treino A (alternativa do Jean, essencial sem alternativa) e o D (essencial).
 let trocarEnabled = true
+
+// --- Sinal fraco ---
+// /__lento/on faz o servidor "pendurar" a leitura do treino (conecta e não responde).
+let lentoEnabled = false
 const SWAP_TABLES = ['assigned_workout_exercises', 'workout_template_exercises']
 
 // /__community/off simula o banco sem o community.sql.
@@ -663,6 +667,10 @@ http
       curtoEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { curtoEnabled })
     }
+    if (url.pathname === '/__lento/on' || url.pathname === '/__lento/off') {
+      lentoEnabled = url.pathname.endsWith('/on')
+      return send(res, 200, { lentoEnabled })
+    }
     if (url.pathname === '/__trocar/off' || url.pathname === '/__trocar/on') {
       trocarEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { trocarEnabled })
@@ -885,6 +893,7 @@ http
     const match = url.pathname.match(/^\/rest\/v1\/(\w+)$/)
     if (!match || !tables[match[1]]) return send(res, 404, { message: 'not found ' + url.pathname })
     const table = match[1]
+    if (lentoEnabled && req.method === 'GET' && table === 'assigned_workouts') await new Promise((resolve) => setTimeout(resolve, 20000))
     if (COMMUNITY_TABLES.includes(table) && !communityEnabled) {
       return send(res, 404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` })
     }

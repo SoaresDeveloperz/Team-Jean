@@ -16,6 +16,7 @@
     - `toque` (`tests/e2e-toque.cjs`): fluxo central do aluno em 320 px com letra grande (✓ à vista, toques de 44 px, foco ao finalizar, textos simples);
     - `movimento` (`tests/e2e-movimento.cjs`): animações em CSS e movimento reduzido (nada em loop, sem atraso, sem blur no painel);
     - `painel` (`tests/e2e-painel.cjs`): menu do aluno com 5 abas, painel do treinador no celular (o que pede ação primeiro) e lista de alunos em colunas no computador;
+    - `lento` (`tests/e2e-lento.cjs`): sinal fraco (servidor pendurado), o treino abre pela cópia do aparelho; `medir` (`tests/medir-treino.cjs`): números da tela de treino com CPU 4x e latência (não aprova nem reprova);
     - `routes`, `admin`, `coach`, `community`, `profile`, `gestao-a11y`, `novidades-a11y`, `exercicios-a11y`, `curto-a11y` e `trocar-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
   - banco: `pnpm test:sql` (precisa de um Postgres; veja o README);
   - não rode dois `tests/run.mjs` ao mesmo tempo, nem `pnpm test:build` com um teste rodando: eles usam as mesmas portas (3200 e 54321) e a mesma pasta `.next`;

@@ -47,7 +47,10 @@ import {
   OfflineError,
   cacheCurrentPage,
   fetchResumableSets,
+  fetchLibrary,
   fetchWorkoutBundle,
+  readCachedLibrary,
+  saveCachedLibrary,
   type LibraryExercise,
   readCachedBundle,
   saveCachedBundle,
@@ -108,6 +111,8 @@ export default function WorkoutExecutionPage() {
   const [workout, setWorkout] = useState<AssignedWorkout | null>(null)
   const [baseExercises, setBaseExercises] = useState<ExerciseRow[]>([])
   const [library, setLibrary] = useState<LibraryExercise[]>([])
+  // Sinal fraco: a tela abriu pela cópia do treino guardada no aparelho.
+  const [usingCopy, setUsingCopy] = useState(false)
   // "Trocar exercício": linha do treino → exercício escolhido hoje (vale neste aparelho).
   const [swaps, setSwaps] = useState<Record<string, string>>({})
   const [swapRowId, setSwapRowId] = useState<string | null>(null)
@@ -171,10 +176,19 @@ export default function WorkoutExecutionPage() {
       let bundle: WorkoutBundle | null = null
       let serverSets: StoredSet[] | null = null
       let cached = false
+      // Com a cópia do treino neste aparelho, sinal fraco (conecta mas não responde) espera pouco.
+      const slowAfter = readCachedBundle(user.id, workoutId) ? 6000 : undefined
       try {
         ;[bundle, serverSets] = await Promise.all([
-          fetchWorkoutBundle(supabase, user.id, workoutId),
-          resumeCandidate ? fetchResumableSets(supabase, user.id, resumeCandidate.sessionId) : Promise.resolve(null),
+          fetchWorkoutBundle(supabase, user.id, workoutId, slowAfter),
+          resumeCandidate
+            ? slowAfter
+              ? Promise.race([
+                  fetchResumableSets(supabase, user.id, resumeCandidate.sessionId),
+                  new Promise<never>((_, reject) => setTimeout(() => reject(new OfflineError('a conexão está lenta demais')), slowAfter)),
+                ])
+              : fetchResumableSets(supabase, user.id, resumeCandidate.sessionId)
+            : Promise.resolve(null),
         ])
         saveCachedBundle(user.id, workoutId, bundle)
         cacheCurrentPage()
@@ -216,19 +230,25 @@ export default function WorkoutExecutionPage() {
       }
 
       const baseRows = bundle.rows as ExerciseRow[]
-      const libraryItems = bundle.library ?? []
-      let restoredSwaps: Record<string, string> = {}
+      // Biblioteca do "Trocar": a cópia do aparelho agora e a atualizada logo depois (fora do
+      // caminho crítico). Só espera por ela quando há uma troca guardada e nenhuma cópia.
+      let libraryItems = readCachedLibrary()
+      let savedSwaps: Record<string, string> = {}
       try {
-        restoredSwaps = parseSwapState(
-          window.localStorage.getItem(SWAP_STORAGE_KEY),
-          workoutId,
-          localDay(),
-          baseRows.map((row) => row.id),
-          libraryItems.map((item) => item.id),
-        )
+        savedSwaps = parseSwapState(window.localStorage.getItem(SWAP_STORAGE_KEY), workoutId, localDay(), baseRows.map((row) => row.id), null)
       } catch {
-        restoredSwaps = {}
+        savedSwaps = {}
       }
+      if (libraryItems.length === 0 && Object.keys(savedSwaps).length > 0) {
+        libraryItems = await fetchLibrary(supabase)
+        if (!active) return
+        saveCachedLibrary(libraryItems)
+      }
+      // Sem biblioteca não dá para mostrar a troca; com ela, confere que o exercício ainda existe.
+      const restoredSwaps =
+        libraryItems.length === 0
+          ? {}
+          : Object.fromEntries(Object.entries(savedSwaps).filter(([, exerciseId]) => libraryItems.some((item) => item.id === exerciseId)))
       const rows = applySwaps(baseRows, restoredSwaps, libraryItems)
       try {
         if (parsePainFlag(window.localStorage.getItem(PAIN_STORAGE_KEY), workoutId, localDay())) {
@@ -343,7 +363,13 @@ export default function WorkoutExecutionPage() {
       setSwaps(restoredSwaps)
       setRecords(pastRecords)
       setSets(initialSets)
+      setUsingCopy(cached)
       setLoadState({ status: 'ready' })
+      void fetchLibrary(supabase).then((items) => {
+        if (!active || items.length === 0) return
+        saveCachedLibrary(items)
+        setLibrary(items)
+      })
     }
 
     void load()
@@ -969,6 +995,12 @@ export default function WorkoutExecutionPage() {
       </div>
 
       <div className="mt-4 space-y-4">
+        {usingCopy && !offline && (
+          <p className="flex items-start gap-2.5 rounded-2xl border border-gold/25 bg-gold-soft px-4 py-3 text-xs leading-relaxed text-gold">
+            <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            Conexão lenta: mostrando a cópia deste treino guardada no aparelho. Pode treinar normalmente; as séries ficam salvas e sobem quando a conexão melhorar.
+          </p>
+        )}
         {offline && (
           <p className="flex items-start gap-2.5 rounded-2xl border border-gold/25 bg-gold-soft px-4 py-3 text-xs leading-relaxed text-gold">
             <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

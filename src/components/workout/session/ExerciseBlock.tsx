@@ -227,8 +227,10 @@ export const ExerciseBlock = memo(function ExerciseBlock({
                 label={labels[setIndex]}
                 inputIdPrefix={`set-${row.id}-${setIndex}`}
                 pending={entry.rowId !== null && pendingIds.has(entry.rowId)}
-                onChange={(patch) => onChangeSet(row.id, setIndex, patch)}
-                onToggle={() => onToggleSet(row.id, setIndex)}
+                rowId={row.id}
+                setIndex={setIndex}
+                onChangeSet={onChangeSet}
+                onToggleSet={onToggleSet}
               />
             ),
           )}

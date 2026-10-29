@@ -80,7 +80,8 @@ export function parseSwapState(
   workoutId: string,
   day: string,
   validRows: string[],
-  validExercises: string[],
+  // null: ainda não há biblioteca (carrega depois do treino); guarda a troca e confere quando ela chegar.
+  validExercises: string[] | null,
 ): Record<string, string> {
   if (!raw) return {}
   try {
@@ -88,7 +89,7 @@ export function parseSwapState(
     if (parsed.workoutId !== workoutId || parsed.day !== day || typeof parsed.swaps !== 'object' || parsed.swaps === null) return {}
     const clean: Record<string, string> = {}
     for (const [rowId, exerciseId] of Object.entries(parsed.swaps)) {
-      if (typeof exerciseId === 'string' && validRows.includes(rowId) && validExercises.includes(exerciseId)) clean[rowId] = exerciseId
+      if (typeof exerciseId === 'string' && validRows.includes(rowId) && (validExercises === null || validExercises.includes(exerciseId))) clean[rowId] = exerciseId
     }
     return clean
   } catch {

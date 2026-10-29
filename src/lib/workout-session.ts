@@ -29,7 +29,6 @@ export type WorkoutBundle = {
   previousSets: StoredSet[]
   // Séries de todos os treinos concluídos do aluno com estes exercícios (recordes).
   recordSets: RecordSet[]
-  library?: LibraryExercise[]
   savedAt: number
 }
 
@@ -54,8 +53,41 @@ const slimExercise = (item: LibraryExercise): LibraryExercise => ({
   media_id: item.media_id ?? null,
 })
 
-export async function fetchWorkoutBundle(supabase: Supabase, userId: string, workoutId: string): Promise<WorkoutBundle> {
-  const [workoutResult, exercisesResult, completedResult, libraryResult] = (await Promise.all([
+// Sinal fraco (conecta mas não responde): passado o tempo, a tela usa a cópia guardada.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new OfflineError('a conexão está lenta demais')), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
+// Biblioteca de exercícios (opções do "Trocar"): vem depois do treino, sem travar a tela.
+export async function fetchLibrary(supabase: Supabase): Promise<LibraryExercise[]> {
+  try {
+    const result = (await supabase.from('exercises').select('*').order('name', { ascending: true }).limit(1000)) as Result
+    if (result.error) return []
+    return ((result.data ?? []) as LibraryExercise[]).map(slimExercise)
+  } catch {
+    return []
+  }
+}
+
+export function fetchWorkoutBundle(supabase: Supabase, userId: string, workoutId: string, timeoutMs?: number): Promise<WorkoutBundle> {
+  const loading = loadWorkoutBundle(supabase, userId, workoutId)
+  return timeoutMs ? withTimeout(loading, timeoutMs) : loading
+}
+
+async function loadWorkoutBundle(supabase: Supabase, userId: string, workoutId: string): Promise<WorkoutBundle> {
+  const [workoutResult, exercisesResult, completedResult] = (await Promise.all([
     supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
     // exercises(*): traz o media_id (GIF) quando o supabase/exercicios.sql já rodou,
     // sem quebrar enquanto a coluna não existe. Vai junto na cópia offline.
@@ -68,7 +100,6 @@ export async function fetchWorkoutBundle(supabase: Supabase, userId: string, wor
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .limit(100),
-    supabase.from('exercises').select('*').order('name', { ascending: true }).limit(1000),
   ])) as Result[]
 
   const workout = check(workoutResult) as AssignedWorkout | null
@@ -106,8 +137,6 @@ export async function fetchWorkoutBundle(supabase: Supabase, userId: string, wor
     rows,
     previousSets: (check(previousResult) ?? []) as StoredSet[],
     recordSets: (check(recordResult) ?? []) as RecordSet[],
-    // Falha ao ler a biblioteca não derruba o treino: só some o "Trocar".
-    library: libraryResult.error ? [] : ((libraryResult.data ?? []) as LibraryExercise[]).map(slimExercise),
     savedAt: Date.now(),
   }
 }
@@ -155,19 +184,32 @@ const LIBRARY_KEY = 'team-jean:biblioteca'
 export function readCachedBundle(userId: string, workoutId: string): WorkoutBundle | null {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(cacheKey(userId, workoutId)) ?? 'null') as WorkoutBundle | null
-    if (!parsed || !parsed.workout || !Array.isArray(parsed.rows)) return null
-    const library = JSON.parse(window.localStorage.getItem(LIBRARY_KEY) ?? '[]') as LibraryExercise[]
-    return { ...parsed, library: Array.isArray(library) ? library : [] }
+    return parsed && parsed.workout && Array.isArray(parsed.rows) ? parsed : null
   } catch {
     return null
   }
 }
 
+export function readCachedLibrary(): LibraryExercise[] {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LIBRARY_KEY) ?? '[]') as LibraryExercise[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCachedLibrary(library: LibraryExercise[]) {
+  try {
+    if (library.length > 0) window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(library))
+  } catch {
+    // Sem espaço: as opções de troca só não aparecem sem internet.
+  }
+}
+
 export function saveCachedBundle(userId: string, workoutId: string, bundle: WorkoutBundle) {
   try {
-    const { library, ...rest } = bundle
-    window.localStorage.setItem(cacheKey(userId, workoutId), JSON.stringify(rest))
-    if (library && library.length > 0) window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(library))
+    window.localStorage.setItem(cacheKey(userId, workoutId), JSON.stringify(bundle))
     // Guarda só os treinos abertos mais recentemente.
     const keys = Object.keys(window.localStorage).filter((key) => key.startsWith(CACHE_PREFIX))
     if (keys.length > CACHE_LIMIT) {

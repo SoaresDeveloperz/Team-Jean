@@ -37,6 +37,10 @@ const SUITES = {
   movimento: ['tests/e2e-movimento.cjs'],
   // Menu do aluno com 5 abas, painel do treinador no celular e lista de alunos em colunas no computador.
   painel: ['tests/e2e-painel.cjs'],
+  // Medição (números, sem aprovar/reprovar) da tela de treino com CPU lenta e rede ruim.
+  medir: ['tests/medir-treino.cjs'],
+  // Sinal fraco: servidor pendurado, treino abre pela cópia do aparelho.
+  lento: ['tests/e2e-lento.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],

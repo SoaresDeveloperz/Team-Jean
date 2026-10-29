@@ -18,7 +18,7 @@ export function Switch({ checked, onChange, label }: SwitchProps) {
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors',
+        'touch-44 relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors',
         checked ? 'bg-brand' : 'bg-white/15',
       )}
     >

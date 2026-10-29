@@ -97,7 +97,7 @@ export function FinanceSummaryTile({ students }: { students: Profile[] }) {
                     .slice(0, 3)
                     .map((student) => student.full_name?.split(' ')[0] || 'Aluno')
                     .join(', ')}${summary.overdue.length > 3 ? '…' : ''}`
-                : 'Ninguém em atraso. 👌'}
+                : 'Ninguém em atraso.'}
             </p>
             {summary.overdue.length === 0 && summary.nextDue && (
               <p className="mt-1 text-xs text-zinc-500">Próximo vencimento: {shortDay(summary.nextDue)}</p>

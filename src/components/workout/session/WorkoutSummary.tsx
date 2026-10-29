@@ -36,10 +36,16 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => {
 export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onDone: () => void }) {
   const toast = useToast()
   const mapRef = useRef<SVGSVGElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const [generating, setGenerating] = useState(false)
   const [image, setImage] = useState<{ blob: Blob; url: string } | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
   const [posted, setPosted] = useState(false)
+
+  // A tela troca de uma vez: o foco vai para o título para o leitor de tela anunciar que salvou.
+  useEffect(() => {
+    titleRef.current?.focus({ preventScroll: true })
+  }, [])
 
   useEffect(() => {
     haptic([40, 60, 120])
@@ -148,6 +154,8 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           Treino concluído
         </m.p>
         <m.h1
+          ref={titleRef}
+          tabIndex={-1}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
@@ -242,7 +250,10 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-black uppercase tracking-[0.16em] text-black disabled:opacity-60"
         >
           {generating ? (
-            <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Gerando imagem" />
+            <>
+              <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" />
+              <span className="sr-only">Gerando imagem…</span>
+            </>
           ) : (
             <>
               <Share2 className="h-4 w-4" aria-hidden="true" /> Compartilhar nos stories

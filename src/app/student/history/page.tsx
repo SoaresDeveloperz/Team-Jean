@@ -223,7 +223,7 @@ export default function StudentHistoryPage() {
                 type="button"
                 onClick={() => changeMonth(-1)}
                 aria-label="Mês anterior"
-                className="grid h-10 w-10 place-items-center rounded-xl text-zinc-400 hover:bg-white/5 hover:text-white"
+                className="grid h-11 w-11 place-items-center rounded-xl text-zinc-400 hover:bg-white/5 hover:text-white"
               >
                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -235,7 +235,7 @@ export default function StudentHistoryPage() {
                 onClick={() => changeMonth(1)}
                 disabled={isCurrentMonth}
                 aria-label="Próximo mês"
-                className="grid h-10 w-10 place-items-center rounded-xl text-zinc-400 hover:bg-white/5 hover:text-white disabled:opacity-30"
+                className="grid h-11 w-11 place-items-center rounded-xl text-zinc-400 hover:bg-white/5 hover:text-white disabled:opacity-30"
               >
                 <ChevronRight className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -275,7 +275,7 @@ export default function StudentHistoryPage() {
                         aria-pressed={isSelected}
                         aria-label={`${date.getDate()} de ${monthTitle(month)}: ${count > 0 ? plural(count, 'treino', 'treinos') : 'sem treino'}`}
                         className={cn(
-                          'grid aspect-square w-full place-items-center rounded-xl text-xs font-bold transition',
+                          'grid aspect-square min-h-11 w-full place-items-center rounded-xl text-xs font-bold transition',
                           count > 1
                             ? 'bg-brand text-black'
                             : count === 1
@@ -308,7 +308,7 @@ export default function StudentHistoryPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedDay(null)}
-                  className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-xs font-bold text-zinc-300"
+                  className="flex min-h-11 items-center gap-1 rounded-full bg-white/[0.06] px-3 text-xs font-bold text-zinc-300"
                 >
                   <X className="h-3 w-3" aria-hidden="true" /> Ver mês
                 </button>

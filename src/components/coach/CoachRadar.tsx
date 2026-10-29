@@ -112,7 +112,7 @@ const EMPTY: Record<RadarTab, string> = {
   feedback: 'Nenhum recado dos alunos nos últimos 14 dias.',
   records: 'Nenhum recorde novo nos últimos 7 dias.',
   progressions: 'Ninguém fechou todas as séries no topo da faixa ainda.',
-  alerts: 'Ninguém com RPE 9+ nos últimos 3 treinos. 👌',
+  alerts: 'Ninguém com RPE 9+ nos últimos 3 treinos.',
 }
 
 const TONES = {

@@ -16,7 +16,7 @@ const HINTS: Record<PushStatus, string> = {
   unsupported: 'Este navegador não recebe notificações push.',
   'ios-install': '',
   unconfigured: 'As notificações push ainda não foram configuradas no servidor.',
-  denied: 'Bloqueadas neste navegador. Libere as notificações nas configurações do site.',
+  denied: 'Bloqueadas neste aparelho. Para receber avisos do Jean, ative as notificações do Team Jean nos ajustes do celular.',
   off: 'Receba avisos, recados e lembretes mesmo com o app fechado.',
   on: 'Ativadas neste aparelho.',
 }
@@ -90,7 +90,7 @@ export function PushNotificationsTile({ coach = false }: { coach?: boolean }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-white">Notificações no celular</p>
-          <p className="text-[11px] leading-snug text-zinc-400" aria-live="polite">
+          <p className="text-xs leading-snug text-zinc-400" aria-live="polite">
             {status === 'ios-install' ? (
               <>
                 No iPhone, toque em <Share className="inline h-3 w-3" aria-label="Compartilhar" />, &quot;Adicionar à Tela de

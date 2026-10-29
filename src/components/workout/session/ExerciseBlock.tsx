@@ -198,7 +198,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
         )}
       </AnimatePresence>
 
-      {row.notes && (
+      {row.notes && !row.swappedFrom && (
         <div className="mx-4 mb-3 flex items-start gap-2.5 rounded-2xl border border-line bg-white/[0.03] p-3">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
           <p className="whitespace-pre-line text-xs leading-relaxed text-zinc-300">{row.notes}</p>
@@ -208,7 +208,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
       <div className="px-2 pb-2" role="table" aria-label={`Séries de ${exercise?.name ?? 'exercício'}`}>
         <div
           role="row"
-          className="grid grid-cols-[3.25rem_minmax(0,1fr)_4.4rem_4.4rem_2.9rem] gap-1.5 px-2 pb-1 text-center text-xs font-bold text-zinc-400"
+          className="set-grid px-2 pb-1 text-center text-xs font-bold text-zinc-400"
         >
           <span role="columnheader">Série</span>
           <span role="columnheader">Anterior</span>

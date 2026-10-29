@@ -296,7 +296,7 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   check('PIX mostra para quem vai e o tipo da chave', billingText.includes('Para: Jean Treinador') && billingText.includes('chave e-mail'))
   check('PIX explica que o treinador confirma o pagamento', billingText.includes('Depois de pagar, seu treinador confirma aqui'))
   check('PIX não mostra a chave inteira no cartão', !billingText.includes('jean@teamjean.app'))
-  await page.click('button:has-text("Copiar PIX copia e cola")')
+  await page.click('button:has-text("Copiar código PIX")')
   await page.waitForSelector('text=PIX copiado')
   const pix = await page.evaluate(() => navigator.clipboard.readText())
   check('PIX copia e cola no padrão do Banco Central', pix.startsWith('000201') && pix.includes('br.gov.bcb.pix') && pix.includes('jean@teamjean.app') && pix.includes('5406150.00'))

@@ -357,6 +357,11 @@ export default function StudentHistoryPage() {
                             {session.short_mode && (
                               <span className="rounded-full bg-gold-soft px-2 py-0.5 text-xs font-bold text-gold">Versão curta</span>
                             )}
+                            {(session.swaps ?? 0) > 0 && (
+                              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
+                                {plural(session.swaps ?? 0, 'troca', 'trocas')}
+                              </span>
+                            )}
                             {duration && (
                               <span className="flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
                                 <Clock className="h-3 w-3" aria-hidden="true" /> {duration} min

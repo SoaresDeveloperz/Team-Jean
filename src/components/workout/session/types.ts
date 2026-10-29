@@ -2,6 +2,8 @@ import type { Exercise, PrescribedExercise } from '@/lib/types'
 
 export type ExerciseRow = PrescribedExercise & {
   exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null
+  // Exercício trocado hoje: id do exercício que o treinador prescreveu.
+  swappedFrom?: string
 }
 
 export type PreviousSet = { weight: number; reps: number }

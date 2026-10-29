@@ -65,6 +65,9 @@ export type PrescribedExercise = {
   set_type?: string | null
   planned_sets: PlannedSet[] | null
   notes: string | null
+  // supabase/trocar-exercicio.sql: marca do treinador e alternativas aceitas.
+  essential?: boolean | null
+  alternatives?: string[] | null
   exercises?: Partial<Exercise> | null
 }
 
@@ -82,6 +85,8 @@ export type WorkoutSession = {
   coach_reply_at?: string | null
   // supabase/treino-curto.sql: o aluno fez a versão curta ("Tenho pouco tempo").
   short_mode?: boolean | null
+  // supabase/trocar-exercicio.sql: quantos exercícios o aluno trocou.
+  swaps?: number | null
   // Não existe na tabela atual; lidos só se um dia forem adicionados.
   created_at?: string | null
   started_at?: string | null

@@ -2,7 +2,7 @@
 
 import { memo, useMemo, useState } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion'
-import { ChevronDown, Flame, Info, Minus, Plus, Target, Trophy, Video } from 'lucide-react'
+import { ChevronDown, Flame, Info, Minus, Plus, RefreshCw, Star, Target, Trophy, Video } from 'lucide-react'
 import { SET_TYPES, formatKg } from '@/lib/workouts'
 import { cn } from '@/lib/cn'
 import { canSuggestWarmup } from '@/lib/warmup'
@@ -27,6 +27,8 @@ type ExerciseBlockProps = {
   onRemoveExtra: (rowId: string) => void
   // Versão curta do treino: séries de trabalho mostradas por exercício (null = treino completo).
   shortCap?: number | null
+  // "Trocar exercício": só vem quando há opção e nenhuma série foi feita.
+  onSwap?: (rowId: string) => void
 }
 
 const NO_HIDDEN: ReadonlySet<number> = new Set()
@@ -42,6 +44,7 @@ export const ExerciseBlock = memo(function ExerciseBlock({
   onAddSet,
   onRemoveExtra,
   shortCap = null,
+  onSwap,
 }: ExerciseBlockProps) {
   const [showMedia, setShowMedia] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
@@ -99,6 +102,12 @@ export const ExerciseBlock = memo(function ExerciseBlock({
             <span>
               {done}/{visibleCount} séries
             </span>
+            {row.essential && (
+              <span className="flex items-center gap-1 rounded-full bg-gold-soft px-2 py-0.5 font-bold text-gold">
+                <Star className="h-3 w-3" aria-hidden="true" /> Essencial
+              </span>
+            )}
+            {row.swappedFrom && <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-bold text-zinc-200">Trocado hoje</span>}
             {targets.length > 0 && (
               <span className="flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 font-bold text-brand">
                 <Target className="h-3 w-3" aria-hidden="true" />
@@ -238,6 +247,17 @@ export const ExerciseBlock = memo(function ExerciseBlock({
           ))}
         </div>
         <div className="flex shrink-0 gap-1.5">
+          {onSwap && (
+            <button
+              type="button"
+              onClick={() => onSwap(row.id)}
+              data-swap-button
+              aria-label={`Trocar ${exercise?.name ?? 'exercício'}`}
+              className="flex h-11 items-center gap-1 rounded-xl bg-white/[0.06] px-3.5 text-sm font-bold text-zinc-300 hover:text-white"
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Trocar
+            </button>
+          )}
           {canRemoveExtra && (
             <button
               type="button"

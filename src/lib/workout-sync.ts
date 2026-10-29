@@ -30,6 +30,8 @@ export type FinishPatch = {
   feedback_tags?: string[]
   // Treino feito na versão curta (supabase/treino-curto.sql).
   short_mode?: boolean
+  // Quantos exercícios o aluno trocou hoje (supabase/trocar-exercicio.sql).
+  swaps?: number
 }
 
 export type SyncOp =
@@ -140,14 +142,19 @@ async function send(supabase: Supabase, op: SyncOp): Promise<Outcome> {
   const update = (patch: Partial<FinishPatch>) =>
     supabase.from('workout_sessions').update(patch).eq('id', op.sessionId).select('id') as unknown as Promise<Result>
   let result = await update(op.patch)
-  // Sem o treino-curto.sql não existe a coluna short_mode: salva o treino sem ela
-  // (nunca trava a fila por causa disso).
+  // Sem o treino-curto.sql / trocar-exercicio.sql não existem as colunas short_mode
+  // e swaps: salva o treino sem elas (nunca trava a fila por causa disso). Só tira
+  // a coluna que a mensagem de erro cita.
   let patch = op.patch
-  if (result.error?.code === 'PGRST204' && 'short_mode' in patch && /short_mode/.test(result.error.message ?? '')) {
-    const withoutShort: Partial<FinishPatch> = { ...patch }
-    delete withoutShort.short_mode
-    patch = withoutShort as FinishPatch
-    result = await update(patch)
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const column of ['short_mode', 'swaps'] as const) {
+      if (result.error?.code === 'PGRST204' && column in patch && result.error.message?.includes(column)) {
+        const without: Partial<FinishPatch> = { ...patch }
+        delete without[column]
+        patch = without as FinishPatch
+        result = await update(patch)
+      }
+    }
   }
   // Sem o gestao.sql não existem as colunas do recado: salva o treino sem ele.
   if (result.error?.code === 'PGRST204' && ('feedback' in patch || 'feedback_tags' in patch)) {

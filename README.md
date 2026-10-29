@@ -270,6 +270,32 @@ série principal ficam; série já feita nunca some.
 - **Contas:** `src/lib/short-workout.ts` (puras, testadas em
   `tests/contas-curto.mjs`). Telas: roteiros `curto` e `curto-a11y`.
 
+### Trocar exercício e marca "Essencial"
+
+Se a máquina está ocupada ou algo incomoda, o aluno toca em **Trocar** no
+exercício (antes da primeira série dele) e vê até 3 opções: primeiro as
+**alternativas que o Jean escolheu** ("Indicado pelo Jean"), depois sugestões
+do mesmo grupo muscular, com GIF primeiro ("Sugestão do app"). A troca vale só
+para hoje e neste aparelho, dá para **voltar ao original**, e a prescrição do
+Jean não muda. A série é gravada no exercício que foi feito (`exercise_id`), com
+o `assigned_exercise_id` da linha original; o "Anterior" e a carga-alvo do outro
+exercício não aparecem, e não há "recorde" falso.
+
+- **Dor:** o painel tem "Estou trocando por causa de dor"; isso só deixa a tag
+  **Senti dor** marcada no recado final (o aviso de sempre ao treinador). Nada de
+  texto livre, e o push continua genérico.
+- **Essencial:** no construtor, o Jean marca o exercício como essencial. Ele
+  nunca sai da versão curta (aparece travado no painel) e só troca por
+  alternativa que o Jean escolheu (até 5 por exercício).
+- **Para o treinador:** o histórico mostra "N trocas" (só o número,
+  `workout_sessions.swaps`, sem aviso nem push).
+- **Banco:** rode [`supabase/trocar-exercicio.sql`](supabase/trocar-exercicio.sql)
+  (idempotente, qualquer ordem). Antes disso o construtor não mostra os campos
+  novos e o aluno troca por sugestão do grupo; ao finalizar, se a coluna não
+  existe, o treino é salvo sem o número de trocas.
+- **Contas:** `src/lib/swap-exercise.ts` (puras, `tests/contas-trocar.mjs`).
+  Telas: roteiros `trocar` e `trocar-a11y`; banco: `tests/sql/rls-trocar.sql`.
+
 ## Testes e CI
 
 - `pnpm test:build && pnpm test:e2e`: sobe um Supabase falso
@@ -289,6 +315,11 @@ série principal ficam; série já feita nunca some.
   (duração, séries escondidas, regra padrão, estado no aparelho). Também roda no
   roteiro `curto`, que testa as telas com e sem o SQL e sem internet; a auditoria
   axe é o roteiro `curto-a11y`.
+- `node tests/contas-trocar.mjs`: confere, sem navegador, as opções de troca
+  (alternativas do Jean primeiro, mesmo grupo muscular, essencial só por
+  alternativa do Jean, nunca o próprio exercício nem um que já está no treino).
+  Também roda no roteiro `trocar`, que testa as telas com e sem o SQL; a
+  auditoria axe é o roteiro `trocar-a11y`.
 - `pnpm test:sql`: aplica os `supabase/*.sql` duas vezes, em duas ordens, num
   Postgres 16 e testa RLS, restrições e funções (`PGHOST`, `PGUSER` e
   `PGPASSWORD` apontando para o banco).

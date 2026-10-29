@@ -11,6 +11,8 @@ type Supabase = ReturnType<typeof createClient>
 export type BundleExercise = PrescribedExercise & {
   exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null
 }
+// Biblioteca de exercícios (opções do "Trocar exercício"); sem ela, só não há troca.
+export type LibraryExercise = Pick<Exercise, 'id' | 'name' | 'muscle_group' | 'secondary_muscle' | 'image_url' | 'video_url' | 'media_id'>
 export type StoredSet = {
   id?: string
   assigned_exercise_id: string | null
@@ -27,6 +29,7 @@ export type WorkoutBundle = {
   previousSets: StoredSet[]
   // Séries de todos os treinos concluídos do aluno com estes exercícios (recordes).
   recordSets: RecordSet[]
+  library?: LibraryExercise[]
   savedAt: number
 }
 
@@ -41,8 +44,18 @@ function check(result: Result) {
   return result.data
 }
 
+const slimExercise = (item: LibraryExercise): LibraryExercise => ({
+  id: item.id,
+  name: item.name,
+  muscle_group: item.muscle_group ?? null,
+  secondary_muscle: item.secondary_muscle ?? null,
+  image_url: item.image_url ?? null,
+  video_url: item.video_url ?? null,
+  media_id: item.media_id ?? null,
+})
+
 export async function fetchWorkoutBundle(supabase: Supabase, userId: string, workoutId: string): Promise<WorkoutBundle> {
-  const [workoutResult, exercisesResult, completedResult] = (await Promise.all([
+  const [workoutResult, exercisesResult, completedResult, libraryResult] = (await Promise.all([
     supabase.from('assigned_workouts').select('*').eq('id', workoutId).maybeSingle(),
     // exercises(*): traz o media_id (GIF) quando o supabase/exercicios.sql já rodou,
     // sem quebrar enquanto a coluna não existe. Vai junto na cópia offline.
@@ -55,6 +68,7 @@ export async function fetchWorkoutBundle(supabase: Supabase, userId: string, wor
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .limit(100),
+    supabase.from('exercises').select('*').order('name', { ascending: true }).limit(1000),
   ])) as Result[]
 
   const workout = check(workoutResult) as AssignedWorkout | null
@@ -92,6 +106,8 @@ export async function fetchWorkoutBundle(supabase: Supabase, userId: string, wor
     rows,
     previousSets: (check(previousResult) ?? []) as StoredSet[],
     recordSets: (check(recordResult) ?? []) as RecordSet[],
+    // Falha ao ler a biblioteca não derruba o treino: só some o "Trocar".
+    library: libraryResult.error ? [] : ((libraryResult.data ?? []) as LibraryExercise[]).map(slimExercise),
     savedAt: Date.now(),
   }
 }
@@ -123,6 +139,7 @@ export function clearSavedWorkouts() {
     Object.keys(window.localStorage)
       .filter((key) => key.startsWith(CACHE_PREFIX))
       .forEach((key) => window.localStorage.removeItem(key))
+    window.localStorage.removeItem(LIBRARY_KEY)
   } catch {
     // Sem armazenamento: nada a limpar.
   }
@@ -131,10 +148,16 @@ export function clearSavedWorkouts() {
 const CACHE_LIMIT = 8
 const cacheKey = (userId: string, workoutId: string) => `${CACHE_PREFIX}${userId}:${workoutId}`
 
+// A biblioteca (opções do "Trocar") é a mesma para todos os treinos: fica numa
+// chave só, para a cópia de cada treino não crescer.
+const LIBRARY_KEY = 'team-jean:biblioteca'
+
 export function readCachedBundle(userId: string, workoutId: string): WorkoutBundle | null {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(cacheKey(userId, workoutId)) ?? 'null') as WorkoutBundle | null
-    return parsed && parsed.workout && Array.isArray(parsed.rows) ? parsed : null
+    if (!parsed || !parsed.workout || !Array.isArray(parsed.rows)) return null
+    const library = JSON.parse(window.localStorage.getItem(LIBRARY_KEY) ?? '[]') as LibraryExercise[]
+    return { ...parsed, library: Array.isArray(library) ? library : [] }
   } catch {
     return null
   }
@@ -142,7 +165,9 @@ export function readCachedBundle(userId: string, workoutId: string): WorkoutBund
 
 export function saveCachedBundle(userId: string, workoutId: string, bundle: WorkoutBundle) {
   try {
-    window.localStorage.setItem(cacheKey(userId, workoutId), JSON.stringify(bundle))
+    const { library, ...rest } = bundle
+    window.localStorage.setItem(cacheKey(userId, workoutId), JSON.stringify(rest))
+    if (library && library.length > 0) window.localStorage.setItem(LIBRARY_KEY, JSON.stringify(library))
     // Guarda só os treinos abertos mais recentemente.
     const keys = Object.keys(window.localStorage).filter((key) => key.startsWith(CACHE_PREFIX))
     if (keys.length > CACHE_LIMIT) {

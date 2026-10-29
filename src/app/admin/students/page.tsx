@@ -30,6 +30,7 @@ import type { AssignedWorkout, Profile } from '@/lib/types'
 import { avatarUrlOf, goalInfo } from '@/lib/profile'
 import { relativeDay, relativeDayPhrase, startOfWeek } from '@/lib/stats'
 import { cn } from '@/lib/cn'
+import { plural } from '@/lib/text'
 import { friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
@@ -71,6 +72,8 @@ type SessionRow = {
   coach_reply_at?: string | null
   // supabase/treino-curto.sql
   short_mode?: boolean | null
+  // supabase/trocar-exercicio.sql: exercícios trocados nesse treino.
+  swaps?: number | null
 }
 
 type Filter = 'all' | 'active' | 'inactive' | 'tired'
@@ -575,6 +578,11 @@ export default function AdminStudentsPage() {
                                 <span className="flex shrink-0 flex-wrap justify-end gap-1.5">
                                   {session.short_mode && (
                                     <span className="rounded-full bg-gold-soft px-2 py-0.5 text-xs font-bold text-gold">Versão curta</span>
+                                  )}
+                                  {(session.swaps ?? 0) > 0 && (
+                                    <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">
+                                      {plural(session.swaps ?? 0, 'troca', 'trocas')}
+                                    </span>
                                   )}
                                   {session.session_rpe != null && (
                                     <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-bold text-zinc-300">

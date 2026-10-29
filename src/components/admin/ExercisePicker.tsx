@@ -15,6 +15,11 @@ type ExercisePickerProps = {
   // Exercícios que já estão no treino ganham uma etiqueta (repetir é permitido).
   inWorkout: ReadonlySet<string>
   onAdd: (exercises: Exercise[]) => void
+  title?: string
+  description?: string
+  confirmLabel?: string
+  // Quantos podem ser marcados de uma vez (sem limite se omitido).
+  max?: number
 }
 
 const ALL = 'Todos'
@@ -27,7 +32,7 @@ const normalizeText = (text: string) =>
 
 // Seleção múltipla no estilo Hevy: marca vários e adiciona todos de uma vez,
 // na ordem em que foram tocados.
-export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: ExercisePickerProps) {
+export function ExercisePicker({ open, onClose, library, inWorkout, onAdd, title = 'Adicionar exercício', description = 'Toque para marcar um ou mais exercícios.', confirmLabel = 'Adicionar', max }: ExercisePickerProps) {
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState(ALL)
   const [picked, setPicked] = useState<string[]>([])
@@ -49,6 +54,8 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
     return !term || normalizeText(`${exercise.name ?? ''} ${exercise.muscle_group ?? ''}`).includes(term)
   })
 
+  const atLimit = max !== undefined && picked.length >= max
+
   const reset = () => {
     setSearch('')
     setGroup(ALL)
@@ -61,7 +68,10 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
   }
 
   const toggle = (id: string) =>
-    setPicked((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+    setPicked((current) => {
+      if (current.includes(id)) return current.filter((item) => item !== id)
+      return max !== undefined && current.length >= max ? current : [...current, id]
+    })
 
   const addPicked = () => {
     const byId = new Map(library.map((exercise) => [exercise.id, exercise]))
@@ -74,8 +84,8 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
       open={open}
       onClose={close}
       variant="sheet"
-      title="Adicionar exercício"
-      description="Toque para marcar um ou mais exercícios."
+      title={title}
+      description={description}
     >
       <div className="space-y-3">
         <div className="relative">
@@ -110,6 +120,12 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
           </div>
         )}
 
+        {max !== undefined && (
+          <p role="status" className="text-xs font-semibold text-zinc-300">
+            {atLimit ? `Limite de ${max} escolhido${max === 1 ? '' : 's'}: tire um para trocar.` : `Você pode escolher até ${max}.`}
+          </p>
+        )}
+
         <ul className="space-y-1.5" aria-label="Biblioteca de exercícios">
           {filtered.map((exercise) => {
             const order = picked.indexOf(exercise.id)
@@ -119,6 +135,7 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
                 <button
                   type="button"
                   aria-pressed={selected}
+                  aria-disabled={!selected && atLimit ? true : undefined}
                   onClick={() => toggle(exercise.id)}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors',
@@ -166,7 +183,7 @@ export function ExercisePicker({ open, onClose, library, inWorkout, onAdd }: Exe
             whileTap={{ scale: 0.98 }}
             className="flex h-14 w-full items-center justify-center rounded-2xl bg-white text-sm font-black uppercase tracking-[0.14em] text-black transition-colors disabled:bg-surface-3 disabled:text-zinc-500"
           >
-            {picked.length === 0 ? 'Selecione exercícios' : `Adicionar (${picked.length})`}
+            {picked.length === 0 ? 'Selecione exercícios' : `${confirmLabel} (${picked.length})`}
           </m.button>
         </SheetFooter>
       </div>

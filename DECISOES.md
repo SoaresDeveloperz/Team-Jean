@@ -18,6 +18,13 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-28 — "Trocar exercício" e a marca "Essencial" do Jean
+- **Pergunta:** o que entra depois da versão curta: trocar um exercício na hora (máquina ocupada, dor) e deixar o Jean marcar o que não pode sair.
+- **Decisão:** o dono pediu os dois ("faz aí"). Troca só para hoje, antes da primeira série do exercício, até 3 opções (alternativas do Jean primeiro, depois mesmo grupo muscular); essencial fica na versão curta e só troca por alternativa do Jean. A troca por dor só pré-marca a tag "Senti dor" do recado, sem texto livre.
+- **Por quê:** a série já guarda o exercício feito separado do prescrito, então a prescrição do Jean nunca muda; um número (`swaps`) basta para o histórico, sem aviso nem push.
+- **Cuidados:** sem o SQL o app segue funcionando (sugestão por grupo; treino salvo sem `swaps`); sem "recorde" nem "Anterior" do exercício antigo no exercício novo.
+- **Rever quando:** o Jean disser que as sugestões do app atrapalham (aí só alternativas dele), ou quando a troca for muito usada para fugir do mesmo exercício.
+
 ## 2026-10-28 — "Tenho pouco tempo" e a Hoje enxuta (reunião dos agentes)
 - **Pergunta:** qual inovação adicionar ao app agora e como reformar o front (revisão com a skill `design-taste-frontend` e os agentes novos).
 - **Opções da inovação:** A) trocar exercício (equivalente do mesmo músculo, com GIF); B) "tenho pouco tempo" (treino de ~20 min); C) cartão semanal compartilhável; D) carga/volume pela prontidão; E) lembrete de treino inteligente (push).

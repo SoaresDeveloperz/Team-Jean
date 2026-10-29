@@ -203,7 +203,9 @@ export async function loadRadar(supabase: Supabase, students: Pick<Profile, 'id'
       .map((session) =>
         (setsBySession.get(session.id) ?? []).filter(
           (set) =>
-            (set.exercise_id === prescription.exercise_id || set.assigned_exercise_id === prescription.id) && set.set_type !== 'warmup',
+            // Série de exercício trocado pelo aluno (outro exercise_id) não conta como carga do prescrito.
+            (set.exercise_id === prescription.exercise_id || (!set.exercise_id && set.assigned_exercise_id === prescription.id)) &&
+            set.set_type !== 'warmup',
         ),
       )
       .find((list) => list.length > 0)

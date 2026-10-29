@@ -136,6 +136,8 @@ async function login(page, email, password = '123456') {
   check('a prescrição do Jean continua com 6 exercícios de 4 séries', prescribed.length === 6 && prescribed.every((row) => row.sets_count === 4))
 
   await markFirstSet()
+  // A tela confirma na hora e a sessão sobe pela fila do aparelho: espera ela chegar ao servidor.
+  for (let attempt = 0; attempt < 60 && (await mariaSessions()).length === 0; attempt += 1) await page.waitForTimeout(250)
   check('marcar série na versão curta cria a sessão normalmente', (await mariaSessions()).length === 1)
   await page.reload()
   await page.waitForSelector('section#exercise-awd1')

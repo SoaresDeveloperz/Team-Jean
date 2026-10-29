@@ -439,12 +439,16 @@ export default function AdminStudentsPage() {
                             <span className="sr-only">com alerta</span>
                           </span>
                         ) : (
-                          <span aria-hidden="true" className="hidden lg:block" />
+                          <span aria-hidden="true" className="hidden text-zinc-600 lg:block">
+                            —
+                          </span>
                         )}
                       </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="sr-only">Prontidão: </span>
                       <span className={cn('font-display text-xl font-bold leading-none', readiness.className)}>{readiness.label}</span>
+                      {student.readiness_score == null && <span className="sr-only">não informada</span>}
                       <span className="text-xs font-black uppercase tracking-wider text-zinc-500 lg:hidden">Prontidão</span>
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />

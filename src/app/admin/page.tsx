@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
           {[
             { href: '/admin/workouts', label: 'Prescrever treino', icon: ClipboardList },
             { href: '/admin/students?novo=1', label: 'Novo aluno', icon: UserPlus },
-            { href: '/admin/announcements', label: 'Enviar aviso', icon: Megaphone },
+            { href: '/admin/announcements', label: 'Avisos', icon: Megaphone },
           ].map((action) => (
             <Link
               key={action.label}
@@ -320,64 +320,17 @@ export default function AdminDashboardPage() {
         </m.div>
 
         {/* No computador: radar e atividade à esquerda; dinheiro e alertas à direita. */}
-        {/* No celular os dois blocos "se desmancham" (contents) e as peças se ordenam
-            pela prioridade: dinheiro e quem precisa de atenção primeiro, depois o radar. */}
+        {/* A ordem no código é a do celular (dinheiro e quem precisa de atenção primeiro,
+            depois o radar); no computador, as colunas são posicionadas pela grade. */}
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div className="contents lg:block lg:space-y-4">
-            {/* Radar: recados, recordes, progressões e cansaço */}
-            <div className="order-3">
-              <CoachRadar students={data.students} />
-            </div>
-
-            {/* Atividade recente */}
-            <Tile className="order-4 p-0">
-              <div className="flex items-center justify-between px-5 pb-1 pt-5">
-                <Eyebrow>Atividade recente</Eyebrow>
-                <span className="text-xs font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
-              </div>
-              {data.sessions.length === 0 ? (
-                <p className="px-5 pb-5 pt-2 text-sm text-zinc-500">Nenhum treino concluído no período.</p>
-              ) : (
-                <ul className="divide-y divide-line">
-                  {data.sessions.slice(0, 8).map((session) => {
-                    const student = derived.studentById.get(session.student_id)
-                    const volume = data.volumeBySession.get(session.id)
-                    return (
-                      <li key={session.id}>
-                        <Link
-                          href={`/admin/students?aluno=${session.student_id}`}
-                          className="flex items-center gap-3 px-5 py-3 transition hover:bg-white/[0.02]"
-                        >
-                          <Avatar name={student?.full_name ?? student?.email} seed={session.student_id} src={avatarUrlOf(student)} size="sm" />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm text-zinc-300">
-                              <span className="font-bold text-white">{student?.full_name?.split(' ')[0] ?? 'Aluno'}</span> concluiu{' '}
-                              <span className="font-semibold text-zinc-200">{session.assigned_workouts?.name ?? 'um treino'}</span>
-                            </span>
-                            <span className="mt-0.5 block text-xs text-zinc-500">
-                              {relativeDay(new Date(session.completed_at))}
-                              {session.session_rpe != null && ` · RPE ${session.session_rpe}`}
-                              {volume ? ` · ${formatKg(volume)} kg` : ''}
-                            </span>
-                          </span>
-                          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
-                        </Link>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </Tile>
-          </div>
-
-          <div className="contents lg:block lg:space-y-4">
-            <div className="order-1">
+          <div className="space-y-4 lg:col-start-2 lg:row-start-1">
+            <div>
               <FinanceSummaryTile students={data.students} />
             </div>
 
             {/* Atenção */}
             {(derived.inactive.length > 0 || derived.lowReadiness.length > 0) && (
-              <Tile className="order-2 space-y-4">
+              <Tile className="space-y-4">
                 <Eyebrow className="text-gold/90">Precisam de atenção</Eyebrow>
                 {derived.inactive.length > 0 && (
                   <div>
@@ -434,10 +387,57 @@ export default function AdminDashboardPage() {
               </Tile>
             )}
 
-            <div className="order-5">
+            <div>
               <PushNotificationsTile coach />
             </div>
           </div>
+<div className="space-y-4 lg:col-start-1 lg:row-start-1">
+            {/* Radar: recados, recordes, progressões e cansaço */}
+            <div>
+              <CoachRadar students={data.students} />
+            </div>
+
+            {/* Atividade recente */}
+            <Tile className="p-0">
+              <div className="flex items-center justify-between px-5 pb-1 pt-5">
+                <Eyebrow>Atividade recente</Eyebrow>
+                <span className="text-xs font-bold text-zinc-500">últimos {WINDOW_DAYS} dias</span>
+              </div>
+              {data.sessions.length === 0 ? (
+                <p className="px-5 pb-5 pt-2 text-sm text-zinc-500">Nenhum treino concluído no período.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {data.sessions.slice(0, 8).map((session) => {
+                    const student = derived.studentById.get(session.student_id)
+                    const volume = data.volumeBySession.get(session.id)
+                    return (
+                      <li key={session.id}>
+                        <Link
+                          href={`/admin/students?aluno=${session.student_id}`}
+                          className="flex items-center gap-3 px-5 py-3 transition hover:bg-white/[0.02]"
+                        >
+                          <Avatar name={student?.full_name ?? student?.email} seed={session.student_id} src={avatarUrlOf(student)} size="sm" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm text-zinc-300">
+                              <span className="font-bold text-white">{student?.full_name?.split(' ')[0] ?? 'Aluno'}</span> concluiu{' '}
+                              <span className="font-semibold text-zinc-200">{session.assigned_workouts?.name ?? 'um treino'}</span>
+                            </span>
+                            <span className="mt-0.5 block text-xs text-zinc-500">
+                              {relativeDay(new Date(session.completed_at))}
+                              {session.session_rpe != null && ` · RPE ${session.session_rpe}`}
+                              {volume ? ` · ${formatKg(volume)} kg` : ''}
+                            </span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </Tile>
+          </div>
+
         </div>
       </Stagger>
 

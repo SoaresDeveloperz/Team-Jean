@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
 
 // Tons lisos da paleta (esmeralda, âmbar, grafite) para diferenciar alunos nas
 // listas sem degradê e sem sair da identidade visual (preto legível em todos).
-const TONES = ['bg-emerald-400', 'bg-amber-300', 'bg-zinc-300', 'bg-teal-300', 'bg-lime-300', 'bg-emerald-300']
+const TONES = ['bg-emerald-400', 'bg-amber-300', 'bg-zinc-300', 'bg-zinc-100', 'bg-lime-300', 'bg-amber-200']
 
 function hash(text: string) {
   let value = 0

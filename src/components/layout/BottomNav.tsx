@@ -13,6 +13,8 @@ export type NavItem = {
   icon: LucideIcon
   // Quando true, só fica ativo na rota exata (ex.: "/admin").
   exact?: boolean
+  // Outras rotas que também marcam esta aba (ex.: a Semana abre pelo Hoje).
+  alsoActive?: string[]
 }
 
 export function BottomNav({ items, label, className }: { items: NavItem[]; label: string; className?: string }) {
@@ -30,9 +32,9 @@ export function BottomNav({ items, label, className }: { items: NavItem[]; label
       <ul className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((item) => {
           const Icon = item.icon
-          const active = item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const active =
+            (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`)) ||
+            (item.alsoActive ?? []).some((route) => pathname === route || pathname.startsWith(`${route}/`))
 
           return (
             <li key={item.href} className="flex justify-center">

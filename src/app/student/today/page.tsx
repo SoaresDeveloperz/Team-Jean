@@ -479,8 +479,8 @@ export default function StudentTodayPage() {
         <m.section variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }} aria-label="Sua rotina">
           <div className="mb-2.5 flex items-center justify-between px-1">
             <Eyebrow>Sua rotina</Eyebrow>
-            <Link href="/student/week" className="text-xs font-bold text-zinc-400 hover:text-white">
-              Ver semana
+            <Link href="/student/week" className="inline-flex min-h-11 items-center text-xs font-bold text-zinc-400 hover:text-white">
+              Semana completa
             </Link>
           </div>
           <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1">

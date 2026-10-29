@@ -32,6 +32,7 @@ const check = (name, condition) => results.push(`${condition ? 'OK  ' : 'FAIL'} 
   await page.waitForSelector('section#exercise-awe1', { timeout: 15000 })
   const elapsed = Date.now() - started
   check(`sinal fraco: o treino abre pela cópia em menos de 12 s (levou ${Math.round(elapsed / 1000)} s)`, elapsed < 12000)
+  check('sinal fraco: aparece o aviso de cópia do treino', (await page.locator('text=Conexão lenta').count()) === 1)
   await page.fill('#set-awe1-2-weight', '55')
   check('sinal fraco: dá para digitar a carga', (await page.inputValue('#set-awe1-2-weight')) === '55')
   await fetch(`${MOCK}/__lento/off`)

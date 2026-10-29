@@ -72,9 +72,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 // Biblioteca de exercícios (opções do "Trocar"): vem depois do treino, sem travar a tela.
 export async function fetchLibrary(supabase: Supabase): Promise<LibraryExercise[]> {
-  const result = (await supabase.from('exercises').select('*').order('name', { ascending: true }).limit(1000)) as Result
-  if (result.error) return []
-  return ((result.data ?? []) as LibraryExercise[]).map(slimExercise)
+  try {
+    const result = (await supabase.from('exercises').select('*').order('name', { ascending: true }).limit(1000)) as Result
+    if (result.error) return []
+    return ((result.data ?? []) as LibraryExercise[]).map(slimExercise)
+  } catch {
+    return []
+  }
 }
 
 export function fetchWorkoutBundle(supabase: Supabase, userId: string, workoutId: string, timeoutMs?: number): Promise<WorkoutBundle> {

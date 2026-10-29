@@ -45,7 +45,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkWithOfflineFallback(request, url));
+    event.respondWith(networkWithOfflineFallback(request, url, event));
   }
 });
 
@@ -66,25 +66,35 @@ function isPage(response) {
 }
 
 // Sinal fraco (conecta mas não responde): com a página guardada, espera pouco e usa a cópia.
-const NAVIGATION_TIMEOUT_MS = 5000
+const NAVIGATION_TIMEOUT_MS = 5000;
 
-function fetchWithTimeout(request, ms) {
-  return Promise.race([
-    fetch(request),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ])
+async function savePage(url, response) {
+  if (OFFLINE_PAGES.test(url.pathname) && isPage(response)) {
+    const cache = await caches.open(PAGES_CACHE);
+    await cache.put(url.pathname, response.clone());
+  }
 }
 
-async function networkWithOfflineFallback(request, url) {
+async function networkWithOfflineFallback(request, url, event) {
+  const saved = OFFLINE_PAGES.test(url.pathname) ? await caches.match(url.pathname, { cacheName: PAGES_CACHE }) : null;
+  const network = fetch(request);
+  let timer;
   try {
-    const saved = OFFLINE_PAGES.test(url.pathname) ? await caches.match(url.pathname, { cacheName: PAGES_CACHE }) : null
-    const response = saved ? await fetchWithTimeout(request, NAVIGATION_TIMEOUT_MS) : await fetch(request);
-    if (OFFLINE_PAGES.test(url.pathname) && isPage(response)) {
-      const cache = await caches.open(PAGES_CACHE);
-      cache.put(url.pathname, response.clone());
-    }
+    const response = saved
+      ? await Promise.race([
+          network,
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('timeout')), NAVIGATION_TIMEOUT_MS);
+          }),
+        ])
+      : await network;
+    clearTimeout(timer);
+    await savePage(url, response);
     return response;
   } catch {
+    clearTimeout(timer);
+    // Se foi só lentidão, a resposta que ainda chega renova a cópia guardada.
+    if (saved) event.waitUntil(network.then((response) => savePage(url, response)).catch(() => undefined));
     // O app instalado abre em "/": sem internet, vai para o "Hoje" guardado.
     const path = url.pathname === '/' ? '/student/today' : url.pathname;
     const page = OFFLINE_PAGES.test(path) ? await caches.match(path, { cacheName: PAGES_CACHE }) : null;

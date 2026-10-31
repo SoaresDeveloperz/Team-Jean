@@ -76,6 +76,24 @@ check('treino concluído só na fila do aparelho conta como feito na semana', pl
 check('vale a conclusão mais recente de cada treino', plan.buildLastDone([{ workoutId: 'a', completedAt: at(MON, 9).toISOString() }, { workoutId: 'a', completedAt: at(TUE, 9).toISOString() }]).get('a') === at(TUE, 9).toISOString())
 check('domingo 23:59 e segunda 00:01 são semanas diferentes', plan.doneThisWeek(new Date(2026, 9, 25, 23, 59).toISOString(), new Date(2026, 9, 26, 0, 1)) === false && plan.doneThisWeek(new Date(2026, 9, 26, 0, 0).toISOString(), new Date(2026, 9, 26, 0, 1)) === true)
 
+// ------------------------------------------------ descanso rotativo (os dias andam 1 por semana)
+const weekN = plan.weekNumber(at(WED))
+const rot = (id, name, weekday) => ({ id, name, weekday, rotate_days: true })
+const shift = weekN % 7
+check('o número da semana anda 1 por semana', plan.weekNumber(at(WED + 7)) === weekN + 1 && plan.weekNumber(at(MON)) === weekN && plan.weekNumber(at(SUN)) === weekN)
+check('semana 0 é a de 01/01/2024 (segunda); 08/01 é a 1; 30/12/2024 é a 52', plan.weekNumber(new Date(2024, 0, 1, 10)) === 0 && plan.weekNumber(new Date(2024, 0, 7, 22)) === 0 && plan.weekNumber(new Date(2024, 0, 8, 1)) === 1 && plan.weekNumber(new Date(2024, 11, 30, 12)) === 52)
+check('antes da âncora a semana é negativa e o dia nunca sai de 0 a 6', plan.weekNumber(new Date(2023, 11, 25, 12)) === -1 && [0, 1, 2, 3, 4, 5, 6].every((d) => { const x = plan.weekdayThisWeek(rot('r', 'R', d), new Date(2023, 11, 25, 12)); return x >= 0 && x <= 6 }))
+check('29/02 e a virada de domingo para segunda não bagunçam a semana', plan.weekNumber(new Date(2024, 1, 29, 12)) === 8 && plan.weekNumber(new Date(2024, 2, 3, 23, 59)) === 8 && plan.weekNumber(new Date(2024, 2, 4, 0, 1)) === 9)
+check('sem rotativo o dia não muda', plan.weekdayThisWeek(SEG, at(WED)) === 1 && plan.weekdayThisWeek(SEG, at(WED + 35)) === 1)
+check('com rotativo o dia anda um por semana (e volta em 7)', plan.weekdayThisWeek(rot('r', 'R', 1), at(WED)) === (1 + shift) % 7 && plan.weekdayThisWeek(rot('r', 'R', 1), at(WED + 7)) === (1 + shift + 1) % 7 && plan.weekdayThisWeek(rot('r', 'R', 1), at(WED + 49)) === (1 + shift) % 7)
+check('rotativo sem dia fixo continua sem dia', plan.weekdayThisWeek(rot('r', 'R', null), at(WED)) === null)
+// Treino marcado para a segunda que, nesta semana, cai no dia de hoje: vira "hoje".
+const hojeDia = at(WED).getDay()
+const diaBase = (hojeDia - shift + 7 * 8) % 7
+check('rotativo: o treino cujo dia andou até hoje é o treino de hoje', plan.planWeek([rot('r', 'Treino R', diaBase)], new Map(), at(WED))?.kind === 'today')
+check('rotativo: o mesmo treino, uma semana depois, já não cai em "hoje"', plan.planWeek([rot('r', 'Treino R', diaBase)], new Map(), at(WED + 7))?.kind === 'rest')
+check('rotativo: a lista mostra o estado do dia desta semana', plan.workoutWeekState(rot('r', 'Treino R', diaBase), new Map(), at(WED)) === 'today')
+
 // ------------------------------------------------ estado na lista
 check('estado: feito', plan.workoutWeekState(SEG, done(['seg', MON]), at(WED), ) === 'done')
 check('estado: hoje', plan.workoutWeekState(QUA, new Map(), at(WED)) === 'today')

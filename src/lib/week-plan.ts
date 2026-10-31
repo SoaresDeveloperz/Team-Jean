@@ -9,7 +9,9 @@
 //   ao getDay do JavaScript) e a ordem (`position`); sem eles vale a ordem do nome;
 // - qualquer treino pode ser feito fora do dia (o plano só sugere).
 
-export type PlanWorkout = { id: string; name: string; weekday?: number | null; position?: number | null }
+// rotate_days: descanso rotativo (supabase/rotina-semanal.sql): os dias marcados andam
+// um dia a cada semana, então o dia de descanso "gira" pela semana.
+export type PlanWorkout = { id: string; name: string; weekday?: number | null; position?: number | null; rotate_days?: boolean | null }
 
 export type WeekPlan<T> =
   // O treino em andamento (retomar) vem sempre primeiro.
@@ -83,6 +85,23 @@ export function doneThisWeek(completedAt: string | null | undefined, now: Date) 
   return done >= start && done < nextStart
 }
 
+// Segunda-feira de referência para contar as semanas (2024-01-01 foi uma segunda).
+const ROTATION_ANCHOR = new Date(2024, 0, 1)
+
+// Quantas semanas se passaram desde a referência (negativo antes dela); o descanso rotativo usa o resto por 7.
+export function weekNumber(now: Date) {
+  const days = Math.round((weekStart(now).getTime() - ROTATION_ANCHOR.getTime()) / 86_400_000)
+  return Math.floor(days / 7)
+}
+
+// Dia da semana do treino NESTA semana: o dia marcado, andando um dia por semana
+// quando o treinador ligou o descanso rotativo. `null` = sem dia fixo.
+export function weekdayThisWeek(workout: PlanWorkout, now: Date): number | null {
+  if (!isWeekday(workout.weekday)) return null
+  if (!workout.rotate_days) return workout.weekday
+  return (((workout.weekday + weekNumber(now)) % 7) + 7) % 7
+}
+
 // Ordem do treinador (`position`); sem ela, ordem do nome (Treino A, B, C...).
 export function orderWorkouts<T extends PlanWorkout>(workouts: T[]): T[] {
   return [...workouts].sort((first, second) => {
@@ -106,7 +125,8 @@ export function planWeek<T extends PlanWorkout>(
 
   const ordered = orderWorkouts(workouts)
   const pending = ordered.filter((workout) => !doneThisWeek(completionOf(workout, lastDone), now))
-  const scheduled = (workout: T) => isWeekday(workout.weekday)
+  const dayOf = (workout: T) => weekdayThisWeek(workout, now)
+  const scheduled = (workout: T) => dayOf(workout) !== null
   const hasAgenda = ordered.some(scheduled)
 
   if (!hasAgenda) {
@@ -114,7 +134,7 @@ export function planWeek<T extends PlanWorkout>(
   }
 
   const today = now.getDay()
-  const todays = pending.find((workout) => workout.weekday === today)
+  const todays = pending.find((workout) => dayOf(workout) === today)
   if (todays) return { kind: 'today', workout: todays }
   if (pending.length === 0) return { kind: 'week-done', workout: ordered[0] }
 
@@ -122,19 +142,20 @@ export function planWeek<T extends PlanWorkout>(
   // (pela ordem) e, por último, os de dias que já passaram ("ainda dá tempo").
   const todayIndex = mondayIndex(today)
   const upcoming = pending
-    .filter((workout) => scheduled(workout) && mondayIndex(workout.weekday as number) > todayIndex)
-    .sort((first, second) => mondayIndex(first.weekday as number) - mondayIndex(second.weekday as number))
+    .filter((workout) => scheduled(workout) && mondayIndex(dayOf(workout) as number) > todayIndex)
+    .sort((first, second) => mondayIndex(dayOf(first) as number) - mondayIndex(dayOf(second) as number))
   const unscheduled = pending.filter((workout) => !scheduled(workout))
-  const missed = pending.filter((workout) => scheduled(workout) && mondayIndex(workout.weekday as number) < todayIndex)
+  const missed = pending.filter((workout) => scheduled(workout) && mondayIndex(dayOf(workout) as number) < todayIndex)
   const suggestion = upcoming[0] ?? unscheduled[0] ?? missed[0] ?? pending[0]
-  const doneToday = ordered.some((workout) => workout.weekday === today && doneThisWeek(completionOf(workout, lastDone), now))
+  const doneToday = ordered.some((workout) => dayOf(workout) === today && doneThisWeek(completionOf(workout, lastDone), now))
   return { kind: 'rest', suggestion, doneToday }
 }
 
 // Estado de um treino na lista da semana.
 export function workoutWeekState(workout: PlanWorkout, lastDone: Map<string, string>, now: Date): 'done' | 'today' | 'pending' | 'missed' {
   if (doneThisWeek(completionOf(workout, lastDone), now)) return 'done'
-  if (!isWeekday(workout.weekday)) return 'pending'
-  if (workout.weekday === now.getDay()) return 'today'
-  return mondayIndex(workout.weekday) < mondayIndex(now.getDay()) ? 'missed' : 'pending'
+  const day = weekdayThisWeek(workout, now)
+  if (day === null) return 'pending'
+  if (day === now.getDay()) return 'today'
+  return mondayIndex(day) < mondayIndex(now.getDay()) ? 'missed' : 'pending'
 }

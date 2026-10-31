@@ -23,7 +23,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { WEEKDAY_NAMES, WEEKDAY_ORDER, isWeekday, orderWorkouts } from '@/lib/week-plan'
+import { WEEKDAY_NAMES, WEEKDAY_ORDER, isWeekday, orderWorkouts, weekdayThisWeek } from '@/lib/week-plan'
 import type { AssignedWorkout, Exercise, PlannedSet, PrescribedExercise, Profile, WorkoutSession } from '@/lib/types'
 import { avatarUrlOf } from '@/lib/profile'
 import { createDefaultPlannedSets, getPlannedSets, normalizeRir, normalizeWeight } from '@/lib/workouts'
@@ -184,10 +184,14 @@ export default function AdminWorkoutsPage() {
   const [altKey, setAltKey] = useState<string | null>(null)
   // supabase/rotina-semanal.sql já rodou? (colunas "weekday" e "position")
   const [rotinaSql, setRotinaSql] = useState(false)
+  // ... e a coluna do descanso rotativo (parte mais nova do mesmo arquivo)?
+  const [rotateSql, setRotateSql] = useState(false)
   // Dia da semana do treino aberto no construtor ('' = sem dia fixo).
   const [workoutDay, setWorkoutDay] = useState('')
   // Aluno cujos treinos estão sendo reordenados (trava os botões até salvar).
   const [movingStudent, setMovingStudent] = useState<string | null>(null)
+  // Aluno cujo descanso rotativo está sendo salvo (evita dois toques seguidos).
+  const [rotatingStudent, setRotatingStudent] = useState<string | null>(null)
   // Dia escolhido no seletor: salva depois de uma pausa (setas do teclado não salvam cada dia que passam).
   const dayTimers = useRef(new Map<string, { before: number | null; timer: number }>())
   const keyCounter = useRef(0)
@@ -213,6 +217,13 @@ export default function AdminWorkoutsPage() {
       .limit(1)
       .then(({ error }) => {
         if (active) setRotinaSql(!error)
+      })
+    void supabase
+      .from('assigned_workouts')
+      .select('rotate_days')
+      .limit(1)
+      .then(({ error }) => {
+        if (active) setRotateSql(!error)
       })
     return () => {
       active = false
@@ -640,6 +651,7 @@ export default function AdminWorkoutsPage() {
             is_current: true,
             // Treino novo entra no fim da ordem do aluno, com o dia escolhido (se houver).
             ...(rotinaSql ? { weekday: workoutDay === '' ? null : Number(workoutDay), position: nextPositionFor(selectedStudent) } : {}),
+            ...(rotateSql ? { rotate_days: rotatesFor(selectedStudent) } : {}),
           })
           .select('id')
           .single()
@@ -811,6 +823,7 @@ export default function AdminWorkoutsPage() {
           is_current: true,
           // Refazer um treino que o aluno já tem mantém o dia e a ordem dele; senão entra no fim.
           ...(rotinaSql ? sameNameSchedule(assignStudentId, templateToAssign.name) : {}),
+          ...(rotateSql ? { rotate_days: rotatesFor(assignStudentId) } : {}),
         })
         .select('id')
         .single()
@@ -877,6 +890,9 @@ export default function AdminWorkoutsPage() {
       0,
     ) + 1
 
+  // Treino novo herda o descanso rotativo do aluno (senão ficaria parado enquanto os outros giram).
+  const rotatesFor = (studentId: string) => workouts.some((workout) => workout.student_id === studentId && workout.is_current && workout.rotate_days)
+
   const sameNameSchedule = (studentId: string, name: string) => {
     const same = workouts.find((workout) => workout.student_id === studentId && workout.is_current && normalizeText(workout.name.trim()) === normalizeText(name.trim()))
     return same ? { weekday: same.weekday ?? null, position: same.position ?? nextPositionFor(studentId) } : { weekday: null, position: nextPositionFor(studentId) }
@@ -886,6 +902,29 @@ export default function AdminWorkoutsPage() {
     error?.code === 'PGRST204' || error?.code === '42703'
       ? 'Rode o arquivo supabase/rotina-semanal.sql no Supabase para usar dia e ordem.'
       : friendlyError(error, 'Não foi possível salvar')
+
+  // Descanso rotativo: liga ou desliga para todos os treinos do aluno de uma vez.
+  const toggleRotation = async (studentId: string, on: boolean) => {
+    if (rotatingStudent) return
+    setRotatingStudent(studentId)
+    // Vale para todos os treinos do aluno (os arquivados também: ao voltarem, já vêm com a marca).
+    const own = workouts.filter((workout) => workout.student_id === studentId)
+    const before = new Map(own.map((workout) => [workout.id, workout.rotate_days ?? false]))
+    setWorkouts((items) => items.map((item) => (item.student_id === studentId ? { ...item, rotate_days: on } : item)))
+    const { error } = await supabase.from('assigned_workouts').update({ rotate_days: on }).eq('student_id', studentId)
+    setRotatingStudent(null)
+    if (error) {
+      setWorkouts((items) => items.map((item) => (before.has(item.id) ? { ...item, rotate_days: before.get(item.id) } : item)))
+      toast({ tone: 'error', title: 'Não foi possível mudar o descanso rotativo', description: rotinaError(error) })
+      return
+    }
+    toast({
+      tone: 'success',
+      title: on ? 'Descanso rotativo ligado' : 'Descanso rotativo desligado',
+      description: on ? 'A cada semana os dias dos treinos andam um dia.' : 'Os dias voltam a ser sempre os mesmos.',
+      duration: 5000,
+    })
+  }
 
   const changeWorkoutDay = (workout: AssignedWorkout, value: string) => {
     const weekday = value === '' ? null : Number(value)
@@ -1106,6 +1145,29 @@ export default function AdminWorkoutsPage() {
                             className="overflow-hidden"
                           >
                             <div className="space-y-2.5 border-t border-line p-3">
+                              {rotateSql && rotinaSql && studentWorkouts.some((workout) => workout.is_current && isWeekday(workout.weekday)) && (
+                                <div className="flex items-start gap-3 rounded-2xl border border-line bg-black/30 p-3">
+                                  <div className="min-w-0 flex-1">
+                                    <p id={`rot-${student.id}`} className="text-sm font-bold text-white">
+                                      Descanso rotativo
+                                    </p>
+                                    <p className="mt-0.5 text-xs leading-relaxed text-zinc-400">
+                                      O dia de descanso gira: a cada semana os dias dos treinos andam um dia.
+                                      {studentWorkouts.some((workout) => workout.is_current && workout.rotate_days) &&
+                                        ` Esta semana: ${studentWorkouts
+                                          .filter((workout) => workout.is_current && isWeekday(workout.weekday))
+                                          .map((workout) => `${workout.name.split(' - ')[0]}: ${WEEKDAY_NAMES[weekdayThisWeek(workout, new Date()) as number]}`)
+                                          .join('; ')}.`}
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={studentWorkouts.some((workout) => workout.is_current && workout.rotate_days)}
+                                    onChange={(on) => void toggleRotation(student.id, on)}
+                                    label={`Descanso rotativo de ${student.full_name || student.email || 'aluno'}`}
+                                  />
+                                </div>
+                              )}
+
                               {studentWorkouts.length === 0 && (
                                 <p className="p-3 text-center text-xs text-zinc-500">Nenhum treino prescrito para este aluno.</p>
                               )}
@@ -1159,7 +1221,7 @@ export default function AdminWorkoutsPage() {
                                     {rotinaSql && workout.is_current && (
                                       <div className="mt-3 flex items-center gap-1.5">
                                         <label htmlFor={`day-${workout.id}`} className="sr-only">
-                                          Dia da semana de {workout.name}
+                                          Dia da semana (dia base) de {workout.name}
                                         </label>
                                         <select
                                           id={`day-${workout.id}`}

@@ -310,6 +310,7 @@ o dia). A tela Hoje do aluno segue uma regra só:
   "Treinar de novo (bônus)".
 - Conta o que foi feito no servidor e o que ainda está na fila do aparelho, por id e por nome
   (se o treinador refizer o treino, o que já foi feito na semana continua valendo).
+- **Descanso rotativo:** no card do aluno (Treinos), o interruptor "Descanso rotativo" faz os dias marcados andarem um dia a cada semana, então a folga gira pela semana (o treinador vê "Esta semana: ..."; o aluno vê o dia desta semana).
 - **Banco:** rode [`supabase/rotina-semanal.sql`](supabase/rotina-semanal.sql) (idempotente).
   Antes disso o reinício semanal já vale (pela ordem do nome); o construtor só não mostra dia
   e ordem. **Contas:** `src/lib/week-plan.ts` (`tests/contas-semana.mjs`); telas: roteiros

@@ -18,6 +18,12 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-10-31 — Descanso rotativo (o dia de descanso gira pela semana)
+- **Pergunta:** o dono pediu a função "descanso rotativo" no app do Jean; ao perguntar, respondeu "dia de descanso que gira".
+- **Decisão (a IA decidiu o desenho, dentro do pedido):** interruptor por aluno no construtor (`assigned_workouts.rotate_days`, só o treinador grava). Ligado, os dias marcados andam um dia a cada semana (ciclo de 7 semanas, contando a partir da segunda de 01/01/2024), então a folga gira pela semana. A regra é a mesma da rotina da semana (`weekdayThisWeek` em `week-plan.ts`): Hoje, Semana e o plano usam o dia desta semana; o treinador vê "Esta semana: ..." ao ligar. O dia base continua sendo o que o treinador marca em cada treino.
+- **O que ficou em aberto:** o "primeiro app" e o "prime app" citados pelo dono não foram encontrados no GitHub (só Team-Jean, exercises-dataset e Codigo-Runner, que é um README apontando para o Replit); a função equivalente, se existir lá, não pôde ser comparada.
+- **Rever quando:** o Jean disser que queria outra coisa por "rotativo" (por exemplo, folga a cada N treinos, sem depender do dia da semana).
+
 ## 2026-10-29 — Rotina da semana: dia de cada treino, reinício semanal e ordem editável (pedido do Jean)
 - **Pergunta:** o Jean pediu (1) treino ligado ao dia da semana, (2) a rotação reiniciar na virada da semana (quem não fez o último treino volta ao primeiro, o de segunda, em vez de seguir do último) e (3) poder mudar a ordem dos treinos no app.
 - **Opções:** A) só dia da semana; B) só reinício semanal da rotação + ordem editável; C) dois modos; D) uma regra só, com ordem (`position`) e dia opcional (`weekday`) no mesmo treino.

@@ -38,3 +38,13 @@ comment on column public.assigned_workouts.weekday is
   'Dia da semana do treino (0 = domingo ... 6 = sábado); vazio = sem dia fixo.';
 comment on column public.assigned_workouts."position" is
   'Ordem do treino na rotina do aluno (menor primeiro); vazio = ordem do nome.';
+
+-- -----------------------------------------------------------------------------
+-- Descanso rotativo: com rotate_days ligado, os dias marcados andam um dia a cada
+-- semana (a folga "gira" pela semana). O treinador liga por aluno (vale para todos
+-- os treinos dele). Só o treinador grava.
+-- -----------------------------------------------------------------------------
+alter table public.assigned_workouts add column if not exists rotate_days boolean not null default false;
+
+comment on column public.assigned_workouts.rotate_days is
+  'Descanso rotativo: os dias marcados andam um dia a cada semana.';

@@ -48,6 +48,7 @@ const day = (offset) => (today + offset + 7) % 7
   await seed({ limpar: '1', a: String(day(1)), b: String(day(2)) })
   await page.goto(BASE + '/student/week')
   await page.waitForSelector('h1:has-text("Seus treinos")')
+  await page.waitForSelector('a[href^="/student/workout/"]')
   await audit('Semana com os dias')
 
   await context.clearCookies()

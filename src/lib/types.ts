@@ -48,6 +48,8 @@ export type AssignedWorkout = {
   // supabase/rotina-semanal.sql: dia da semana (0 = domingo ... 6 = sábado) e ordem; ausentes antes do SQL.
   weekday?: number | null
   position?: number | null
+  // Descanso rotativo: os dias andam um dia por semana (supabase/rotina-semanal.sql).
+  rotate_days?: boolean | null
   created_at: string
   profiles?: Pick<Profile, 'full_name' | 'email'> | null
 }

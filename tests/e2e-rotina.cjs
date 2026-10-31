@@ -16,6 +16,14 @@ const mock = (route) => fetch(`${MOCK}${route}`)
 const seed = (params) => mock(`/__rotina/seed?${new URLSearchParams(params)}`)
 const NAMES = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const today = new Date().getDay()
+// Mesmo cálculo do app: quantas semanas desde a segunda de 01/01/2024 (os dias do descanso rotativo andam 1 por semana).
+const weekNumber = () => {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  start.setDate(start.getDate() - ((now.getDay() + 6) % 7))
+  return Math.floor(Math.round((start - new Date(2024, 0, 1)) / 864e5) / 7)
+}
+const shift = weekNumber() % 7
 const day = (offset) => (today + offset + 7) % 7
 
 async function login(page, who) {
@@ -60,6 +68,17 @@ async function login(page, who) {
   check('"Sua rotina" mostra o dia no lugar da letra (ex.: "' + ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][today] + '")', text.includes(['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][today]))
   await page.screenshot({ path: path.join(OUT, 'r01-hoje-dia-marcado.png'), fullPage: true })
 
+  // ------------------------------------------------ descanso rotativo: os dias andam 1 por semana
+  await seed({ limpar: '1', a: String((today - shift + 7) % 7), b: String((today - shift + 8) % 7), rodar: '1' })
+  text = await hoje()
+  check('descanso rotativo: o treino marcado para "o dia base" cai em hoje esta semana', text.includes('Hoje é dia de Treino A - Peito e Tríceps'))
+  await page.goto(`${BASE}/student/week`)
+  await page.waitForSelector('h1:has-text("Seus treinos")')
+  await page.waitForSelector('a[href^="/student/workout/"]')
+  text = (await page.textContent('main')) ?? ''
+  check('Semana: mostra o dia desta semana e explica o descanso rotativo', text.includes(NAMES[today]) && text.includes('descanso é rotativo'))
+  await page.screenshot({ path: path.join(OUT, 'r05-semana-rotativo.png'), fullPage: true })
+
   // ------------------------------------------------ descanso: hoje não tem treino marcado
   await seed({ limpar: '1', a: String(day(1)), b: String(day(2)) })
   text = await hoje()
@@ -73,6 +92,7 @@ async function login(page, who) {
   // ------------------------------------------------ Semana
   await page.goto(`${BASE}/student/week`)
   await page.waitForSelector('h1:has-text("Seus treinos")')
+  await page.waitForSelector('a[href^="/student/workout/"]')
   text = (await page.textContent('main')) ?? ''
   check('Semana: mostra o nome do dia de cada treino', text.includes(NAMES[day(1)]) && text.includes(NAMES[day(2)]), text.slice(0, 400))
   check('Semana: explica que a semana começa na segunda', text.includes('A semana começa na segunda'))
@@ -104,6 +124,24 @@ async function login(page, who) {
   await page.waitForSelector('text=Treino A - Peito e Tríceps: sem dia fixo')
   stored = (await state()).assigned_workouts.find((row) => row.id === 'w-a')
   check('"Sem dia fixo" volta para vazio', stored.weekday === null)
+
+  // Descanso rotativo: interruptor por aluno.
+  await seed({ limpar: '1', a: '1', b: '3' })
+  await page.reload()
+  await page.waitForSelector('text=Maria Souza')
+  await page.click('text=Maria Souza')
+  await page.waitForSelector('text=Treino A - Peito e Tríceps')
+  const rotate = page.locator('button[role=switch][aria-label="Descanso rotativo de Maria Souza"]')
+  check('descanso rotativo: interruptor por aluno (começa desligado)', (await rotate.count()) === 1 && (await rotate.getAttribute('aria-checked')) === 'false')
+  await rotate.click()
+  await page.waitForSelector('text=Descanso rotativo ligado')
+  const rotated = (await state()).assigned_workouts.filter((row) => row.student_id === 'u-student')
+  check('ligar grava rotate_days em todos os treinos do aluno', rotated.length > 0 && rotated.every((row) => row.rotate_days === true))
+  check('o treinador vê a prévia "Esta semana: ..."', (await page.textContent('main'))?.includes('Esta semana:') === true)
+  await rotate.click()
+  await page.waitForSelector('text=Descanso rotativo desligado')
+  check('desligar volta rotate_days para falso', (await state()).assigned_workouts.filter((row) => row.student_id === 'u-student').every((row) => row.rotate_days === false))
+  await seed({ limpar: '1', a: '', b: '' })
 
   // O aluno vê a nova ordem: semana nova começa pelo B.
   await context.clearCookies()

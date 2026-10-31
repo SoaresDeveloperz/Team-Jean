@@ -263,7 +263,7 @@ function columnsOf(table) {
   if (table === 'workout_sessions' && curtoEnabled) columns = [...columns, 'short_mode']
   if (table === 'workout_sessions' && trocarEnabled) columns = [...columns, 'swaps']
   if (SWAP_TABLES.includes(table) && trocarEnabled) columns = [...columns, 'essential', 'alternatives']
-  if (table === 'assigned_workouts' && rotinaEnabled) columns = [...columns, 'weekday', 'position']
+  if (table === 'assigned_workouts' && rotinaEnabled) columns = [...columns, 'weekday', 'position', 'rotate_days']
   return columns
 }
 // Colunas que o banco real não teria sem o gestao.sql/profile.sql somem das respostas.
@@ -688,6 +688,7 @@ http
         const value = url.searchParams.get(key)
         workout.weekday = value === null || value === '' ? null : Number(value)
         workout.position = ['w-a', 'w-b', 'w-c'].indexOf(id) + 1
+        workout.rotate_days = url.searchParams.get('rodar') === '1'
       }
       return send(res, 200, { ok: true })
     }

@@ -88,7 +88,7 @@ export function doneThisWeek(completedAt: string | null | undefined, now: Date) 
 // Segunda-feira de referência para contar as semanas (2024-01-01 foi uma segunda).
 const ROTATION_ANCHOR = new Date(2024, 0, 1)
 
-// Quantas semanas se passaram desde a referência (módulo 7: o ciclo completo do descanso rotativo).
+// Quantas semanas se passaram desde a referência (negativo antes dela); o descanso rotativo usa o resto por 7.
 export function weekNumber(now: Date) {
   const days = Math.round((weekStart(now).getTime() - ROTATION_ANCHOR.getTime()) / 86_400_000)
   return Math.floor(days / 7)

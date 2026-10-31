@@ -134,3 +134,8 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - **Decisão:** A, implementado nos PRs #8 e #9.
 - **Por quê:** roda de graça no GitHub Actions, sem chaves, e pega erro de permissão antes de chegar ao aluno.
 - **Rever quando:** o Supabase falso começar a divergir do real com frequência.
+
+## 2026-10-31 — Ponytail (skill de código enxuto)
+- Pergunta: vale trazer o repositório DietrichGebert/ponytail (indicado pelo dono) para o app?
+- O que é: não é um app de treino; é uma skill para agentes de IA ("dev sênior preguiçoso", MIT) com regras de menor mudança, revisão ranqueada e lista de atalhos (`shortcut:`).
+- Decidido: adaptar para `.claude/skills/ponytail/SKILL.md` em português, com as regras do projeto como "nunca corte". Primeira aplicação: varredura de código sem uso (removidos `PageLoader`, `FeedbackAlert`, `countInWeek`, `formatSeconds`; nenhuma dependência sobrando; nenhum `shortcut:` no código ainda).

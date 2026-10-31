@@ -44,12 +44,3 @@ export function Alert({ variant = 'info', children, className, onRetry, retryLab
     </div>
   )
 }
-
-export function FeedbackAlert({ feedback, className }: { feedback: Feedback; className?: string }) {
-  if (!feedback) return null
-  return (
-    <Alert variant={feedback.type} className={className}>
-      {feedback.message}
-    </Alert>
-  )
-}

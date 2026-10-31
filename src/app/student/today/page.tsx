@@ -7,7 +7,7 @@ import { Check, ChevronDown, ChevronRight, Clock, Dumbbell, Flame, Hourglass, Me
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout, Exercise, PrescribedExercise } from '@/lib/types'
 import { getPlannedSets, getSetsCount } from '@/lib/workouts'
-import { WEEKDAY_NAMES, WEEKDAY_SHORT, buildLastDone, completionOf, doneThisWeek, isWeekday, orderWorkouts, planWeek, workoutWeekState, type WeekPlan } from '@/lib/week-plan'
+import { WEEKDAY_NAMES, WEEKDAY_SHORT, buildLastDone, completionOf, doneThisWeek, orderWorkouts, planWeek, weekdayThisWeek, workoutWeekState, type WeekPlan } from '@/lib/week-plan'
 import { queuedCompletions } from '@/lib/workout-sync'
 import { readActiveSession } from '@/lib/active-session'
 import { canOfferShort } from '@/lib/short-workout'
@@ -266,7 +266,8 @@ export default function StudentTodayPage() {
   const restPlan = data.plan?.kind === 'rest' && !data.inProgress ? data.plan : null
   const weekDone = data.plan?.kind === 'week-done' && !data.inProgress
   const softCta = doneForToday || Boolean(restPlan) || weekDone
-  const suggestionDay = restPlan && isWeekday(restPlan.suggestion.weekday) ? WEEKDAY_NAMES[restPlan.suggestion.weekday] : null
+  const suggestionDayNumber = restPlan ? weekdayThisWeek(restPlan.suggestion, new Date()) : null
+  const suggestionDay = suggestionDayNumber !== null ? WEEKDAY_NAMES[suggestionDayNumber] : null
 
   let subtitle = 'Seu treinador ainda não liberou um treino. Aproveite para recuperar.'
   if (data.inProgress) subtitle = 'Você tem um treino em andamento. Quer terminar?'
@@ -525,6 +526,7 @@ export default function StudentTodayPage() {
               const isNext = workout.id === next?.id
               const done = completionOf(workout, data.lastDoneByWorkout)
               const weekState = workoutWeekState(workout, data.lastDoneByWorkout, new Date())
+              const weekDay = weekdayThisWeek(workout, new Date())
               return (
                 <li key={workout.id} className="w-[62%] max-w-[220px] shrink-0 snap-start">
                   <Link
@@ -541,10 +543,10 @@ export default function StudentTodayPage() {
                       )}
                       aria-hidden="true"
                     >
-                      {isWeekday(workout.weekday) ? WEEKDAY_SHORT[workout.weekday] : workoutLetter(index)}
+                      {weekDay !== null ? WEEKDAY_SHORT[weekDay] : workoutLetter(index)}
                     </span>
                     <span className="line-clamp-2 text-sm font-bold leading-snug text-white">
-                      {isWeekday(workout.weekday) && <span className="sr-only">{WEEKDAY_NAMES[workout.weekday]}: </span>}
+                      {weekDay !== null && <span className="sr-only">{WEEKDAY_NAMES[weekDay]}: </span>}
                       {workout.name}
                     </span>
                     <span className="mt-auto text-xs text-zinc-400">

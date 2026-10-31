@@ -76,6 +76,21 @@ check('treino concluído só na fila do aparelho conta como feito na semana', pl
 check('vale a conclusão mais recente de cada treino', plan.buildLastDone([{ workoutId: 'a', completedAt: at(MON, 9).toISOString() }, { workoutId: 'a', completedAt: at(TUE, 9).toISOString() }]).get('a') === at(TUE, 9).toISOString())
 check('domingo 23:59 e segunda 00:01 são semanas diferentes', plan.doneThisWeek(new Date(2026, 9, 25, 23, 59).toISOString(), new Date(2026, 9, 26, 0, 1)) === false && plan.doneThisWeek(new Date(2026, 9, 26, 0, 0).toISOString(), new Date(2026, 9, 26, 0, 1)) === true)
 
+// ------------------------------------------------ descanso rotativo (os dias andam 1 por semana)
+const weekN = plan.weekNumber(at(WED))
+const rot = (id, name, weekday) => ({ id, name, weekday, rotate_days: true })
+const shift = weekN % 7
+check('o número da semana anda 1 por semana', plan.weekNumber(at(WED + 7)) === weekN + 1 && plan.weekNumber(at(MON)) === weekN && plan.weekNumber(at(SUN)) === weekN)
+check('sem rotativo o dia não muda', plan.weekdayThisWeek(SEG, at(WED)) === 1 && plan.weekdayThisWeek(SEG, at(WED + 35)) === 1)
+check('com rotativo o dia anda um por semana (e volta em 7)', plan.weekdayThisWeek(rot('r', 'R', 1), at(WED)) === (1 + shift) % 7 && plan.weekdayThisWeek(rot('r', 'R', 1), at(WED + 7)) === (1 + shift + 1) % 7 && plan.weekdayThisWeek(rot('r', 'R', 1), at(WED + 49)) === (1 + shift) % 7)
+check('rotativo sem dia fixo continua sem dia', plan.weekdayThisWeek(rot('r', 'R', null), at(WED)) === null)
+// Treino marcado para a segunda que, nesta semana, cai no dia de hoje: vira "hoje".
+const hojeDia = at(WED).getDay()
+const diaBase = (hojeDia - shift + 7 * 8) % 7
+check('rotativo: o treino cujo dia andou até hoje é o treino de hoje', plan.planWeek([rot('r', 'Treino R', diaBase)], new Map(), at(WED))?.kind === 'today')
+check('rotativo: o mesmo treino, uma semana depois, já não cai em "hoje"', plan.planWeek([rot('r', 'Treino R', diaBase)], new Map(), at(WED + 7))?.kind === 'rest')
+check('rotativo: a lista mostra o estado do dia desta semana', plan.workoutWeekState(rot('r', 'Treino R', diaBase), new Map(), at(WED)) === 'today')
+
 // ------------------------------------------------ estado na lista
 check('estado: feito', plan.workoutWeekState(SEG, done(['seg', MON]), at(WED), ) === 'done')
 check('estado: hoje', plan.workoutWeekState(QUA, new Map(), at(WED)) === 'today')

@@ -6,7 +6,7 @@ import { m } from 'framer-motion'
 import { ArrowUpRight, Dumbbell } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { AssignedWorkout } from '@/lib/types'
-import { WEEKDAY_NAMES, WEEKDAY_SHORT, buildLastDone, completionOf, isWeekday, orderWorkouts, planWeek, workoutWeekState } from '@/lib/week-plan'
+import { WEEKDAY_NAMES, WEEKDAY_SHORT, buildLastDone, completionOf, isWeekday, orderWorkouts, planWeek, weekdayThisWeek, workoutWeekState } from '@/lib/week-plan'
 import { queuedCompletions } from '@/lib/workout-sync'
 import { readActiveSession } from '@/lib/active-session'
 import { relativeDay } from '@/lib/stats'
@@ -30,6 +30,7 @@ export default function StudentWeekPage() {
   const [workouts, setWorkouts] = useState<RoutineWorkout[] | null>(null)
   const [nextWorkoutId, setNextWorkoutId] = useState<string | null>(null)
   const [hasAgenda, setHasAgenda] = useState(false)
+  const [rotates, setRotates] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
 
@@ -112,6 +113,7 @@ export default function StudentWeekPage() {
       setLoadError('')
       setWorkouts(rows)
       setHasAgenda(rows.some((workout) => isWeekday(workout.weekday)))
+      setRotates(rows.some((workout) => isWeekday(workout.weekday) && workout.rotate_days))
       setNextWorkoutId(plan ? (plan.kind === 'rest' ? plan.suggestion.id : plan.workout.id) : null)
     }
 
@@ -136,7 +138,7 @@ export default function StudentWeekPage() {
           </h1>
           <p className="mt-2 text-sm text-zinc-400">
             {hasAgenda
-              ? 'A semana começa na segunda. O treino da vez fica em destaque; qualquer um pode ser feito fora do dia.'
+              ? `A semana começa na segunda. O treino da vez fica em destaque; qualquer um pode ser feito fora do dia.${rotates ? ' Seu descanso é rotativo: os dias andam um dia a cada semana.' : ''}`
               : 'Siga a ordem: o próximo da rotina fica em destaque. A semana começa na segunda.'}
           </p>
         </div>
@@ -164,6 +166,7 @@ export default function StudentWeekPage() {
           <Stagger className="space-y-3">
             {workouts.map((workout, index) => {
               const isNext = workout.id === nextWorkoutId
+              const weekDay = weekdayThisWeek(workout, new Date())
               const letter = index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
               return (
                 <m.div key={workout.id} variants={tileVariants}>
@@ -181,7 +184,7 @@ export default function StudentWeekPage() {
                       )}
                       aria-hidden="true"
                     >
-                      {isWeekday(workout.weekday) ? WEEKDAY_SHORT[workout.weekday] : letter}
+                      {weekDay !== null ? WEEKDAY_SHORT[weekDay] : letter}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
@@ -196,7 +199,7 @@ export default function StudentWeekPage() {
                           </span>
                         )}
                         <span className="text-xs font-semibold text-zinc-400">
-                          {isWeekday(workout.weekday) ? `${WEEKDAY_NAMES[workout.weekday]} · ` : ''}
+                          {weekDay !== null ? `${WEEKDAY_NAMES[weekDay]} · ` : ''}
                           {workout.lastDoneAt
                             ? `Feito ${relativeDay(new Date(workout.lastDoneAt))}`
                             : workout.weekState === 'missed'

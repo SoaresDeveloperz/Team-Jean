@@ -19,6 +19,12 @@ begin
   select data_type into t from information_schema.columns where table_schema = 'public' and table_name = 'assigned_workouts' and column_name = 'position';
   if t = 'smallint' then raise notice 'OK  assigned_workouts.position existe (smallint)';
   else raise notice 'FALHOU: sem position (%)', t; end if;
+  select data_type into t from information_schema.columns where table_schema = 'public' and table_name = 'assigned_workouts' and column_name = 'rotate_days';
+  if t = 'boolean' then raise notice 'OK  assigned_workouts.rotate_days existe (boolean)';
+  else raise notice 'FALHOU: sem rotate_days (%)', t; end if;
+  if (select not rotate_days from public.assigned_workouts where id = '20000000-0000-0000-0000-000000000001')
+  then raise notice 'OK  descanso rotativo começa desligado';
+  else raise notice 'FALHOU: rotate_days não começa falso'; end if;
   if (select weekday is null and position is null from public.assigned_workouts where id = '20000000-0000-0000-0000-000000000001')
   then raise notice 'OK  treino antigo continua sem dia e sem ordem (vazios)';
   else raise notice 'FALHOU: padrão do treino antigo'; end if;
@@ -47,6 +53,11 @@ begin
   exception when check_violation then
     raise notice 'OK  position fora de 0 a 99 é recusado';
   end;
+  update public.assigned_workouts set rotate_days = true where id = '20000000-0000-0000-0000-000000000001';
+  get diagnostics n = row_count;
+  if n = 1 then raise notice 'OK  o treinador liga o descanso rotativo';
+  else raise notice 'FALHOU: não ligou o rotativo'; end if;
+  update public.assigned_workouts set rotate_days = false where id = '20000000-0000-0000-0000-000000000001';
   update public.assigned_workouts set weekday = null where id = '20000000-0000-0000-0000-000000000001';
   get diagnostics n = row_count;
   if n = 1 then raise notice 'OK  o treinador volta para "sem dia fixo"';
@@ -62,7 +73,7 @@ begin
   select weekday into d from public.assigned_workouts where id = '20000000-0000-0000-0000-000000000001';
   if d = 3 then raise notice 'OK  a aluna lê o dia do próprio treino';
   else raise notice 'FALHOU: a aluna não leu o dia (%)', d; end if;
-  update public.assigned_workouts set weekday = 5, position = 9 where id = '20000000-0000-0000-0000-000000000001';
+  update public.assigned_workouts set weekday = 5, position = 9, rotate_days = true where id = '20000000-0000-0000-0000-000000000001';
   get diagnostics n = row_count;
   if n = 0 then raise notice 'OK  a aluna não muda dia nem ordem';
   else raise notice 'FALHOU: a aluna alterou o dia ou a ordem'; end if;

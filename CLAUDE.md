@@ -64,6 +64,7 @@
 - `engenheiro-de-cobranca`: mensalidade e PIX (dinheiro contado uma vez só, sem constrangimento). Só lê e aponta. Chame ao mexer em valores, vencimentos e financeiro.
 - `curador-de-instagram`: conteúdo para o Jean divulgar a consultoria. Não mexe no app.
 - Os dez últimos vêm do [agency-agents](https://github.com/msitarzewski/agency-agents) (MIT), adaptados.
+- Skill `ponytail` ([ponytail](https://github.com/DietrichGebert/ponytail), MIT, adaptada): dev sênior preguiçoso. Use ao escrever, corrigir ou rever código: a menor mudança completa, sem abstração, opção ou dependência que ninguém pediu; atalho com limite leva o comentário `shortcut: <limite>, <quando melhorar>`; "dívida" lista esses atalhos. As regras do projeto (RLS, LGPD, WCAG, treino sem internet, dinheiro) nunca são cortadas.
 - Skill `design-taste-frontend` ([taste-skill](https://github.com/Leonxlnx/taste-skill), MIT): direção de arte para páginas públicas e telas novas. Use para páginas de divulgação e para rever telas, mas as regras do projeto mandam: paleta Team Jean, WCAG 2.1 AA, letra de pelo menos 12 px, fundo escuro, e nunca foto de banco de imagens de pessoas (LGPD e confiança). Rode sempre os roteiros axe depois de mudar uma tela.
 
 ## Como tomar uma decisão importante

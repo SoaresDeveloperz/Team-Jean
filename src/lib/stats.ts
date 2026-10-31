@@ -47,10 +47,6 @@ export function weekDayCounts(dates: Date[], now = new Date()) {
   return counts
 }
 
-export function countInWeek(dates: Date[], now = new Date()) {
-  return weekDayCounts(dates, now).reduce((total, count) => total + count, 0)
-}
-
 export function countInMonth(dates: Date[], now = new Date()) {
   return dates.filter((date) => date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()).length
 }

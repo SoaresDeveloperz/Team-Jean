@@ -76,12 +76,6 @@ export function normalizeWeight(value: PlannedSet['weight']) {
 // Aquecimento e feeder não contam como séries de trabalho.
 export const PREP_SET_TYPES = new Set(['warmup', 'feeder'])
 
-export function formatSeconds(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}
-
 export function formatKg(value: number) {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value)
 }

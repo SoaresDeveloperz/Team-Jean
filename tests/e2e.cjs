@@ -103,6 +103,8 @@ async function openShortcuts(page) {
   await shot(page, '04-semana')
 
   await page.goto(`${BASE}/student/history`)
+  // O histórico abre no mês atual; nos primeiros dias do mês os treinos de 7 e 14 dias atrás estão no mês anterior.
+  if (!(await page.waitForSelector('text=Treino A - Peito e Tríceps', { timeout: 4000 }).catch(() => null))) await page.click('button[aria-label="Mês anterior"]')
   await page.waitForSelector('text=Treino A - Peito e Tríceps')
   await page.click('li button[aria-expanded=false] >> nth=0')
   await page.waitForSelector('text=Volume')

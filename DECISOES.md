@@ -139,3 +139,10 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - Pergunta: vale trazer o repositório DietrichGebert/ponytail (indicado pelo dono) para o app?
 - O que é: não é um app de treino; é uma skill para agentes de IA ("dev sênior preguiçoso", MIT) com regras de menor mudança, revisão ranqueada e lista de atalhos (`shortcut:`).
 - Decidido: adaptar para `.claude/skills/ponytail/SKILL.md` em português, com as regras do projeto como "nunca corte". Primeira aplicação: varredura de código sem uso (removidos `PageLoader`, `FeedbackAlert`, `countInWeek`, `formatSeconds`; nenhuma dependência sobrando; nenhum `shortcut:` no código ainda).
+
+## 2026-11-03 — Ideias do awesome-android-ui
+- Pergunta: o que aproveitar da lista de bibliotecas Android (indicada pelo dono)?
+- Contexto: são bibliotecas nativas, sem uso direto no PWA; só as ideias de tela servem.
+- Feito: cartão "Primeira vez por aqui?" na tela Hoje (3 dicas, dispensável por aluno), no lugar do tour com tela por cima (ShowcaseView), que é mais código e mais barreira de acessibilidade.
+- Já existia: anel de progresso da semana na tela Hoje (`ProgressRing`).
+- Não feito: arrastar o cartão do aluno (a ação "WhatsApp" já é botão, gesto escondido briga com a rolagem e pede alternativa por botão) e puxar para atualizar (o PWA já atualiza ao abrir).

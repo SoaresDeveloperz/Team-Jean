@@ -26,6 +26,7 @@ import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { ReadinessCard } from '@/components/fitness/ReadinessCard'
 import { AnamnesePrompt } from '@/components/health/AnamnesePrompt'
+import { FirstTimeTips } from '@/components/student/FirstTimeTips'
 
 type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null }
 
@@ -291,6 +292,8 @@ export default function StudentTodayPage() {
           Ver minha semana
         </Link>
       </m.header>
+
+      {data.completedDates.length === 0 && !data.inProgress && <FirstTimeTips userId={userId} />}
 
       {/* Treino do dia */}
       {next ? (

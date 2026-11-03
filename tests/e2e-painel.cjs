@@ -4,6 +4,7 @@
 const path = require('path')
 const fs = require('fs')
 const { chromium } = require('playwright')
+const { runAxe } = require('./a11y/run-axe.cjs')
 
 const BASE = process.env.BASE || 'http://localhost:3200'
 const OUT = path.join(__dirname, '.output', 'shots')
@@ -38,6 +39,7 @@ async function login(page, who) {
   await login(student, 'maria')
   await student.goto(`${BASE}/student/today`)
   await student.waitForSelector('h1:has-text("Fala,")')
+  check('aluna com treinos não vê as dicas da primeira vez', (await student.locator('text=Primeira vez por aqui?').count()) === 0)
   const links = student.locator('nav[aria-label="Menu do aluno"] a')
   check('menu do aluno tem 5 abas', (await links.count()) === 5)
   check('menu do aluno não tem mais "Semana" (abre pelo Hoje)', (await student.locator('nav[aria-label="Menu do aluno"] a[href="/student/week"]').count()) === 0)
@@ -50,6 +52,25 @@ async function login(page, who) {
   await week.click()
   await student.waitForURL('**/student/week')
   check('"Ver minha semana" abre a tela da semana', true)
+
+  // Dicas da primeira vez: só quem nunca treinou vê; "Entendi" dispensa e não volta.
+  const novice = await phone.newPage()
+  watch(novice)
+  await novice.route(/\/rest\/v1\/workout_sessions/, (route) => (route.request().method() === 'GET' ? route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }) : route.continue()))
+  await novice.goto(`${BASE}/student/today`)
+  await novice.waitForSelector('h1:has-text("Fala,")')
+  check('quem nunca treinou vê "Primeira vez por aqui?"', (await novice.locator('text=Primeira vez por aqui?').count()) === 1)
+  await novice.waitForTimeout(500)
+  const axe = await runAxe(novice)
+  check(`dicas da primeira vez sem violações no axe${axe.length ? ': ' + JSON.stringify(axe) : ''}`, axe.length === 0)
+  const gotIt = novice.getByRole('button', { name: 'Entendi' })
+  check('"Entendi" tem 44 px ou mais', ((await gotIt.boundingBox())?.height ?? 0) >= 43.5)
+  await gotIt.click()
+  check('"Entendi" esconde as dicas', (await novice.locator('text=Primeira vez por aqui?').count()) === 0)
+  await novice.reload()
+  await novice.waitForSelector('h1:has-text("Fala,")')
+  check('as dicas não voltam depois de dispensadas', (await novice.locator('text=Primeira vez por aqui?').count()) === 0)
+  await novice.close()
 
   // ------------------------------------------------ treinador no celular
   const coach = await phone.newPage()

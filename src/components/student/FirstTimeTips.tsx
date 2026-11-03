@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { Check, Hourglass, RefreshCw } from 'lucide-react'
 import { Eyebrow, Tile } from '@/components/ui/tile'
 
-const STORAGE_KEY = 'team-jean:dicas-primeiro-treino'
+// Uma chave por aluno: num aparelho emprestado, quem chega depois ainda vê as dicas.
+const storageKey = (userId: string | null) => `team-jean:dicas-primeiro-treino:${userId ?? ''}`
 
-function alreadySeen() {
+function alreadySeen(userId: string | null) {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === '1'
+    return window.localStorage.getItem(storageKey(userId)) === '1'
   } catch {
     return false
   }
@@ -16,23 +17,23 @@ function alreadySeen() {
 
 // Três dicas para quem ainda não fez nenhum treino. Um cartão simples (sem tela
 // por cima) que o aluno dispensa uma vez; some também quando ele termina o primeiro treino.
-export function FirstTimeTips() {
-  const [hidden, setHidden] = useState(alreadySeen)
+export function FirstTimeTips({ userId }: { userId: string | null }) {
+  const [hidden, setHidden] = useState(() => alreadySeen(userId))
   if (hidden) return null
 
   const dismiss = () => {
     setHidden(true)
     try {
-      window.localStorage.setItem(STORAGE_KEY, '1')
+      window.localStorage.setItem(storageKey(userId), '1')
     } catch {
       // Sem armazenamento: o cartão só volta na próxima visita.
     }
   }
 
   const tips = [
-    { icon: Check, title: 'Marque cada série', text: 'Toque no ✓ ao terminar a série. O app guarda a carga e mostra a do treino anterior.' },
-    { icon: Hourglass, title: 'Sem tempo?', text: 'Use "Tenho pouco tempo" para fazer uma versão mais curta só hoje.' },
-    { icon: RefreshCw, title: 'Aparelho ocupado?', text: 'Use "Trocar exercício" e o Jean vê o que você fez no lugar.' },
+    { icon: Check, title: 'Marque cada série', text: 'Toque no ✓ ao terminar a série. O app guarda a carga, e você vê a do último treino na coluna "Anterior".' },
+    { icon: Hourglass, title: 'Sem tempo?', text: 'Quando o treino é longo, aparece o botão "Tenho pouco tempo" na tela Hoje: ele monta uma versão mais curta só para hoje.' },
+    { icon: RefreshCw, title: 'Aparelho ocupado?', text: 'Antes da primeira série, toque em "Trocar" ao lado do exercício (aparece quando há opção). O Jean vê o que você fez no lugar.' },
   ]
 
   return (

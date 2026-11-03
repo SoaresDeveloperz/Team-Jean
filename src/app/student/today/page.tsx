@@ -293,7 +293,7 @@ export default function StudentTodayPage() {
         </Link>
       </m.header>
 
-      {data.completedDates.length === 0 && !data.inProgress && <FirstTimeTips />}
+      {data.completedDates.length === 0 && !data.inProgress && <FirstTimeTips userId={userId} />}
 
       {/* Treino do dia */}
       {next ? (

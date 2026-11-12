@@ -43,6 +43,8 @@ const SUITES = {
   lento: ['tests/e2e-lento.cjs'],
   // Rotina da semana: dia de cada treino, reinício semanal, ordem editável (contas puras + telas).
   rotina: ['tests/contas-semana.mjs', 'tests/e2e-rotina.cjs'],
+  // Aba "Evolução" da ficha do aluno: carga por exercício e percentual (contas puras + tela + axe).
+  evolucao: ['tests/contas-evolucao.mjs', 'tests/e2e-evolucao.cjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],

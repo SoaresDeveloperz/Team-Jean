@@ -58,7 +58,7 @@ export type RadarAlert = { key: string; studentId: string; studentName: string; 
 export type Radar = { records: RadarRecord[]; progressions: RadarProgression[]; alerts: RadarAlert[] }
 
 // .in() com muitos ids estoura o tamanho da URL: busca em lotes.
-async function inChunks<T>(
+export async function inChunks<T>(
   ids: string[],
   size: number,
   run: (chunk: string[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>,

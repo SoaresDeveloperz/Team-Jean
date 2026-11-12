@@ -1,5 +1,5 @@
 // Roteiro da aba "Evolução" da ficha do aluno (pedido do Jean): carga por exercício,
-// referência e percentual, troca de período, gráfico ao tocar e auditoria axe.
+// referência e percentual, troca de período, gráfico de cada exercício e auditoria axe.
 // As contas puras ficam em contas-evolucao.mjs.
 const path = require('path')
 const fs = require('fs')
@@ -40,10 +40,8 @@ const check = (name, condition, detail = '') => results.push(`${condition ? 'OK 
   check('30 dias: supino 65 kg → 70 kg = +8%', text.includes('65 kg × 7') && text.includes('70 kg × 6') && text.includes('+8%'), text.slice(0, 400))
   check('30 dias: resumo conta quem subiu', text.includes('1 subiu'))
 
-  const row = page.locator(`${dialog} button[aria-expanded]`, { hasText: 'Supino Reto com Barra' })
-  await row.click()
-  await page.waitForSelector(`${dialog} svg >> nth=0`)
-  check('tocar no exercício abre o gráfico', (await row.getAttribute('aria-expanded')) === 'true' && (await page.locator(`${dialog} [role=img], ${dialog} figure`).count()) > 0)
+  check('gráfico do supino aparece sem precisar tocar', (await page.locator(`${dialog} [role=img][aria-label*="Supino Reto com Barra"], ${dialog} figure:has-text("Supino")`).count()) > 0)
+  check('exercício com um registro só não mostra gráfico', (await page.locator(`${dialog} [role=img]`).count()) === 1)
   await page.waitForTimeout(1200)
   await page.screenshot({ path: path.join(OUT, 'ev01-evolucao-30-dias.png') })
 

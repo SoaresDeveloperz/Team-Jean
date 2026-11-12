@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Minus, TrendingDown, TrendingUp } from 'lucide-react'
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { inChunks } from '@/lib/coach-insights'
 import { buildTrends, formatChange, sortTrends, trendKind, type ExercisePoint, type ReportSession, type ReportSet } from '@/lib/progress-report'
@@ -23,14 +23,13 @@ type Loaded = { sessions: ReportSession[]; sets: ReportSet[]; names: Map<string,
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
-// Relatório de evolução de carga por exercício, para o treinador dar o retorno da semana.
+// Relatório de evolução de carga por exercício, com gráfico, para o treinador dar o retorno da semana.
 export function ProgressReport({ studentId, studentName }: { studentId: string; studentName: string }) {
   const [supabase] = useState(() => createClient())
   const [data, setData] = useState<Loaded | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [period, setPeriod] = useState<Period>(7)
-  const [open, setOpen] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -109,10 +108,7 @@ export function ProgressReport({ studentId, studentName }: { studentId: string; 
         size="sm"
         label="Período do relatório"
         value={period}
-        onChange={(value) => {
-          setPeriod(value)
-          setOpen(null)
-        }}
+        onChange={setPeriod}
         options={[
           { value: 7, label: '7 dias' },
           { value: 30, label: '30 dias' },
@@ -135,21 +131,13 @@ export function ProgressReport({ studentId, studentName }: { studentId: string; 
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
             {trends.map((trend) => {
               const kind = trendKind(trend)
-              const expanded = open === trend.exerciseId
               const value = (point: ExercisePoint) => (trend.unit === 'kg' ? point.weight : point.reps)
               const label = (point: ExercisePoint) =>
                 trend.unit === 'kg' ? `${formatKg(point.weight)} kg × ${point.reps}` : plural(point.reps, 'rep.', 'reps.')
               const Icon = kind === 'up' ? TrendingUp : kind === 'down' ? TrendingDown : Minus
-              const panelId = `evolucao-${trend.exerciseId}`
               return (
-                <li key={trend.exerciseId}>
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    aria-controls={panelId}
-                    onClick={() => setOpen(expanded ? null : trend.exerciseId)}
-                    className="flex min-h-11 w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/[0.03]"
-                  >
+                <li key={trend.exerciseId} className="px-4 py-3">
+                  <div className="flex items-center gap-3">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-white">{trend.name}</span>
                       <span className="block text-xs text-zinc-400">
@@ -169,19 +157,14 @@ export function ProgressReport({ studentId, studentName }: { studentId: string; 
                       {kind !== 'first' && <Icon className="h-3 w-3" aria-hidden="true" />}
                       {trend.change === null ? '1º registro' : formatChange(trend.change)}
                     </span>
-                    <ChevronDown className={cn('h-4 w-4 shrink-0 text-zinc-500 transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
-                  </button>
-                  {expanded && (
-                    <div id={panelId} className="px-3 pb-3">
-                      {trend.points.length < 2 ? (
-                        <p className="py-4 text-center text-xs text-zinc-500">Só um registro: o gráfico aparece a partir do segundo treino.</p>
-                      ) : (
-                        <LineChart
-                          title={`Evolução de ${trend.name}`}
-                          format={(point) => (trend.unit === 'kg' ? `${formatKg(point)} kg` : plural(point, 'rep.', 'reps.'))}
-                          points={trend.points.map((point) => ({ key: point.sessionId, label: shortDate(point.date), value: value(point) }))}
-                        />
-                      )}
+                  </div>
+                  {trend.points.length >= 2 && (
+                    <div className="mt-2">
+                      <LineChart
+                        title={`Evolução de ${trend.name}`}
+                        format={(point) => (trend.unit === 'kg' ? `${formatKg(point)} kg` : plural(point, 'rep.', 'reps.'))}
+                        points={trend.points.map((point) => ({ key: point.sessionId, label: shortDate(point.date), value: value(point) }))}
+                      />
                     </div>
                   )}
                 </li>

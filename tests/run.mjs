@@ -45,6 +45,8 @@ const SUITES = {
   rotina: ['tests/contas-semana.mjs', 'tests/e2e-rotina.cjs'],
   // Aba "Evolução" da ficha do aluno: carga por exercício e percentual (contas puras + tela + axe).
   evolucao: ['tests/contas-evolucao.mjs', 'tests/e2e-evolucao.cjs'],
+  // Nutrição (base de alimentos da TACO): contas puras e integridade dos dados. O banco: tests/sql/rls-nutricao.sql.
+  nutricao: ['tests/contas-nutricao.mjs'],
   routes: [
     ['tests/a11y/a11y.cjs', 'anon', ...ROUTES.anon],
     ['tests/a11y/a11y.cjs', 'maria', ...ROUTES.maria],

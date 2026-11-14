@@ -316,6 +316,29 @@ o dia). A tela Hoje do aluno segue uma regra só:
   e ordem. **Contas:** `src/lib/week-plan.ts` (`tests/contas-semana.mjs`); telas: roteiros
   `rotina` e `rotina-a11y`; banco: `tests/sql/rls-rotina.sql`.
 
+### Nutrição (base de alimentos)
+
+Primeira parte da aba de nutrição pedida pelo Jean: a **base de alimentos**. Ainda não tem
+tela; a aba do treinador e a tela do aluno entram depois que o dono confirmar quem é o
+responsável técnico dos planos (veja o `DECISOES.md`, 2026-11-14).
+
+- **Banco:** rode [`supabase/nutricao.sql`](supabase/nutricao.sql) e depois
+  [`supabase/nutricao-taco.sql`](supabase/nutricao-taco.sql) (idempotentes). A tabela `foods`
+  tem energia, proteína, lipídeos, carboidrato, fibra, sódio e colesterol por 100 g, e os
+  minerais e vitaminas em `micros`. Todo logado lê; só o treinador cadastra alimento próprio
+  (`custom`); os da TACO ninguém muda pelo app.
+- **Fonte:** Tabela Brasileira de Composição de Alimentos (TACO), 4ª edição revisada e
+  ampliada, NEPA/UNICAMP, Campinas, 2011 ("É permitida a reprodução parcial ou total desta
+  obra, desde que citada a fonte"). A citação tem de aparecer nas telas que mostrarem os
+  valores. A TBCA (USP) não foi usada: o site proíbe a comercialização.
+- **Como a TACO virou dado:** "Tr" (traço) e "NA" (não aplicável: fibra na carne, colesterol
+  no vegetal) entram como **0**; só a célula em branco e o "\*" ("análises sendo
+  reavaliadas") ficam **vazios** (sem dado). Por isso leite de vaca integral e desnatado,
+  iogurte sabor abacaxi e coco verde estão sem energia na TACO: o treinador cadastra à mão.
+  Os totais avisam quando um nutriente tem item sem dado (`incomplete`), em vez de mostrar 0.
+- **Contas:** `src/lib/nutrition.ts` (`tests/contas-nutricao.mjs`, roteiro `nutricao`);
+  banco: `tests/sql/rls-nutricao.sql`.
+
 ## Testes e CI
 
 - `pnpm test:build && pnpm test:e2e`: sobe um Supabase falso
@@ -326,6 +349,9 @@ o dia). A tela Hoje do aluno segue uma regra só:
 - `node tests/contas-novidades.mjs`: confere, sem navegador, as contas do
   aquecimento e das anilhas (`src/lib/warmup.ts`) e a mensagem de WhatsApp
   (`src/lib/whatsapp.ts`). Também roda no roteiro `novidades`.
+- `node tests/contas-nutricao.mjs`: confere, sem navegador, os 597 alimentos da TACO em
+  `supabase/nutricao-taco.sql` e as contas de totais e busca (`src/lib/nutrition.ts`).
+  Também roda no roteiro `nutricao`.
 - `node tests/contas-exercicios.mjs`: confere, sem navegador, o endereço dos
   GIFs (com e sem a variável, e com `off`), a biblioteca gerada, a busca e o
   casamento. Também roda no roteiro `exercicios`; a auditoria axe das telas dos

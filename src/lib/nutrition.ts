@@ -45,6 +45,12 @@ export function formatNutrient(nutrient: Nutrient, value: number): string {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: decimals }).format(value)
 }
 
+// Número digitado pelo treinador: "12", "12,5" ou "12.5". Vazio, letras, "1e3", "0x10" e negativo viram null.
+export function parseAmount(text: string): number | null {
+  const clean = text.trim()
+  return /^\d+(?:[.,]\d+)?$/.test(clean) ? Number(clean.replace(',', '.')) : null
+}
+
 const plain = (text: string) =>
   text
     .normalize('NFD')

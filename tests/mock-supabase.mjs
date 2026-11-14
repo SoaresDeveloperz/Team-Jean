@@ -1120,6 +1120,7 @@ http
           }[table]
           const row = { ...defaults, ...item }
           if (table === 'foods' && (row.source !== 'custom' || row.taco_number != null)) return forbidden()
+          if (rows.some((existing) => existing.id === row.id)) return send(res, 409, { code: '23505', message: `duplicate key value violates unique constraint "${table}_pkey"` })
           const violation = check(row)
           if (violation) return violates(violation)
           if (table === 'nutrition_plans' && nutrition_plans.some((plan) => plan.student_id === row.student_id)) return send(res, 409, { code: '23505', message: 'duplicate key value violates unique constraint "nutrition_plans_student_id_key"' })

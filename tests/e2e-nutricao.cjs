@@ -15,6 +15,13 @@ const problems = []
 const check = (name, condition, detail = '') => results.push(`${condition ? 'OK  ' : 'FAIL'} ${name}${condition || !detail ? '' : ` → ${detail}`}`)
 const mock = (route) => fetch(`${MOCK}${route}`)
 
+// Menor altura (em px) entre os elementos que casam com o seletor.
+const minHeight = (page, selector) =>
+  page.evaluate((sel) => {
+    const heights = [...document.querySelectorAll(sel)].map((el) => el.getBoundingClientRect().height)
+    return heights.length ? Math.min(...heights) : 0
+  }, selector)
+
 async function login(page, who) {
   await page.goto(`${BASE}/login`)
   await page.fill('#email', `${who}@teste.com`)
@@ -61,7 +68,7 @@ async function login(page, who) {
   await jean.fill('#plan-resp-name', 'Jean Souza')
   await top().getByRole('button', { name: 'Criar plano' }).click()
   await jean.waitForSelector('text=Informe o nome e o CRN')
-  check('plano sem CRN é recusado com aviso', true)
+  check('plano sem CRN é recusado com aviso (e o plano não foi criado)', (await jean.locator('section[aria-label="Resumo do plano"]').count()) === 0)
   await jean.fill('#plan-resp-crn', 'CRN-3 12345')
   await jean.fill('#plan-kcal', '1800')
   await jean.fill('#plan-protein', '110')
@@ -104,6 +111,10 @@ async function login(page, who) {
   await jean.fill('#new-food-carb', '4,6')
   await jean.fill('#new-food-fat', '3,3')
   await jean.getByRole('button', { name: 'Cadastrar e escolher' }).click()
+  await jean.fill('#food-grams', '0')
+  await jean.getByRole('button', { name: 'Adicionar à refeição' }).click()
+  await jean.waitForSelector('text=Informe as gramas, entre 1 e 5000.')
+  check('0 g no seletor é recusado com aviso (e o seletor continua aberto)', (await jean.locator('#food-grams').count()) === 1)
   await jean.fill('#food-grams', '200')
   await jean.getByRole('button', { name: 'Adicionar à refeição' }).click()
   await jean.waitForSelector('input[aria-label="Gramas de Leite integral (rótulo)"]')
@@ -114,7 +125,45 @@ async function login(page, who) {
   await grams.fill('200')
   await grams.blur()
   await jean.waitForFunction(() => document.querySelector('section[aria-label="Resumo do plano"]')?.textContent?.includes('454'))
-  check('mudar 150 g para 200 g de arroz atualiza o total (454 kcal)', true)
+  check('mudar 150 g para 200 g de arroz atualiza o total (454 kcal)', (await sheet.textContent()).includes('454'), await sheet.textContent())
+
+  // Gramas inválidas voltam ao valor salvo (nada de "abc" nem 0 no plano).
+  await grams.fill('abc')
+  await grams.blur()
+  check('gramas inválidas ("abc") voltam ao valor salvo', (await grams.inputValue()) === '200', await grams.inputValue())
+  await grams.fill('0')
+  await grams.blur()
+  check('0 g volta ao valor salvo', (await grams.inputValue()) === '200', await grams.inputValue())
+
+  // Regressão: editar as gramas e tocar logo na medida caseira não pode perder o foco nem o texto digitado.
+  const beansGrams = jean.locator('input[aria-label="Gramas de Feijão, carioca, cozido"]')
+  const beansPortion = jean.locator('input[aria-label="Medida caseira de Feijão, carioca, cozido"]')
+  await beansGrams.fill('120')
+  await beansPortion.click()
+  await beansPortion.pressSequentially('1 concha', { delay: 40 })
+  check('o campo da medida mantém o foco e o texto enquanto as gramas salvam', (await beansPortion.inputValue()) === '1 concha' && (await beansPortion.evaluate((el) => el === document.activeElement)))
+  await beansGrams.click()
+  await jean.waitForTimeout(900)
+  check('as duas edições (gramas e medida) foram salvas', (await beansGrams.inputValue()) === '120' && (await beansPortion.inputValue()) === '1 concha')
+
+  // Toque duplo numa sugestão cria uma refeição só.
+  await jean.locator('button:has-text("+ Jantar")').dblclick()
+  await jean.waitForSelector('section[aria-label="Jantar"]')
+  await jean.waitForTimeout(900)
+  check('toque duplo em "+ Jantar" cria uma refeição só', (await jean.locator('section[aria-label="Jantar"]').count()) === 1)
+  const sameName = jean.locator('input[aria-label="Nome de outra refeição"]')
+  await sameName.fill('almoço')
+  await sameName.press('Enter')
+  await jean.waitForTimeout(900)
+  check('"Outra refeição" com nome que já existe não duplica', (await jean.locator('section[aria-label="Almoço"]').count()) === 1)
+
+  // Alvos de toque do treinador: pelo menos 44 px.
+  const coachTargets = Math.min(
+    await minHeight(jean, 'button[aria-label^="Tirar"]'),
+    await minHeight(jean, 'section[aria-label="Almoço"] button'),
+    await minHeight(jean, 'section[aria-label="Almoço"] input'),
+  )
+  check('alvos de toque da aba do treinador têm 44 px ou mais', coachTargets >= 43.5, String(coachTargets))
 
   await jean.waitForTimeout(900)
   await jean.screenshot({ path: path.join(OUT, 'nu01-treinador-plano.png') })
@@ -136,13 +185,20 @@ async function login(page, who) {
   await login(maria, 'maria')
   await maria.goto(`${BASE}/student/today`)
   await maria.waitForSelector('h1:has-text("Fala,")')
-  await maria.getByRole('link', { name: 'Ver minha alimentação' }).click()
+  const todayLink = maria.getByRole('link', { name: 'Ver minha alimentação' })
+  const linkHeight = await todayLink.evaluate((el) => el.getBoundingClientRect().height)
+  check('o link "Ver minha alimentação" da Hoje tem 44 px ou mais de altura', linkHeight >= 43.5, String(linkHeight))
+  await todayLink.click()
   await maria.waitForSelector('h1:has-text("Alimentação")')
   await maria.waitForSelector('section[aria-labelledby]')
   let text = await maria.textContent('main')
   check('a aluna vê o plano: refeição, medida caseira e gramas', text.includes('Almoço') && text.includes('4 colheres de servir') && text.includes('200 g') && text.includes('Arroz, tipo 1, cozido'))
   check('mostra o responsável técnico com o CRN', text.includes('Jean Souza') && text.includes('CRN-3 12345'))
   check('aviso de que não substitui nutricionista ou médico', text.includes('não substitui a orientação do seu nutricionista ou médico'))
+  const mealTexts = await maria.locator('section[aria-labelledby]').allTextContents()
+  check('por refeição só aparecem calorias (nada de carboidrato, proteína ou gordura)', mealTexts.length >= 2 && mealTexts.every((meal) => !/carboidrato|proteína|gordura/i.test(meal)), mealTexts.join(' || ').slice(0, 300))
+  check('refeição vazia mostra "Nada nesta refeição ainda."', mealTexts.some((meal) => meal.includes('Jantar') && meal.includes('Nada nesta refeição ainda.')))
+  check('responsável técnico em letra legível, perto do topo', (await maria.locator('p:has-text("Plano elaborado por")').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 14)
   check('metas do dia com barras (calorias, proteína, carboidrato, gordura)', (await maria.locator('[role=progressbar]').count()) === 4 && text.includes('454') && text.includes('1.800'))
   check('total parcial avisado ao aluno (leite sem calorias na TACO), só de calorias e macros', text.includes('Total parcial') && !/fibra|sódio|colesterol/i.test(text.slice(text.indexOf('Total parcial'), text.indexOf('Total parcial') + 160)))
   check('créditos da TACO NÃO ficam nas telas de nutrição', !/TACO|Tabela Brasileira/i.test(text))
@@ -184,11 +240,11 @@ async function login(page, who) {
   await jean.getByRole('button', { name: 'Apagar plano de Maria' }).click()
   await top().getByRole('button', { name: 'Apagar', exact: true }).click()
   await jean.waitForSelector(`${dialog} >> text=ainda não tem plano de alimentação`)
-  check('treinador apaga o plano e volta ao convite', true)
+  check('treinador apaga o plano e volta ao convite', (await jean.textContent(dialog)).includes('Maria ainda não tem plano') && (await jean.locator('section[aria-label="Resumo do plano"]').count()) === 0)
   await login(maria, 'maria')
   await maria.goto(`${BASE}/student/nutrition`)
   await maria.waitForSelector('text=ainda não foi montado')
-  check('sem plano, a aluna vê "ainda não foi montado"', true)
+  check('sem plano, a aluna vê "ainda não foi montado" e nenhuma refeição', (await maria.textContent('main')).includes('ainda não foi montado') && (await maria.locator('section[aria-labelledby]').count()) === 0)
   await maria.goto(`${BASE}/student/today`)
   await maria.waitForSelector('h1:has-text("Fala,")')
   check('sem plano, o link da Hoje some', (await maria.getByRole('link', { name: 'Ver minha alimentação' }).count()) === 0)

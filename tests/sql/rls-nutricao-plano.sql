@@ -47,6 +47,12 @@ begin
 
   select updated_at into a from public.nutrition_plans where id = plan;
   perform pg_sleep(0.05);
+  update public.nutrition_plans set notes = 'Beba água' where id = plan;
+  select updated_at into b from public.nutrition_plans where id = plan;
+  if b > a then raise notice 'OK  mudar metas ou observações atualiza o "atualizado em"';
+  else raise notice 'FALHOU: updated_at não mudou ao editar o plano'; end if;
+  a := b;
+  perform pg_sleep(0.05);
   insert into public.nutrition_meal_items (meal_id, food_id, grams, portion_text) values (meal, rice, 150, '4 colheres de servir');
   select updated_at into b from public.nutrition_plans where id = plan;
   if b > a then raise notice 'OK  mexer num item atualiza o "atualizado em" do plano';
@@ -90,6 +96,17 @@ begin
   if n = 0 then raise notice 'OK  a aluna não muda a meta'; else raise notice 'FALHOU: a aluna mudou o plano'; end if;
   begin insert into public.nutrition_meals (plan_id, name) values ('a0000000-0000-0000-0000-000000000001', 'Minha refeição'); raise notice 'FALHOU: a aluna criou refeição';
   exception when insufficient_privilege then raise notice 'OK  a aluna não cria refeição'; end;
+  begin insert into public.nutrition_meal_items (meal_id, food_id, grams) values ('b0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000002', 10); raise notice 'FALHOU: a aluna criou item';
+  exception when insufficient_privilege then raise notice 'OK  a aluna não cria item no próprio plano'; end;
+  update public.nutrition_meals set name = 'Outro nome';
+  get diagnostics n = row_count;
+  if n = 0 then raise notice 'OK  a aluna não renomeia refeição'; else raise notice 'FALHOU: a aluna renomeou refeição'; end if;
+  delete from public.nutrition_meals;
+  get diagnostics n = row_count;
+  if n = 0 then raise notice 'OK  a aluna não apaga refeições'; else raise notice 'FALHOU: a aluna apagou refeições'; end if;
+  delete from public.nutrition_plans;
+  get diagnostics n = row_count;
+  if n = 0 then raise notice 'OK  a aluna não apaga o próprio plano'; else raise notice 'FALHOU: a aluna apagou o plano'; end if;
   update public.nutrition_meal_items set grams = 999;
   get diagnostics n = row_count;
   if n = 0 then raise notice 'OK  a aluna não muda gramas'; else raise notice 'FALHOU: a aluna mudou gramas'; end if;
@@ -135,4 +152,12 @@ begin
   raise notice 'FALHOU: sem login leu % planos', n;
 exception when insufficient_privilege then
   raise notice 'OK  sem login não lê planos';
+end $$;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.nutrition_meal_items;
+  raise notice 'FALHOU: sem login leu % itens', n;
+exception when insufficient_privilege then
+  raise notice 'OK  sem login não lê itens';
 end $$;

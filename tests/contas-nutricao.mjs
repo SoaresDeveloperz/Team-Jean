@@ -74,6 +74,8 @@ check('sal tem energia 0 de verdade: kcal não fica incompleto', !nutrition.sumI
 
 check('formato: kcal inteira, gramas com uma casa, vírgula brasileira', nutrition.formatNutrient('kcal', 191.6) === '192' && nutrition.formatNutrient('protein_g', 4.26) === '4,3' && nutrition.formatNutrient('sodium_mg', 1234.4) === '1.234')
 
+check('números digitados: vírgula e ponto valem; letras, "1e3", "0x10", negativo e vazio não', nutrition.parseAmount('12,5') === 12.5 && nutrition.parseAmount(' 150 ') === 150 && nutrition.parseAmount('12.5') === 12.5 && ['abc', '1e3', '0x10', '-5', '', '  ', '1,2,3', '12 g'].every((text) => nutrition.parseAmount(text) === null))
+
 const nomes = foods.map((item) => ({ name: item.name, n: item.n }))
 check('busca sem acento e sem maiúscula: "pao frances" acha "Pão, trigo, francês"', nutrition.searchFoods(nomes, 'pao frances').some((item) => /Pão, trigo, francês/.test(item.name)), JSON.stringify(nutrition.searchFoods(nomes, 'pao frances')))
 check('busca: quem começa com o texto vem primeiro', nutrition.searchFoods(nomes, 'arroz')[0].name.startsWith('Arroz'))

@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pencil, Plus, Salad, Trash2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { formatNutrient, nutrientIn, type Food } from '@/lib/nutrition'
+import { formatNutrient, nutrientIn, parseAmount, type Food } from '@/lib/nutrition'
 import {
   FOOD_COLUMNS,
   NUTRITION_SETUP_MESSAGE,
@@ -29,7 +29,7 @@ import { FoodPicker } from './FoodPicker'
 const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 const smallInputClassName =
-  'w-full rounded-xl border border-line-strong bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
+  'min-h-11 w-full rounded-xl border border-line-strong bg-black/40 px-3 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const iconButton = 'grid h-11 w-11 shrink-0 place-items-center rounded-xl text-zinc-500 transition hover:bg-white/[0.06] hover:text-white disabled:opacity-50'
 
@@ -38,11 +38,6 @@ const RESPONSIBLE_KEY = 'team-jean:nutri-responsavel'
 const SUGGESTED_MEALS = ['Café da manhã', 'Lanche da manhã', 'Almoço', 'Lanche da tarde', 'Jantar', 'Ceia']
 
 type DbResult = PromiseLike<{ error: { code?: string; message?: string } | null }>
-
-const toNumber = (text: string) => {
-  const value = Number(text.trim().replace(',', '.'))
-  return text.trim() !== '' && Number.isFinite(value) ? value : null
-}
 
 // Responsável técnico: o treinador digita uma vez e o app lembra neste aparelho (não é dado do aluno).
 function rememberedResponsible() {
@@ -85,6 +80,10 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const [customMeal, setCustomMeal] = useState('')
   const [confirm, setConfirm] = useState<{ kind: 'plan' } | { kind: 'meal'; meal: PlanMeal } | null>(null)
   const firstName = studentName.split(' ')[0]
+  // Mudanças entram numa fila (uma por vez, na ordem em que o Jean mexeu) e o plano mais recente fica numa ref.
+  const queue = useRef<Promise<unknown>>(Promise.resolve())
+  const pending = useRef(0)
+  const planRef = useRef<Plan | null | undefined>(undefined)
 
   const fetchPlan = useCallback(async () => {
     try {
@@ -103,12 +102,20 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const apply = useCallback((result: Awaited<ReturnType<typeof fetchPlan>>) => {
     if (result.error) setLoadError(result.error)
     else {
+      planRef.current = result.plan
       setPlan(result.plan)
       setLoadError(null)
     }
   }, [])
 
-  const reload = async () => apply(await fetchPlan())
+  // Depois de uma mudança, um erro ao recarregar vira aviso e não derruba o plano que já está na tela.
+  const reload = async () => {
+    const result = await fetchPlan()
+    if (result.error) {
+      const message = result.error.message
+      setActionError((current) => current || message)
+    } else apply(result)
+  }
 
   useEffect(() => {
     let active = true
@@ -120,18 +127,31 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
     }
   }, [fetchPlan, apply])
 
-  // Faz a mudança, mostra o erro (se houver) e recarrega o plano para a tela refletir o banco.
-  const run = async (action: () => DbResult) => {
-    setBusy(true)
-    setActionError('')
-    try {
-      const { error } = await action()
-      if (error) setActionError(friendlyError(error, 'Não foi possível salvar'))
-    } catch (error) {
-      setActionError(friendlyError(error, 'Não foi possível salvar'))
-    }
-    await reload()
-    setBusy(false)
+  // Faz a mudança na sua vez, mostra o erro (se houver) e recarrega o plano para a tela refletir o banco.
+  // Devolve se deu certo (a linha volta ao valor antigo quando não deu).
+  const run = (action: () => DbResult): Promise<boolean> => {
+    const job = queue.current.then(async () => {
+      pending.current += 1
+      setBusy(true)
+      setActionError('')
+      let ok = true
+      try {
+        const { error } = await action()
+        if (error) {
+          ok = false
+          setActionError(friendlyError(error, 'Não foi possível salvar'))
+        }
+      } catch (error) {
+        ok = false
+        setActionError(friendlyError(error, 'Não foi possível salvar'))
+      }
+      await reload()
+      pending.current -= 1
+      if (pending.current === 0) setBusy(false)
+      return ok
+    })
+    queue.current = job.catch(() => undefined)
+    return job
   }
 
   const openPicker = async (mealId: string) => {
@@ -154,7 +174,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   }
 
   const submitForm = async () => {
-    const targets = { kcal: toNumber(form.kcal), protein: toNumber(form.protein), carb: toNumber(form.carb), fat: toNumber(form.fat) }
+    const targets = { kcal: parseAmount(form.kcal), protein: parseAmount(form.protein), carb: parseAmount(form.carb), fat: parseAmount(form.fat) }
     const name = form.name.trim()
     const crn = form.crn.trim()
     const filled = (text: string, value: number | null) => text.trim() === '' || value !== null
@@ -163,6 +183,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
       return setFormError('Use só números nas metas.')
     }
     if (targets.kcal !== null && (targets.kcal < 800 || targets.kcal > 10000)) return setFormError('A meta de calorias fica entre 800 e 10000.')
+    if ((targets.protein ?? 0) > 1000 || (targets.carb ?? 0) > 1500 || (targets.fat ?? 0) > 600) return setFormError('Confira as metas de proteína, carboidrato e gordura: algum valor está alto demais.')
     if (form.notes.length > 500) return setFormError('As observações passam de 500 letras.')
     const row = {
       responsible_name: name,
@@ -183,9 +204,16 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   }
 
   const addMeal = (name: string) => {
-    if (!plan || !name.trim()) return
+    const clean = name.trim().slice(0, 40)
+    if (!plan || !clean) return
     setCustomMeal('')
-    return run(() => supabase.from('nutrition_meals').insert({ plan_id: plan.id, name: name.trim().slice(0, 40), position: Math.min(plan.meals.length, 30) }))
+    return run(async () => {
+      // Confere de novo na vez da fila: dois toques seguidos no mesmo botão criam uma refeição só.
+      const latest = planRef.current
+      if (!latest) return { error: null }
+      if (latest.meals.some((meal) => meal.name.toLowerCase() === clean.toLowerCase())) return { error: { code: '23505', message: 'duplicate' } }
+      return supabase.from('nutrition_meals').insert({ plan_id: latest.id, name: clean, position: Math.min(latest.meals.length, 30) })
+    })
   }
 
   if (loadError) {
@@ -324,9 +352,8 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
 
       {plan.meals.map((meal) => (
         <MealCard
-          key={`${meal.id}:${meal.name}:${meal.time ?? ''}`}
+          key={meal.id}
           meal={meal}
-          busy={busy}
           onAddFood={() => void openPicker(meal.id)}
           onRename={(name, time) => run(() => supabase.from('nutrition_meals').update({ name, meal_time: time }).eq('id', meal.id))}
           onDelete={() => setConfirm({ kind: 'meal', meal })}
@@ -339,7 +366,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         <p className="text-xs font-black uppercase tracking-[0.1em] text-zinc-500">Nova refeição</p>
         <div className="flex flex-wrap gap-2">
           {SUGGESTED_MEALS.filter((name) => !usedNames.has(name.toLowerCase())).map((name) => (
-            <button key={name} type="button" disabled={busy} onClick={() => void addMeal(name)} className="min-h-11 rounded-full border border-line-strong bg-white/[0.04] px-4 text-xs font-bold text-zinc-200 hover:text-white disabled:opacity-60">
+            <button key={name} type="button" onClick={() => void addMeal(name)} className="min-h-11 rounded-full border border-line-strong bg-white/[0.04] px-4 text-xs font-bold text-zinc-200 hover:text-white disabled:opacity-60">
               + {name}
             </button>
           ))}
@@ -352,7 +379,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
           }}
         >
           <input type="text" maxLength={40} value={customMeal} onChange={(event) => setCustomMeal(event.target.value)} placeholder="Outra refeição (ex.: Pré-treino)" aria-label="Nome de outra refeição" className={inputClassName} />
-          <button type="submit" disabled={busy || !customMeal.trim()} className="h-12 shrink-0 rounded-2xl bg-white px-5 text-xs font-black uppercase tracking-wider text-black disabled:opacity-50">
+          <button type="submit" disabled={!customMeal.trim()} className="h-12 shrink-0 rounded-2xl bg-white px-5 text-xs font-black uppercase tracking-wider text-black disabled:opacity-50">
             Criar
           </button>
         </form>
@@ -368,11 +395,12 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         onClose={() => setPickerMeal(null)}
         foods={foods ?? []}
         onFoodCreated={(food) => setFoods((current) => [...(current ?? []), food].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')))}
-        onPick={async (food, grams, portionText) => {
+        onPick={async (food, grams, portionText, itemId) => {
           const meal = plan.meals.find((candidate) => candidate.id === pickerMeal)
           if (!meal) return
-          const { error } = await supabase.from('nutrition_meal_items').insert({ meal_id: meal.id, food_id: food.id, grams, portion_text: portionText, position: Math.min(meal.items.length, 60) })
-          if (error) throw error
+          const { error } = await supabase.from('nutrition_meal_items').insert({ id: itemId, meal_id: meal.id, food_id: food.id, grams, portion_text: portionText, position: Math.min(meal.items.length, 60) })
+          // 23505: o item já tinha entrado numa tentativa anterior (a resposta se perdeu). Não duplica.
+          if (error && error.code !== '23505') throw error
           await reload()
         }}
       />
@@ -400,7 +428,6 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
 
 function MealCard({
   meal,
-  busy,
   onAddFood,
   onRename,
   onDelete,
@@ -408,39 +435,53 @@ function MealCard({
   onRemoveItem,
 }: {
   meal: PlanMeal
-  busy: boolean
   onAddFood: () => void
-  onRename: (name: string, time: string | null) => unknown
+  onRename: (name: string, time: string | null) => Promise<boolean>
   onDelete: () => void
-  onSaveItem: (item: MealItem, grams: number, portion: string | null) => unknown
+  onSaveItem: (item: MealItem, grams: number, portion: string | null) => Promise<boolean>
   onRemoveItem: (item: MealItem) => unknown
 }) {
+  // Os campos guardam o que o Jean está digitando; só voltam ao valor do banco quando ele muda por fora.
   const [name, setName] = useState(meal.name)
+  const [seenName, setSeenName] = useState(meal.name)
+  if (meal.name !== seenName) {
+    setSeenName(meal.name)
+    setName(meal.name)
+  }
   const [time, setTime] = useState(meal.time ?? '')
-  const save = () => {
+  const [seenTime, setSeenTime] = useState(meal.time ?? '')
+  if ((meal.time ?? '') !== seenTime) {
+    setSeenTime(meal.time ?? '')
+    setTime(meal.time ?? '')
+  }
+  const save = async () => {
     const clean = name.trim().slice(0, 40)
     if (!clean) return setName(meal.name)
-    if (clean !== meal.name || (time || null) !== meal.time) void onRename(clean, time || null)
+    if (clean === meal.name && (time || null) === meal.time) return
+    if (!(await onRename(clean, time || null))) {
+      setName(meal.name)
+      setTime(meal.time ?? '')
+    }
   }
 
   return (
     <section aria-label={meal.name} className="rounded-2xl border border-line">
       <div className="flex items-center gap-2 border-b border-line p-3">
-        <input type="text" value={name} maxLength={40} onChange={(event) => setName(event.target.value)} onBlur={save} aria-label={`Nome da refeição ${meal.name}`} className={cn(smallInputClassName, 'min-w-0 flex-1 font-bold')} />
-        <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={save} aria-label={`Horário de ${meal.name}`} className={cn(smallInputClassName, 'w-28 shrink-0')} />
-        <button type="button" onClick={onDelete} disabled={busy} aria-label={`Apagar a refeição ${meal.name}`} className={iconButton}>
+        <input type="text" value={name} maxLength={40} onChange={(event) => setName(event.target.value)} onBlur={() => void save()} aria-label={`Nome da refeição ${meal.name}`} className={cn(smallInputClassName, 'min-w-0 flex-1 font-bold')} />
+        <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => void save()} aria-label={`Horário de ${meal.name}`} className={cn(smallInputClassName, 'w-28 shrink-0')} />
+        <button type="button" onClick={onDelete} aria-label={`Apagar a refeição ${meal.name}`} className={iconButton}>
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       {meal.items.length > 0 && (
         <ul className="divide-y divide-line">
           {meal.items.map((item) => (
-            <ItemRow key={`${item.id}:${item.grams}:${item.portionText ?? ''}`} item={item} busy={busy} onSave={(grams, portion) => onSaveItem(item, grams, portion)} onRemove={() => onRemoveItem(item)} />
+            <ItemRow key={item.id} item={item} onSave={(grams, portion) => onSaveItem(item, grams, portion)} onRemove={() => onRemoveItem(item)} />
           ))}
         </ul>
       )}
       <div className="p-3">
-        <button type="button" onClick={onAddFood} disabled={busy} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-xs font-bold text-zinc-300 hover:text-white disabled:opacity-60">
+        <button type="button" onClick={onAddFood} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-xs font-bold text-zinc-300 hover:text-white">
           <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar alimento
         </button>
       </div>
@@ -448,15 +489,32 @@ function MealCard({
   )
 }
 
-function ItemRow({ item, busy, onSave, onRemove }: { item: MealItem; busy: boolean; onSave: (grams: number, portion: string | null) => unknown; onRemove: () => unknown }) {
-  const [grams, setGrams] = useState(String(item.grams).replace('.', ','))
-  const [portion, setPortion] = useState(item.portionText ?? '')
-  const kcal = nutrientIn(item.food, 'kcal', toNumber(grams) ?? item.grams)
+function ItemRow({ item, onSave, onRemove }: { item: MealItem; onSave: (grams: number, portion: string | null) => Promise<boolean>; onRemove: () => unknown }) {
+  const savedGrams = String(item.grams).replace('.', ',')
+  const savedPortion = item.portionText ?? ''
+  const [grams, setGrams] = useState(savedGrams)
+  const [seenGrams, setSeenGrams] = useState(savedGrams)
+  if (savedGrams !== seenGrams) {
+    setSeenGrams(savedGrams)
+    setGrams(savedGrams)
+  }
+  const [portion, setPortion] = useState(savedPortion)
+  const [seenPortion, setSeenPortion] = useState(savedPortion)
+  if (savedPortion !== seenPortion) {
+    setSeenPortion(savedPortion)
+    setPortion(savedPortion)
+  }
+  const kcal = nutrientIn(item.food, 'kcal', parseAmount(grams) ?? item.grams)
 
-  const save = () => {
-    const value = toNumber(grams)
-    if (value === null || value <= 0 || value > 5000) return setGrams(String(item.grams).replace('.', ','))
-    if (value !== item.grams || (portion.trim() || null) !== item.portionText) void onSave(value, portion.trim() || null)
+  const save = async () => {
+    const value = parseAmount(grams)
+    if (value === null || value <= 0 || value > 5000) return setGrams(savedGrams)
+    const nextPortion = portion.trim() || null
+    if (value === item.grams && nextPortion === item.portionText) return
+    if (!(await onSave(value, nextPortion))) {
+      setGrams(savedGrams)
+      setPortion(savedPortion)
+    }
   }
 
   return (
@@ -466,13 +524,13 @@ function ItemRow({ item, busy, onSave, onRemove }: { item: MealItem; busy: boole
           <p className="text-sm font-semibold leading-snug text-white">{item.food.name}</p>
           <p className="text-xs tabular-nums text-zinc-500">{kcal === null ? 'Sem calorias na tabela' : `${formatNutrient('kcal', kcal)} kcal`}</p>
         </div>
-        <button type="button" onClick={() => void onRemove()} disabled={busy} aria-label={`Tirar ${item.food.name}`} className={iconButton}>
+        <button type="button" onClick={() => void onRemove()} aria-label={`Tirar ${item.food.name}`} className={iconButton}>
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       <div className="grid grid-cols-[6rem_1fr] gap-2">
-        <input type="text" inputMode="decimal" value={grams} onChange={(event) => setGrams(event.target.value)} onBlur={save} aria-label={`Gramas de ${item.food.name}`} className={smallInputClassName} />
-        <input type="text" maxLength={60} value={portion} onChange={(event) => setPortion(event.target.value)} onBlur={save} placeholder="Ex.: 2 unidades" aria-label={`Medida caseira de ${item.food.name}`} className={smallInputClassName} />
+        <input type="text" inputMode="decimal" value={grams} onChange={(event) => setGrams(event.target.value)} onBlur={() => void save()} aria-label={`Gramas de ${item.food.name}`} className={smallInputClassName} />
+        <input type="text" maxLength={60} value={portion} onChange={(event) => setPortion(event.target.value)} onBlur={() => void save()} placeholder="Ex.: 2 unidades" aria-label={`Medida caseira de ${item.food.name}`} className={smallInputClassName} />
       </div>
     </li>
   )

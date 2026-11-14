@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { formatNutrient, searchFoods, type Food } from '@/lib/nutrition'
+import { formatNutrient, parseAmount, searchFoods, type Food } from '@/lib/nutrition'
 import { FOOD_COLUMNS, toFood } from '@/lib/nutrition-plan'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
@@ -13,12 +13,6 @@ const inputClassName =
   'w-full rounded-2xl border border-line-strong bg-black/40 p-3.5 text-sm text-white placeholder:text-zinc-600 focus:border-brand focus:outline-none'
 const labelClassName = 'mb-1.5 block text-xs font-black uppercase tracking-[0.1em] text-zinc-400'
 const primaryButton = 'flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black disabled:opacity-60'
-
-// Aceita "12,5" e "12.5"; vazio ou inválido vira null.
-const toNumber = (text: string) => {
-  const value = Number(text.trim().replace(',', '.'))
-  return text.trim() !== '' && Number.isFinite(value) ? value : null
-}
 
 const summary = (food: Food) =>
   food.kcal === null
@@ -30,7 +24,8 @@ type Props = {
   onClose: () => void
   foods: Food[]
   // Chamado com o alimento, as gramas e a medida caseira em texto (opcional).
-  onPick: (food: Food, grams: number, portionText: string | null) => Promise<void> | void
+  // O id do item nasce aqui e é o mesmo em toda nova tentativa: se a rede falhar depois de gravar, tentar de novo não duplica.
+  onPick: (food: Food, grams: number, portionText: string | null, itemId: string) => Promise<void> | void
   onFoodCreated: (food: Food) => void
 }
 
@@ -45,8 +40,17 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
   const [draft, setDraft] = useState({ name: '', kcal: '', protein: '', carb: '', fat: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Trava contra toque duplo (o estado só muda no próximo desenho) e ids que valem para as novas tentativas.
+  const working = useRef(false)
+  const itemId = useRef('')
+  const newFoodId = useRef('')
 
   const results = searchFoods(foods, query)
+
+  const choose = (food: Food) => {
+    itemId.current = crypto.randomUUID()
+    setChosen(food)
+  }
 
   const reset = () => {
     setQuery('')
@@ -63,39 +67,48 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
   }
 
   const add = async () => {
-    const amount = toNumber(grams)
+    const amount = parseAmount(grams)
     if (!chosen || amount === null || amount <= 0 || amount > 5000) {
       setError('Informe as gramas, entre 1 e 5000.')
       return
     }
+    if (working.current) return
+    working.current = true
     setBusy(true)
     setError('')
     try {
-      await onPick(chosen, amount, portion.trim() || null)
+      await onPick(chosen, amount, portion.trim() || null, itemId.current)
       close()
     } catch (pickError) {
-      setError(friendlyError(pickError, 'Não foi possível adicionar'))
+      setError(`${friendlyError(pickError, 'Não foi possível adicionar')} Se acabou de tocar, confira se o alimento já entrou antes de tentar de novo.`)
     } finally {
+      working.current = false
       setBusy(false)
     }
   }
 
   const createFood = async () => {
-    const kcal = toNumber(draft.kcal)
-    const protein = toNumber(draft.protein)
-    const carb = toNumber(draft.carb)
-    const fat = toNumber(draft.fat)
+    const kcal = parseAmount(draft.kcal)
+    const protein = parseAmount(draft.protein)
+    const carb = parseAmount(draft.carb)
+    const fat = parseAmount(draft.fat)
     if (draft.name.trim().length < 2 || kcal === null || protein === null || carb === null || fat === null) {
       setError('Preencha o nome e os valores por 100 g (pode ser 0).')
       return
     }
+    if (working.current) return
+    working.current = true
     setBusy(true)
     setError('')
-    const { data, error: insertError } = await supabase
+    const id = newFoodId.current
+    let { data, error: insertError } = await supabase
       .from('foods')
-      .insert({ name: draft.name.trim(), group_name: 'Cadastrado pelo treinador', kcal, protein_g: protein, carb_g: carb, fat_g: fat })
+      .insert({ id, name: draft.name.trim(), group_name: 'Cadastrado pelo treinador', kcal, protein_g: protein, carb_g: carb, fat_g: fat })
       .select(FOOD_COLUMNS)
       .single()
+    // Já gravou na tentativa anterior (a resposta se perdeu): busca o mesmo alimento em vez de duplicar.
+    if (insertError?.code === '23505') ({ data, error: insertError } = await supabase.from('foods').select(FOOD_COLUMNS).eq('id', id).single())
+    working.current = false
     setBusy(false)
     if (insertError || !data) {
       setError(friendlyError(insertError, 'Não foi possível cadastrar o alimento'))
@@ -104,7 +117,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
     const food = toFood(data)
     onFoodCreated(food)
     setCreating(false)
-    setChosen(food)
+    choose(food)
   }
 
   const title = chosen ? 'Quanto vai comer?' : creating ? 'Cadastrar alimento' : 'Adicionar alimento'
@@ -161,7 +174,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
               </div>
             ))}
           </div>
-          <p className="text-xs text-zinc-500">Depois que o alimento entra num plano, os valores não mudam mais. Para corrigir, cadastre um novo.</p>
+          <p className="text-xs text-zinc-500">Depois que o alimento entra num plano, os valores não mudam mais. Para corrigir, cadastre um novo. Todos os alunos conseguem ler os nomes dos alimentos cadastrados: não escreva nome de aluno nem doença no nome.</p>
           <button type="button" onClick={createFood} disabled={busy} className={primaryButton}>
             {busy ? 'Salvando...' : 'Cadastrar e escolher'}
           </button>
@@ -184,7 +197,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
             <ul className="overflow-hidden rounded-2xl border border-line">
               {results.map((food) => (
                 <li key={food.id} className="border-b border-line last:border-b-0">
-                  <button type="button" onClick={() => setChosen(food)} className="block min-h-11 w-full px-4 py-3 text-left transition hover:bg-white/[0.03]">
+                  <button type="button" onClick={() => choose(food)} className="block min-h-11 w-full px-4 py-3 text-left transition hover:bg-white/[0.03]">
                     <span className="block text-sm font-semibold text-white">{food.name}</span>
                     <span className="mt-0.5 block text-xs text-zinc-500">{summary(food)}</span>
                   </button>
@@ -196,6 +209,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
           <button
             type="button"
             onClick={() => {
+              newFoodId.current = crypto.randomUUID()
               setDraft({ ...draft, name: query.trim() })
               setCreating(true)
             }}

@@ -65,7 +65,10 @@ create index if not exists nutrition_meal_items_food_idx on public.nutrition_mea
 -- "not valid": vale para o que for gravado daqui em diante.
 alter table public.nutrition_plans drop constraint if exists nutrition_plans_responsible_check;
 alter table public.nutrition_plans add constraint nutrition_plans_responsible_check
-  check (char_length(btrim(responsible_name)) between 3 and 80 and char_length(btrim(responsible_crn)) between 4 and 30) not valid;
+  check (
+    char_length(responsible_name) <= 80 and char_length(btrim(responsible_name)) >= 3
+    and char_length(responsible_crn) <= 30 and char_length(btrim(responsible_crn)) >= 4
+  ) not valid;
 alter table public.nutrition_plans drop constraint if exists nutrition_plans_targets_check;
 alter table public.nutrition_plans add constraint nutrition_plans_targets_check
   check (
@@ -78,7 +81,7 @@ alter table public.nutrition_plans add constraint nutrition_plans_targets_check
 alter table public.nutrition_meals drop constraint if exists nutrition_meals_check;
 alter table public.nutrition_meals add constraint nutrition_meals_check
   check (
-    char_length(btrim(name)) between 1 and 40
+    char_length(name) <= 40 and char_length(btrim(name)) >= 1
     and (meal_time is null or meal_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
     and position between 0 and 30
   ) not valid;
@@ -113,6 +116,24 @@ end;
 $$;
 
 revoke execute on function public.touch_nutrition_plan() from public, anon, authenticated;
+
+create or replace function public.stamp_nutrition_plan()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at := clock_timestamp();
+  return new;
+end;
+$$;
+
+revoke execute on function public.stamp_nutrition_plan() from public, anon, authenticated;
+
+drop trigger if exists stamp_nutrition_plan on public.nutrition_plans;
+create trigger stamp_nutrition_plan
+  before update on public.nutrition_plans
+  for each row execute function public.stamp_nutrition_plan();
 
 drop trigger if exists touch_nutrition_plan_meals on public.nutrition_meals;
 create trigger touch_nutrition_plan_meals
@@ -157,7 +178,7 @@ grant select, insert, update, delete on public.nutrition_plans, public.nutrition
 
 drop policy if exists "nutrition_plans: aluno lê o seu, treinador lê tudo" on public.nutrition_plans;
 create policy "nutrition_plans: aluno lê o seu, treinador lê tudo" on public.nutrition_plans
-  for select to authenticated using (student_id = auth.uid() or public.is_admin());
+  for select to authenticated using (student_id = (select auth.uid()) or public.is_admin());
 drop policy if exists "nutrition_plans: treinador cria" on public.nutrition_plans;
 create policy "nutrition_plans: treinador cria" on public.nutrition_plans
   for insert to authenticated with check (public.is_admin());
@@ -171,7 +192,7 @@ create policy "nutrition_plans: treinador apaga" on public.nutrition_plans
 drop policy if exists "nutrition_meals: aluno lê as suas, treinador lê tudo" on public.nutrition_meals;
 create policy "nutrition_meals: aluno lê as suas, treinador lê tudo" on public.nutrition_meals
   for select to authenticated using (
-    public.is_admin() or exists (select 1 from public.nutrition_plans p where p.id = plan_id and p.student_id = auth.uid())
+    public.is_admin() or exists (select 1 from public.nutrition_plans p where p.id = nutrition_meals.plan_id and p.student_id = (select auth.uid()))
   );
 drop policy if exists "nutrition_meals: treinador cria" on public.nutrition_meals;
 create policy "nutrition_meals: treinador cria" on public.nutrition_meals
@@ -188,7 +209,7 @@ create policy "nutrition_meal_items: aluno lê os seus, treinador lê tudo" on p
   for select to authenticated using (
     public.is_admin() or exists (
       select 1 from public.nutrition_meals m join public.nutrition_plans p on p.id = m.plan_id
-      where m.id = meal_id and p.student_id = auth.uid()
+      where m.id = nutrition_meal_items.meal_id and p.student_id = (select auth.uid())
     )
   );
 drop policy if exists "nutrition_meal_items: treinador cria" on public.nutrition_meal_items;

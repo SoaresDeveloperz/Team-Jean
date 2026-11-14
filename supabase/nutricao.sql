@@ -47,7 +47,7 @@ alter table public.foods add constraint foods_source_check
   check (source in ('taco', 'custom') and ((source = 'taco') = (taco_number is not null))) not valid;
 alter table public.foods drop constraint if exists foods_name_check;
 alter table public.foods add constraint foods_name_check
-  check (char_length(btrim(name)) between 2 and 120 and (group_name is null or char_length(group_name) <= 60)) not valid;
+  check (char_length(name) <= 120 and char_length(btrim(name)) >= 2 and (group_name is null or char_length(group_name) <= 60)) not valid;
 -- Por 100 g: energia até 900 kcal (gordura pura), macros e fibra até 100 g.
 alter table public.foods drop constraint if exists foods_values_check;
 alter table public.foods add constraint foods_values_check

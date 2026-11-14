@@ -126,9 +126,15 @@ export const TARGET_NUTRIENTS: { nutrient: Nutrient; key: 'kcal' | 'protein_g' |
 const COPY_PREFIX = 'team-jean:alimentacao:'
 const copyKey = (userId: string) => `${COPY_PREFIX}${userId}`
 
+// A cópia vale 30 dias; passando disso (ou de outra conta neste aparelho) ela é descartada.
+const COPY_MAX_AGE_MS = 30 * 86_400_000
+
 export function saveNutritionCopy(userId: string, plan: Plan) {
   try {
-    window.localStorage.setItem(copyKey(userId), JSON.stringify(plan))
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith(COPY_PREFIX) && key !== copyKey(userId))
+      .forEach((key) => window.localStorage.removeItem(key))
+    window.localStorage.setItem(copyKey(userId), JSON.stringify({ savedAt: Date.now(), plan }))
   } catch {
     // Sem armazenamento (aba privada, cheio): o plano só não abre sem internet.
   }
@@ -138,8 +144,12 @@ export function readNutritionCopy(userId: string): Plan | null {
   try {
     const raw = window.localStorage.getItem(copyKey(userId))
     if (!raw) return null
-    const plan = JSON.parse(raw) as Plan
-    return plan && typeof plan === 'object' && Array.isArray(plan.meals) && plan.studentId === userId ? plan : null
+    const copy = JSON.parse(raw) as { savedAt?: number; plan?: Plan } | null
+    const plan = copy?.plan
+    const fresh = typeof copy?.savedAt === 'number' && Date.now() - copy.savedAt <= COPY_MAX_AGE_MS
+    if (fresh && plan && Array.isArray(plan.meals) && plan.studentId === userId) return plan
+    window.localStorage.removeItem(copyKey(userId))
+    return null
   } catch {
     return null
   }

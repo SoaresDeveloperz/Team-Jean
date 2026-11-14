@@ -23,6 +23,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+// Verdadeiro quando há itens e nenhum deles tem o dado: mostrar "sem dado" em vez de 0.
+const allMissing = (items: { food: Record<Nutrient, number | null> }[], nutrient: Nutrient) => items.length > 0 && items.every((item) => item.food[nutrient] === null)
 const nutrientLabel: Record<string, string> = { kcal: 'calorias', protein_g: 'proteína', carb_g: 'carboidrato', fat_g: 'gordura' }
 
 // "Alimentação" do aluno: o plano que o nutricionista montou, em refeições. Só leitura.
@@ -125,12 +127,16 @@ export default function StudentNutritionPage() {
   }
 
   const totals = planTotals(plan)
+  const allItems = plan.meals.flatMap((meal) => meal.items)
   const hasTargets = TARGET_NUTRIENTS.some(({ key }) => plan.targets[key] !== null)
 
   return (
     <div className="space-y-4">
       {header}
       <Alert variant="info">Valores aproximados. Este plano não substitui a orientação do seu nutricionista ou médico.</Alert>
+      <p className="px-1 text-sm leading-relaxed text-zinc-300">
+        Plano elaborado por <span className="font-bold text-white">{plan.responsibleName}</span> ({plan.responsibleCrn}).
+      </p>
       {fromCopy && (
         <Alert variant="info" onRetry={() => setAttempt((value) => value + 1)}>
           Sem internet agora. Mostrando a cópia deste aparelho, de {shortDate(plan.updatedAt)}.
@@ -145,12 +151,13 @@ export default function StudentNutritionPage() {
               {TARGET_NUTRIENTS.filter(({ key }) => plan.targets[key] !== null).map(({ nutrient, key, label, unit }) => {
                 const target = plan.targets[key] as number
                 const value = totals.values[nutrient]
+                const noData = allMissing(allItems, nutrient)
                 return (
                   <li key={key}>
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-sm font-semibold text-zinc-300">{label}</span>
                       <span className="text-base font-bold tabular-nums text-white">
-                        {formatNutrient(nutrient, value)} <span className="text-sm font-medium text-zinc-500">de {formatNutrient(nutrient, target)} {unit}</span>
+                        {noData ? 'sem dado' : formatNutrient(nutrient, value)} <span className="text-sm font-medium text-zinc-500">de {formatNutrient(nutrient, target)} {unit}</span>
                       </span>
                     </div>
                     <div
@@ -198,7 +205,7 @@ export default function StudentNutritionPage() {
                 </h2>
                 {meal.items.length > 0 && (
                   <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-400">
-                    {formatNutrient('kcal', kcal.values.kcal)} kcal{kcal.incomplete.includes('kcal') ? '*' : ''}
+                    {allMissing(meal.items, 'kcal') ? 'sem dado de calorias' : `${formatNutrient('kcal', kcal.values.kcal)} kcal${kcal.incomplete.includes('kcal') ? '*' : ''}`}
                   </span>
                 )}
               </div>
@@ -229,7 +236,7 @@ export default function StudentNutritionPage() {
         )}
 
         <p className="px-1 pb-2 text-xs leading-relaxed text-zinc-500">
-          Plano elaborado por {plan.responsibleName} ({plan.responsibleCrn}). Atualizado em {shortDate(plan.updatedAt)}.
+          Atualizado em {shortDate(plan.updatedAt)}.
           {mealsHaveIncomplete(plan) && ' * Algum alimento desta refeição não tem o dado de calorias.'}
         </p>
       </Stagger>

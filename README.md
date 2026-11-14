@@ -316,28 +316,39 @@ o dia). A tela Hoje do aluno segue uma regra só:
   e ordem. **Contas:** `src/lib/week-plan.ts` (`tests/contas-semana.mjs`); telas: roteiros
   `rotina` e `rotina-a11y`; banco: `tests/sql/rls-rotina.sql`.
 
-### Nutrição (base de alimentos)
+### Nutrição (plano alimentar)
 
-Primeira parte da aba de nutrição pedida pelo Jean: a **base de alimentos**. Ainda não tem
-tela; a aba do treinador e a tela do aluno entram depois que o dono confirmar quem é o
-responsável técnico dos planos (veja o `DECISOES.md`, 2026-11-14).
+Pedido do Jean: o treinador monta o plano alimentar do aluno com alimentos de uma tabela
+brasileira, e o app calcula calorias e macros sozinho.
 
-- **Banco:** rode [`supabase/nutricao.sql`](supabase/nutricao.sql) e depois
-  [`supabase/nutricao-taco.sql`](supabase/nutricao-taco.sql) (idempotentes). A tabela `foods`
-  tem energia, proteína, lipídeos, carboidrato, fibra, sódio e colesterol por 100 g, e os
-  minerais e vitaminas em `micros`. Todo logado lê; só o treinador cadastra alimento próprio
-  (`custom`); os da TACO ninguém muda pelo app.
+- **Treinador:** na ficha do aluno, aba **Nutrição**. Cria o plano (nutricionista responsável
+  com CRN, metas do dia opcionais e observações), cria refeições com um toque (Café da manhã,
+  Almoço...), busca alimentos sem acento, informa as gramas e, se quiser, a medida caseira
+  ("4 colheres de servir"). Vê os totais contra as metas enquanto monta. O que não está na
+  tabela ele cadastra à mão (valores por 100 g). Um plano por aluno: **criar o plano é o que
+  liga a "Alimentação" para aquele aluno**; apagar o plano a desliga.
+- **Aluno:** link **Ver minha alimentação** na tela Hoje (só aparece com plano) e a tela
+  `/student/nutrition`: o dia em barras, as refeições com a medida caseira primeiro e as gramas
+  depois, só calorias por refeição, aviso de que não substitui nutricionista ou médico e o
+  responsável técnico. Abre **sem internet** pela cópia do aparelho, que sai ao sair da conta.
+- **Banco:** rode, nesta ordem, [`supabase/nutricao.sql`](supabase/nutricao.sql),
+  [`supabase/nutricao-taco.sql`](supabase/nutricao-taco.sql) e
+  [`supabase/nutricao-plano.sql`](supabase/nutricao-plano.sql) (idempotentes). O aluno lê só o
+  plano dele; só o treinador grava. Alimento que está num plano não é apagado, e o alimento
+  próprio em uso não muda de valores. Sem os arquivos, a aba do treinador pede para rodá-los e o
+  aluno só vê "ainda não foi montado".
 - **Fonte:** Tabela Brasileira de Composição de Alimentos (TACO), 4ª edição revisada e
   ampliada, NEPA/UNICAMP, Campinas, 2011 ("É permitida a reprodução parcial ou total desta
-  obra, desde que citada a fonte"). A citação tem de aparecer nas telas que mostrarem os
-  valores. A TBCA (USP) não foi usada: o site proíbe a comercialização.
+  obra, desde que citada a fonte"). O crédito fica, bem pequeno, no fim do **Perfil** do aluno,
+  e não nas telas de nutrição. A TBCA (USP) não foi usada: o site proíbe a comercialização.
 - **Como a TACO virou dado:** "Tr" (traço) e "NA" (não aplicável: fibra na carne, colesterol
   no vegetal) entram como **0**; só a célula em branco e o "\*" ("análises sendo
   reavaliadas") ficam **vazios** (sem dado). Por isso leite de vaca integral e desnatado,
-  iogurte sabor abacaxi e coco verde estão sem energia na TACO: o treinador cadastra à mão.
-  Os totais avisam quando um nutriente tem item sem dado (`incomplete`), em vez de mostrar 0.
-- **Contas:** `src/lib/nutrition.ts` (`tests/contas-nutricao.mjs`, roteiro `nutricao`);
-  banco: `tests/sql/rls-nutricao.sql`.
+  iogurte sabor abacaxi e coco verde estão sem calorias na TACO: o treinador cadastra à mão. Os
+  totais avisam "Total parcial" quando algum alimento não tem o dado, em vez de mostrar 0.
+- **Contas:** `src/lib/nutrition.ts` e `src/lib/nutrition-plan.ts` (`tests/contas-nutricao.mjs`);
+  telas: roteiro `nutricao` (com axe); banco: `tests/sql/rls-nutricao.sql` e
+  `tests/sql/rls-nutricao-plano.sql`.
 
 ## Testes e CI
 

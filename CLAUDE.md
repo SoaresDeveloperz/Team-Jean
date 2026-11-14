@@ -19,7 +19,7 @@
     - `lento` (`tests/e2e-lento.cjs`): sinal fraco (servidor pendurado), o treino abre pela cópia do aparelho; `medir` (`tests/medir-treino.cjs`): números da tela de treino com CPU 4x e latência (não aprova nem reprova);
     - `rotina` (`tests/contas-semana.mjs` e `tests/e2e-rotina.cjs`): rotina da semana (dia de cada treino, reinício semanal pela ordem, descanso, dia e ordem no construtor), com e sem o SQL;
     - `evolucao` (`tests/contas-evolucao.mjs` e `tests/e2e-evolucao.cjs`): aba "Evolução" da ficha do aluno no painel do treinador (carga por exercício, percentual de progressão ou queda, gráfico de cada exercício e axe);
-    - `nutricao` (`tests/contas-nutricao.mjs`): base de alimentos da TACO (597 alimentos, vazios por nutriente, energia coerente) e as contas de totais e busca; o banco fica em `tests/sql/rls-nutricao.sql`;
+    - `nutricao` (`tests/contas-nutricao.mjs` e `tests/e2e-nutricao.cjs`): base de alimentos da TACO (597 alimentos, vazios por nutriente, energia coerente), contas de totais e busca, aba "Nutrição" do treinador, tela "Alimentação" do aluno (inclusive sem internet), créditos da TACO no Perfil e axe; o banco fica em `tests/sql/rls-nutricao.sql` e `rls-nutricao-plano.sql`;
     - `routes`, `admin`, `coach`, `community`, `profile`, `gestao-a11y`, `novidades-a11y`, `exercicios-a11y`, `curto-a11y`, `trocar-a11y` e `rotina-a11y` (`tests/a11y/`): auditorias axe das telas de cada área;
   - banco: `pnpm test:sql` (precisa de um Postgres; veja o README);
   - não rode dois `tests/run.mjs` ao mesmo tempo, nem `pnpm test:build` com um teste rodando: eles usam as mesmas portas (3200 e 54321) e a mesma pasta `.next`;

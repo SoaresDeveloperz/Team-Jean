@@ -225,11 +225,35 @@ let rotinaEnabled = true
 let lentoEnabled = false
 const SWAP_TABLES = ['assigned_workout_exercises', 'workout_template_exercises']
 
+// --- Nutrição (supabase/nutricao.sql, nutricao-taco.sql e nutricao-plano.sql) ---
+// Alguns alimentos reais da TACO. O leite integral vem sem calorias (a própria TACO marca "*").
+// /__nutricao/off simula o banco sem o SQL; /__nutricao/seed cria o plano da Maria.
+let nutricaoEnabled = true
+const NUTRICAO_TABLES = ['foods', 'nutrition_plans', 'nutrition_meals', 'nutrition_meal_items']
+const taco = (n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg) => ({ id: `taco-${n}`, source: 'taco', taco_number: n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg, micros: {}, created_by: null, created_at: iso(-30) })
+const foods = [
+  taco(3, 'Arroz, tipo 1, cozido', 'Cereais e derivados', 128, 2.5, 0.2, 28.1, 1.6, 1, 0),
+  taco(4, 'Arroz, tipo 1, cru', 'Cereais e derivados', 358, 7.2, 0.3, 78.8, 1.6, 1, 0),
+  taco(561, 'Feijão, carioca, cozido', 'Leguminosas e derivados', 76, 4.8, 0.5, 13.6, 8.5, 2, 0),
+  taco(410, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 159, 32, 2.5, 0, 0, 50, 89),
+  taco(488, 'Ovo, de galinha, inteiro, cozido/10minutos', 'Ovos e derivados', 146, 13.3, 9.5, 0.6, 0, 146, 397),
+  taco(182, 'Banana, prata, crua', 'Frutas e derivados', 98, 1.3, 0.1, 26, 2, 0, 0),
+  taco(53, 'Pão, trigo, francês', 'Cereais e derivados', 300, 8, 3.1, 58.6, 2.3, 648, 0),
+  taco(7, 'Aveia, flocos, crua', 'Cereais e derivados', 394, 13.9, 8.5, 66.6, 9.1, 5, 0),
+  taco(88, 'Batata, doce, cozida', 'Verduras, hortaliças e derivados', 77, 0.6, 0.1, 18.4, 2.2, 3, 0),
+  taco(260, 'Azeite, de oliva, extra virgem', 'Gorduras e óleos', 884, 0, 100, 0, 0, null, 0),
+  taco(458, 'Leite, de vaca, integral', 'Leite e derivados', null, null, null, null, 0, 64, 10),
+  taco(78, 'Alface, crespa, crua', 'Verduras, hortaliças e derivados', 11, 1.3, 0.2, 1.7, 1.8, 3, 0),
+]
+const nutrition_plans = []
+const nutrition_meals = []
+const nutrition_meal_items = []
+
 // /__community/off simula o banco sem o community.sql.
 let communityEnabled = true
 const COMMUNITY_TABLES = ['community_posts', 'community_likes', 'community_comments']
 
-const tables = { profiles, exercises, assigned_workouts, assigned_workout_exercises, workout_sessions, session_sets, notifications, workout_templates, workout_template_exercises, community_posts, community_likes, community_comments, body_measurements, coach_notes, challenges, push_subscriptions, anamneses, student_billing, payments, coach_settings }
+const tables = { profiles, exercises, assigned_workouts, assigned_workout_exercises, workout_sessions, session_sets, notifications, workout_templates, workout_template_exercises, community_posts, community_likes, community_comments, body_measurements, coach_notes, challenges, push_subscriptions, anamneses, student_billing, payments, coach_settings, foods, nutrition_plans, nutrition_meals, nutrition_meal_items }
 
 
 // Esquema estrito (colunas e relações comprovadas pelo código antigo).
@@ -254,6 +278,10 @@ const SCHEMA = {
   student_billing: ['student_id', 'monthly_fee', 'due_day', 'active', 'starts_on', 'last_reminder_on', 'note', 'created_at', 'updated_at'],
   payments: ['id', 'student_id', 'reference_month', 'amount', 'paid_on', 'method', 'note', 'created_by', 'created_at'],
   coach_settings: ['id', 'pix_key', 'pix_name', 'pix_city', 'billing_reminders', 'updated_at'],
+  foods: ['id', 'source', 'taco_number', 'name', 'group_name', 'kcal', 'protein_g', 'fat_g', 'carb_g', 'fiber_g', 'sodium_mg', 'cholesterol_mg', 'micros', 'created_by', 'created_at'],
+  nutrition_plans: ['id', 'student_id', 'responsible_name', 'responsible_crn', 'kcal_target', 'protein_target_g', 'carb_target_g', 'fat_target_g', 'notes', 'created_by', 'created_at', 'updated_at'],
+  nutrition_meals: ['id', 'plan_id', 'name', 'meal_time', 'position', 'created_at'],
+  nutrition_meal_items: ['id', 'meal_id', 'food_id', 'grams', 'portion_text', 'position', 'created_at'],
 }
 function columnsOf(table) {
   let columns = SCHEMA[table]
@@ -278,6 +306,7 @@ const RELATIONS = {
   session_sets: ['exercises'],
   workout_sessions: ['assigned_workouts'],
   workout_template_exercises: ['exercises'],
+  nutrition_meal_items: ['foods'],
 }
 
 function splitTopLevel(text) {
@@ -362,6 +391,10 @@ function embed(table, row, select) {
   if (select.includes('exercises(') && row.exercise_id) {
     const exercise = exercises.find((item) => item.id === row.exercise_id)
     out.exercises = exercise ? visibleRow('exercises', exercise) : null
+  }
+  if (table === 'nutrition_meal_items' && select.includes('foods(')) {
+    const food = foods.find((item) => item.id === row.food_id)
+    out.foods = food ? visibleRow('foods', food) : null
   }
   if (/assigned_workouts(!inner)?\(/.test(select) && row.assigned_workout_id) {
     const workout = assigned_workouts.find((w) => w.id === row.assigned_workout_id)
@@ -823,6 +856,29 @@ http
       })
     }
 
+    if (url.pathname === '/__nutricao/off' || url.pathname === '/__nutricao/on') {
+      nutricaoEnabled = url.pathname.endsWith('/on')
+      return send(res, 200, { nutricaoEnabled })
+    }
+    if (url.pathname === '/__nutricao/seed') {
+      // Plano da Maria: café da manhã e almoço, com metas.
+      nutrition_plans.length = 0
+      nutrition_meals.length = 0
+      nutrition_meal_items.length = 0
+      nutrition_plans.push({ id: 'plan-maria', student_id: 'u-student', responsible_name: 'Jean Souza', responsible_crn: 'CRN-3 12345', kcal_target: 1800, protein_target_g: 110, carb_target_g: 200, fat_target_g: 55, notes: 'Beba 2 litros de água por dia.', created_by: 'u-admin', created_at: iso(-3), updated_at: iso(-1) })
+      nutrition_meals.push(
+        { id: 'meal-cafe', plan_id: 'plan-maria', name: 'Café da manhã', meal_time: '07:30', position: 0, created_at: iso(-3) },
+        { id: 'meal-almoco', plan_id: 'plan-maria', name: 'Almoço', meal_time: '12:30', position: 1, created_at: iso(-3, 1) },
+      )
+      nutrition_meal_items.push(
+        { id: 'item-1', meal_id: 'meal-cafe', food_id: 'taco-53', grams: 50, portion_text: '1 pão francês', position: 0, created_at: iso(-3) },
+        { id: 'item-2', meal_id: 'meal-cafe', food_id: 'taco-488', grams: 100, portion_text: '2 ovos', position: 1, created_at: iso(-3, 1) },
+        { id: 'item-3', meal_id: 'meal-almoco', food_id: 'taco-3', grams: 150, portion_text: '4 colheres de servir', position: 0, created_at: iso(-3) },
+        { id: 'item-4', meal_id: 'meal-almoco', food_id: 'taco-561', grams: 100, portion_text: null, position: 1, created_at: iso(-3, 1) },
+        { id: 'item-5', meal_id: 'meal-almoco', food_id: 'taco-410', grams: 120, portion_text: '1 filé', position: 2, created_at: iso(-3, 2) },
+      )
+      return send(res, 200, { plans: nutrition_plans.length })
+    }
     if (url.pathname === '/__community/off') {
       communityEnabled = false
       return send(res, 200, { communityEnabled })
@@ -921,6 +977,9 @@ http
     if (!match || !tables[match[1]]) return send(res, 404, { message: 'not found ' + url.pathname })
     const table = match[1]
     if (lentoEnabled && req.method === 'GET' && table === 'assigned_workouts') await new Promise((resolve) => setTimeout(resolve, 20000))
+    if (NUTRICAO_TABLES.includes(table) && !nutricaoEnabled) {
+      return send(res, 404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` })
+    }
     if (COMMUNITY_TABLES.includes(table) && !communityEnabled) {
       return send(res, 404, { code: 'PGRST205', message: `Could not find the table 'public.${table}' in the schema cache` })
     }
@@ -956,6 +1015,16 @@ http
         // RLS: o próprio aluno ou o treinador.
         const requester = userFromAuth(req)
         rows = rows.filter((row) => row.user_id === requester?.id || isAdminUser(requester))
+      }
+      if (NUTRICAO_TABLES.includes(table) && !isService(req)) {
+        // RLS do nutricao*.sql: o aluno só lê o plano dele (e as refeições e itens dele); o treinador lê tudo.
+        const requester = userFromAuth(req)
+        const mine = (studentId) => requester && (studentId === requester.id || isAdminUser(requester))
+        const mealIsMine = (mealId) => mine(nutrition_plans.find((plan) => plan.id === nutrition_meals.find((meal) => meal.id === mealId)?.plan_id)?.student_id)
+        if (table === 'foods') rows = requester ? rows : []
+        else if (table === 'nutrition_plans') rows = rows.filter((row) => mine(row.student_id))
+        else if (table === 'nutrition_meals') rows = rows.filter((row) => mine(nutrition_plans.find((plan) => plan.id === row.plan_id)?.student_id))
+        else rows = rows.filter((row) => mealIsMine(row.meal_id))
       }
       if (GESTAO_TABLES.includes(table) && !isService(req)) {
         // RLS do gestao.sql.
@@ -1001,6 +1070,107 @@ http
     const upsert = String(req.headers.prefer || '').includes('resolution=merge-duplicates')
     const forbidden = () => send(res, 403, { code: '42501', message: `new row violates row-level security policy for table "${table}"` })
     const violates = (constraint) => send(res, 400, { code: '23514', message: `new row for relation "${table}" violates check constraint "${constraint}"` })
+
+    if (NUTRICAO_TABLES.includes(table)) {
+      // Regras do nutricao.sql e do nutricao-plano.sql: só o treinador grava; limites das colunas;
+      // um plano por aluno; alimento em uso não é apagado nem muda de valores.
+      const admin = service || isAdminUser(user)
+      const rows = tables[table]
+      const nowISO = () => new Date().toISOString()
+      const touchPlan = (planId) => {
+        const plan = nutrition_plans.find((item) => item.id === planId)
+        if (plan) plan.updated_at = nowISO()
+      }
+      const planOfMeal = (mealId) => nutrition_meals.find((meal) => meal.id === mealId)?.plan_id
+      const inRange = (value, min, max) => value === null || value === undefined || (Number(value) >= min && Number(value) <= max)
+      const check = (row) => {
+        if (table === 'foods') {
+          if (chars(String(row.name ?? '').trim()) < 2 || chars(row.name) > 120) return 'foods_name_check'
+          const sum = (Number(row.protein_g) || 0) + (Number(row.fat_g) || 0) + (Number(row.carb_g) || 0)
+          if (!inRange(row.kcal, 0, 900) || !inRange(row.protein_g, 0, 100) || !inRange(row.fat_g, 0, 100) || !inRange(row.carb_g, 0, 100) || sum > 105) return 'foods_values_check'
+        }
+        if (table === 'nutrition_plans') {
+          if (chars(String(row.responsible_name ?? '').trim()) < 3 || chars(row.responsible_name) > 80) return 'nutrition_plans_responsible_check'
+          if (chars(String(row.responsible_crn ?? '').trim()) < 4 || chars(row.responsible_crn) > 30) return 'nutrition_plans_responsible_check'
+          if (!inRange(row.kcal_target, 800, 10000) || !inRange(row.protein_target_g, 0, 1000) || !inRange(row.carb_target_g, 0, 1500) || !inRange(row.fat_target_g, 0, 600) || (row.notes != null && chars(row.notes) > 500)) return 'nutrition_plans_targets_check'
+        }
+        if (table === 'nutrition_meals') {
+          if (chars(String(row.name ?? '').trim()) < 1 || chars(row.name) > 40 || !inRange(row.position, 0, 30)) return 'nutrition_meals_check'
+          if (row.meal_time != null && !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(row.meal_time)) return 'nutrition_meals_check'
+        }
+        if (table === 'nutrition_meal_items') {
+          if (!(Number(row.grams) > 0 && Number(row.grams) <= 5000) || (row.portion_text != null && chars(row.portion_text) > 60) || !inRange(row.position, 0, 60)) return 'nutrition_meal_items_check'
+        }
+        return null
+      }
+      const canWrite = (row) => admin && (table !== 'foods' || row.source === 'custom')
+      const foodInUse = (id) => nutrition_meal_items.some((item) => item.food_id === id)
+      const items = (Array.isArray(body) ? body : [body ?? {}]).map((item) => ({ ...item }))
+
+      if (req.method === 'POST') {
+        if (!admin) return forbidden()
+        const saved = []
+        for (const item of items) {
+          const id = crypto.randomUUID()
+          const defaults = {
+            foods: { id, source: 'custom', taco_number: null, group_name: null, micros: {}, created_by: user?.id ?? null, created_at: nowISO(), kcal: null, protein_g: null, fat_g: null, carb_g: null, fiber_g: null, sodium_mg: null, cholesterol_mg: null },
+            nutrition_plans: { id, notes: null, kcal_target: null, protein_target_g: null, carb_target_g: null, fat_target_g: null, created_by: user?.id ?? null, created_at: nowISO(), updated_at: nowISO() },
+            nutrition_meals: { id, meal_time: null, position: 0, created_at: nowISO() },
+            nutrition_meal_items: { id, portion_text: null, position: 0, created_at: nowISO() },
+          }[table]
+          const row = { ...defaults, ...item }
+          if (table === 'foods' && (row.source !== 'custom' || row.taco_number != null)) return forbidden()
+          const violation = check(row)
+          if (violation) return violates(violation)
+          if (table === 'nutrition_plans' && nutrition_plans.some((plan) => plan.student_id === row.student_id)) return send(res, 409, { code: '23505', message: 'duplicate key value violates unique constraint "nutrition_plans_student_id_key"' })
+          if (table === 'nutrition_meals' && !nutrition_plans.some((plan) => plan.id === row.plan_id)) return send(res, 409, { code: '23503', message: 'insert or update on table "nutrition_meals" violates foreign key constraint' })
+          if (table === 'nutrition_meal_items' && (!nutrition_meals.some((meal) => meal.id === row.meal_id) || !foods.some((food) => food.id === row.food_id))) return send(res, 409, { code: '23503', message: 'insert or update on table "nutrition_meal_items" violates foreign key constraint' })
+          rows.push(row)
+          if (table === 'nutrition_meals') touchPlan(row.plan_id)
+          if (table === 'nutrition_meal_items') touchPlan(planOfMeal(row.meal_id))
+          saved.push(row)
+        }
+        return send(res, 201, wantsObject ? saved[0] : saved)
+      }
+      const matched = applyFilters(rows, url.searchParams).filter(canWrite)
+      if (req.method === 'PATCH') {
+        for (const row of matched) {
+          const next = { ...row, ...body }
+          if (table === 'foods' && foodInUse(row.id) && ['kcal', 'protein_g', 'fat_g', 'carb_g', 'fiber_g', 'sodium_mg', 'cholesterol_mg'].some((key) => key in body && body[key] !== row[key])) {
+            return violates('foods_in_use')
+          }
+          const violation = check(next)
+          if (violation) return violates(violation)
+        }
+        matched.forEach((row) => {
+          Object.assign(row, body)
+          if (table === 'nutrition_plans') row.updated_at = nowISO()
+          if (table === 'nutrition_meals') touchPlan(row.plan_id)
+          if (table === 'nutrition_meal_items') touchPlan(planOfMeal(row.meal_id))
+        })
+        return send(res, 200, wantsObject ? matched[0] ?? null : matched)
+      }
+      if (req.method === 'DELETE') {
+        if (table === 'foods' && matched.some((row) => foodInUse(row.id))) return send(res, 409, { code: '23503', message: 'update or delete on table "foods" violates foreign key constraint' })
+        for (const row of matched) {
+          rows.splice(rows.indexOf(row), 1)
+          // Apagar em cascata: plano leva as refeições, e a refeição leva os itens.
+          if (table === 'nutrition_plans') {
+            for (const meal of nutrition_meals.filter((item) => item.plan_id === row.id)) {
+              nutrition_meal_items.splice(0, nutrition_meal_items.length, ...nutrition_meal_items.filter((item) => item.meal_id !== meal.id))
+              nutrition_meals.splice(nutrition_meals.indexOf(meal), 1)
+            }
+          }
+          if (table === 'nutrition_meals') {
+            nutrition_meal_items.splice(0, nutrition_meal_items.length, ...nutrition_meal_items.filter((item) => item.meal_id !== row.id))
+            touchPlan(row.plan_id)
+          }
+          if (table === 'nutrition_meal_items') touchPlan(planOfMeal(row.meal_id))
+        }
+        return send(res, 200, matched)
+      }
+      return send(res, 405, {})
+    }
 
     if (GESTAO_TABLES.includes(table)) {
       const admin = service || isAdminUser(user)

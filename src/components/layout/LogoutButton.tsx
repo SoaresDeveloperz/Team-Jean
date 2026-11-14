@@ -8,6 +8,7 @@ import { resetNotifications } from '@/lib/notifications'
 import { cancelPushOnLogout } from '@/lib/push/client'
 import { clearActiveSession } from '@/lib/active-session'
 import { clearSavedWorkouts } from '@/lib/workout-session'
+import { clearSavedNutrition } from '@/lib/nutrition-plan'
 import { cn } from '@/lib/cn'
 
 export function LogoutButton({ className, showLabel = false }: { className?: string; showLabel?: boolean }) {
@@ -28,6 +29,8 @@ export function LogoutButton({ className, showLabel = false }: { className?: str
     // Treino em andamento e treinos guardados são desta conta: não ficam no aparelho.
     clearActiveSession()
     clearSavedWorkouts()
+    // O plano de alimentação (dado de saúde) também é desta conta.
+    clearSavedNutrition()
     // As telas guardadas para uso offline eram desta conta.
     navigator.serviceWorker?.controller?.postMessage({ type: 'clear-pages' })
     router.replace('/login')

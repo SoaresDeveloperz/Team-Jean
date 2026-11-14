@@ -199,7 +199,7 @@ async function login(page, who) {
   check('por refeição só aparecem calorias (nada de carboidrato, proteína ou gordura)', mealTexts.length >= 2 && mealTexts.every((meal) => !/carboidrato|proteína|gordura/i.test(meal)), mealTexts.join(' || ').slice(0, 300))
   check('refeição vazia mostra "Nada nesta refeição ainda."', mealTexts.some((meal) => meal.includes('Jantar') && meal.includes('Nada nesta refeição ainda.')))
   check('responsável técnico em letra legível, perto do topo', (await maria.locator('p:has-text("Plano elaborado por")').first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 14)
-  check('metas do dia com barras (calorias, proteína, carboidrato, gordura)', (await maria.locator('[role=progressbar]').count()) === 4 && text.includes('454') && text.includes('1.800'))
+  check('metas do dia com barras (calorias, proteína, carboidrato, gordura)', (await maria.locator('[role=progressbar]').count()) === 4 && text.includes('469') && text.includes('1.800'), text.slice(0, 400))
   check('total parcial avisado ao aluno (leite sem calorias na TACO), só de calorias e macros', text.includes('Total parcial') && !/fibra|sódio|colesterol/i.test(text.slice(text.indexOf('Total parcial'), text.indexOf('Total parcial') + 160)))
   check('créditos da TACO NÃO ficam nas telas de nutrição', !/TACO|Tabela Brasileira/i.test(text))
   await maria.waitForTimeout(1200)

@@ -6,7 +6,8 @@ export type Nutrient = 'kcal' | 'protein_g' | 'fat_g' | 'carb_g' | 'fiber_g' | '
 
 export const NUTRIENTS: Nutrient[] = ['kcal', 'protein_g', 'fat_g', 'carb_g', 'fiber_g', 'sodium_mg', 'cholesterol_mg']
 
-// null = sem dado (NA da TACO ou não informado). Nunca é o mesmo que zero.
+// null = sem dado (célula em branco ou "*" da TACO, ou não informado). Nunca é o mesmo que zero;
+// o "NA" (não aplicável) e o traço da TACO já entram como 0.
 export type Food = { id: string; name: string; group_name: string | null } & Record<Nutrient, number | null>
 
 export type PlanItem = { food: Food; grams: number }

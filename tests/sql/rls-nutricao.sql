@@ -56,7 +56,7 @@ begin
   begin
     insert into public.foods (source, taco_number, name, kcal) values ('taco', 998, 'Falso da TACO', 100);
     raise notice 'FALHOU: o treinador criou um alimento "taco"';
-  exception when insufficient_privilege then
+  exception when insufficient_privilege or check_violation then
     raise notice 'OK  o treinador não cria alimento "taco"';
   end;
   update public.foods set kcal = 1 where source = 'taco' and taco_number = 3;
@@ -72,6 +72,12 @@ begin
     raise notice 'FALHOU: transformou o próprio em "taco"';
   exception when insufficient_privilege then
     raise notice 'OK  o treinador não transforma o seu alimento em "taco"';
+  end;
+  begin
+    update public.foods set taco_number = 5 where id = fid;
+    raise notice 'FALHOU: deu número da TACO a um alimento próprio';
+  exception when insufficient_privilege or check_violation then
+    raise notice 'OK  alimento próprio não ganha número da TACO';
   end;
   update public.foods set source = 'custom', name = 'Arroz alterado' where source = 'taco' and taco_number = 3;
   get diagnostics n = row_count;

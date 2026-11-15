@@ -19,6 +19,12 @@ const foods = sql.split('\n').flatMap((line) => {
   if (!m) return []
   return [{ n: Number(m[1]), name: m[2].replace(/''/g, "'"), group_name: m[3], kcal: num(m[4]), protein_g: num(m[5]), fat_g: num(m[6]), carb_g: num(m[7]), fiber_g: num(m[8]), sodium_mg: num(m[9]), cholesterol_mg: num(m[10]), micros: JSON.parse(m[11]) }]
 })
+// As 4 partes (para colar no celular) têm de ser exatamente as mesmas linhas do arquivo completo.
+const rowLines = (text) => text.split('\n').filter((line) => /^ {2}\(\d+, '/.test(line)).map((line) => line.replace(/,$/, ''))
+const partFiles = [1, 2, 3, 4].map((n) => readFileSync(new URL(`../supabase/nutricao-taco-partes/parte-${n}.sql`, import.meta.url), 'utf8'))
+const fromParts = partFiles.flatMap(rowLines)
+check('as 4 partes têm as mesmas 597 linhas do arquivo completo, na mesma ordem', fromParts.length === 597 && JSON.stringify(fromParts) === JSON.stringify(rowLines(sql)))
+check('cada parte tem menos de 60 KB (cabe na colagem do celular) e termina com "on conflict"', partFiles.every((text) => Buffer.byteLength(text) < 60_000 && /on conflict \(taco_number\) do update/.test(text)))
 const byName = (name) => foods.find((food) => food.name === name)
 
 check('597 alimentos no arquivo', foods.length === 597, String(foods.length))

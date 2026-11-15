@@ -337,6 +337,9 @@ brasileira, e o app calcula calorias e macros sozinho.
   plano dele; só o treinador grava. Alimento que está num plano não é apagado, e o alimento
   próprio em uso não muda de valores. Sem os arquivos, a aba do treinador pede para rodá-los e o
   aluno só vê "ainda não foi montado".
+- **Pelo celular:** o SQL Editor do Supabase corta colagens grandes (o `nutricao-taco.sql` tem
+  173 KB). Use as 4 partes em [`supabase/nutricao-taco-partes/`](supabase/nutricao-taco-partes/): cada
+  uma roda sozinha, em qualquer ordem, e juntas dão o mesmo que o arquivo completo (um teste confere).
 - **Fonte:** Tabela Brasileira de Composição de Alimentos (TACO), 4ª edição revisada e
   ampliada, NEPA/UNICAMP, Campinas, 2011 ("É permitida a reprodução parcial ou total desta
   obra, desde que citada a fonte"). O crédito fica, bem pequeno, no fim do **Perfil** do aluno,

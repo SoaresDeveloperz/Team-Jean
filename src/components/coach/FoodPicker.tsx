@@ -4,8 +4,9 @@ import { useRef, useState } from 'react'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
-import { formatNutrient, parseAmount, searchFoods, type Food } from '@/lib/nutrition'
+import { formatNutrient, nutrientIn, parseAmount, searchFoods, type Food } from '@/lib/nutrition'
 import { FOOD_COLUMNS, toFood } from '@/lib/nutrition-plan'
+import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
 import { Modal } from '@/components/ui/modal'
 
@@ -120,6 +121,16 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
     choose(food)
   }
 
+  // Conta ao vivo da porção escolhida: "120 g = 109 kcal · P 5,8 · C 12 · G 0,6".
+  const portionPreview = (() => {
+    const amount = parseAmount(grams)
+    if (!chosen || amount === null || amount <= 0) return ''
+    const kcal = nutrientIn(chosen, 'kcal', amount)
+    if (kcal === null) return `${formatNutrient('fat_g', amount)} g · sem calorias na tabela`
+    const part = (nutrient: 'protein_g' | 'carb_g' | 'fat_g') => formatNutrient(nutrient, nutrientIn(chosen, nutrient, amount) ?? 0)
+    return `${formatNutrient('fat_g', amount)} g = ${formatNutrient('kcal', kcal)} kcal · P ${part('protein_g')} · C ${part('carb_g')} · G ${part('fat_g')}`
+  })()
+
   const title = chosen ? 'Quanto vai comer?' : creating ? 'Cadastrar alimento' : 'Adicionar alimento'
 
   return (
@@ -127,11 +138,28 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
       {error && <Alert variant="error" className="mb-3">{error}</Alert>}
 
       {chosen ? (
-        <div className="space-y-3">
+        <div key="quanto" className="rise-in space-y-3">
           <p className="text-xs text-zinc-400">{summary(chosen)}</p>
           <div>
             <label htmlFor="food-grams" className={labelClassName}>Gramas</label>
             <input id="food-grams" type="text" inputMode="decimal" value={grams} onChange={(event) => setGrams(event.target.value)} className={inputClassName} />
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Atalhos de gramas">
+              {[50, 100, 150, 200].map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => setGrams(String(amount))}
+                  className={cn('min-h-11 rounded-full border px-4 text-xs font-bold transition', grams.trim() === String(amount) ? 'border-brand/50 bg-brand-soft text-brand' : 'border-line-strong bg-white/[0.04] text-zinc-300 hover:text-white')}
+                >
+                  {amount} g
+                </button>
+              ))}
+            </div>
+            {portionPreview && (
+              <p aria-live="polite" className="mt-2 text-sm font-semibold tabular-nums text-white">
+                {portionPreview}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="food-portion" className={labelClassName}>Medida caseira (opcional)</label>
@@ -154,7 +182,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
           </button>
         </div>
       ) : creating ? (
-        <div className="space-y-3">
+        <div key="cadastro" className="rise-in space-y-3">
           <div>
             <label htmlFor="new-food-name" className={labelClassName}>Nome</label>
             <input id="new-food-name" type="text" maxLength={120} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Ex.: Leite de vaca, integral" className={inputClassName} />
@@ -183,7 +211,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div key="busca" className="space-y-3">
           <input
             type="search"
             value={query}

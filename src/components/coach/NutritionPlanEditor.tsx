@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Salad, Trash2, X } from 'lucide-react'
+import { AnimatePresence, m } from 'framer-motion'
+import { Leaf, Pencil, Plus, Salad, Trash2, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
 import { formatNutrient, nutrientIn, parseAmount, type Food } from '@/lib/nutrition'
@@ -11,6 +12,7 @@ import {
   NutritionLoadError,
   TARGET_NUTRIENTS,
   loadPlan,
+  mealTotals,
   planTotals,
   targetRatio,
   toFood,
@@ -24,6 +26,7 @@ import { BarFill } from '@/components/ui/bar-fill'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Modal } from '@/components/ui/modal'
 import { Skeleton } from '@/components/ui/skeleton'
+import { NutrientDetails } from '@/components/nutrition/NutrientDetails'
 import { FoodPicker } from './FoodPicker'
 
 const inputClassName =
@@ -78,12 +81,16 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const [form, setForm] = useState<FormState>(() => formFor(null))
   const [formError, setFormError] = useState('')
   const [customMeal, setCustomMeal] = useState('')
+  const [microsOpen, setMicrosOpen] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [confirm, setConfirm] = useState<{ kind: 'plan' } | { kind: 'meal'; meal: PlanMeal } | null>(null)
   const firstName = studentName.split(' ')[0]
   // Mudanças entram numa fila (uma por vez, na ordem em que o Jean mexeu) e o plano mais recente fica numa ref.
   const queue = useRef<Promise<unknown>>(Promise.resolve())
   const pending = useRef(0)
   const planRef = useRef<Plan | null | undefined>(undefined)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const failed = useRef(false)
 
   const fetchPlan = useCallback(async () => {
     try {
@@ -127,12 +134,24 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
     }
   }, [fetchPlan, apply])
 
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
+
+  // Mostra a mudança na hora (o item some com animação) e o banco confirma em seguida; se falhar, o recarregamento devolve.
+  const optimistic = (change: (current: Plan) => Plan) => {
+    const next = planRef.current ? change(planRef.current) : planRef.current
+    planRef.current = next
+    setPlan(next)
+  }
+
   // Faz a mudança na sua vez, mostra o erro (se houver) e recarrega o plano para a tela refletir o banco.
   // Devolve se deu certo (a linha volta ao valor antigo quando não deu).
   const run = (action: () => DbResult): Promise<boolean> => {
     const job = queue.current.then(async () => {
+      if (pending.current === 0) failed.current = false
       pending.current += 1
+      clearTimeout(savedTimer.current)
       setBusy(true)
+      setSaveState('saving')
       setActionError('')
       let ok = true
       try {
@@ -145,9 +164,15 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         ok = false
         setActionError(friendlyError(error, 'Não foi possível salvar'))
       }
+      if (!ok) failed.current = true
       await reload()
       pending.current -= 1
-      if (pending.current === 0) setBusy(false)
+      if (pending.current === 0) {
+        setBusy(false)
+        // "Salvo ✓" por 2 s; se algo falhou, o aviso de erro já diz o que houve.
+        setSaveState(failed.current ? 'idle' : 'saved')
+        savedTimer.current = setTimeout(() => setSaveState('idle'), 2000)
+      }
       return ok
     })
     queue.current = job.catch(() => undefined)
@@ -269,6 +294,18 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         <button type="button" onClick={submitForm} className="flex h-12 w-full items-center justify-center rounded-2xl bg-white text-xs font-black uppercase tracking-wider text-black">
           {plan ? 'Salvar' : 'Criar plano'}
         </button>
+        {plan && (
+          <button
+            type="button"
+            onClick={() => {
+              setFormOpen(false)
+              setConfirm({ kind: 'plan' })
+            }}
+            className="flex min-h-11 w-full items-center justify-center gap-2 text-xs font-bold text-zinc-500 hover:text-danger"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Apagar plano de {firstName}
+          </button>
+        )}
       </div>
     </Modal>
   )
@@ -295,39 +332,45 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   // Só calorias e macros: fibra, sódio e colesterol faltando num alimento próprio não é o que o treinador acompanha aqui.
   const shownIncomplete = totals.incomplete.filter((nutrient): nutrient is keyof typeof SHOWN_LABELS => nutrient in SHOWN_LABELS)
   const usedNames = new Set(plan.meals.map((meal) => meal.name.toLowerCase()))
+  const mealSummary = (meal: PlanMeal) => {
+    if (meal.items.length === 0) return ''
+    const sum = mealTotals(meal)
+    return `${formatNutrient('kcal', sum.values.kcal)} kcal · P ${formatNutrient('protein_g', sum.values.protein_g)} · C ${formatNutrient('carb_g', sum.values.carb_g)} · G ${formatNutrient('fat_g', sum.values.fat_g)}${sum.incomplete.some((nutrient) => nutrient in SHOWN_LABELS) ? ' · parcial' : ''}`
+  }
 
   return (
     <div className="space-y-4">
       {actionError && <Alert variant="error">{actionError}</Alert>}
 
-      <section aria-label="Resumo do plano" className="space-y-3 rounded-2xl border border-line p-4">
-        <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 text-xs leading-relaxed text-zinc-400">
-            Responsável: <span className="font-bold text-white">{plan.responsibleName}</span> ({plan.responsibleCrn})
-          </p>
-          <button type="button" onClick={openForm} disabled={busy} className="flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-xs font-bold text-brand hover:text-white">
-            <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar
-          </button>
-        </div>
+      <div className="flex items-start justify-between gap-3 px-1">
+        <p className="min-w-0 text-xs leading-relaxed text-zinc-400">
+          Responsável: <span className="font-bold text-white">{plan.responsibleName}</span> ({plan.responsibleCrn})
+        </p>
+        <button type="button" onClick={openForm} disabled={busy} className="flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-xs font-bold text-brand hover:text-white">
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar
+        </button>
+      </div>
+
+      <section aria-label="Resumo do plano" className="sticky top-0 z-10 space-y-2.5 rounded-2xl border border-line bg-surface p-3.5 shadow-lg shadow-black/50">
         {targetRows.length === 0 ? (
           <p className="text-sm font-bold tabular-nums text-white">
             {formatNutrient('kcal', totals.values.kcal)} kcal
-            <span className="text-xs font-medium text-zinc-500"> · sem metas definidas (em &quot;Editar&quot;)</span>
+            <span className="text-xs font-medium text-zinc-500">
+              {' '}· P {formatNutrient('protein_g', totals.values.protein_g)} · C {formatNutrient('carb_g', totals.values.carb_g)} · G {formatNutrient('fat_g', totals.values.fat_g)} (sem metas definidas: veja em &quot;Editar&quot;)
+            </span>
           </p>
         ) : (
-          <ul className="space-y-2.5">
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5">
             {targetRows.map(({ nutrient, key, label, unit }) => {
               const target = plan.targets[key] as number
               const value = totals.values[nutrient]
               const ratio = targetRatio(value, target) ?? 0
               return (
                 <li key={key}>
-                  <div className="flex items-baseline justify-between gap-3 text-xs">
-                    <span className="font-semibold text-zinc-300">{label}</span>
-                    <span className={cn('font-bold tabular-nums', ratio > 1.05 ? 'text-gold' : 'text-white')}>
-                      {formatNutrient(nutrient, value)} <span className="font-medium text-zinc-500">/ {formatNutrient(nutrient, target)} {unit}</span>
-                    </span>
-                  </div>
+                  <p className="text-xs font-semibold text-zinc-400">{label}</p>
+                  <p className={cn('text-sm font-bold tabular-nums', ratio > 1.05 ? 'text-gold' : 'text-white')}>
+                    {formatNutrient(nutrient, value)} <span className="font-medium text-zinc-500">/ {formatNutrient(nutrient, target)} {unit}</span>
+                  </p>
                   <div
                     role="progressbar"
                     aria-label={`${label}: ${formatNutrient(nutrient, value)} de ${formatNutrient(nutrient, target)} ${unit}`}
@@ -348,17 +391,29 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
             Total parcial: algum alimento não tem o dado de {shownIncomplete.map((nutrient) => SHOWN_LABELS[nutrient]).join(', ')}.
           </p>
         )}
+        <div className="flex items-center justify-between gap-2">
+          <button type="button" onClick={() => setMicrosOpen(true)} className="flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-xs font-bold text-brand hover:text-white">
+            <Leaf className="h-3.5 w-3.5" aria-hidden="true" /> Vitaminas e minerais
+          </button>
+          <span role="status" aria-live="polite" className={cn('text-xs font-semibold transition-opacity', saveState === 'idle' ? 'opacity-0' : 'opacity-100', saveState === 'saved' ? 'text-brand' : 'text-zinc-400')}>
+            {saveState === 'saving' ? 'Salvando…' : saveState === 'saved' ? 'Salvo ✓' : '\u00a0'}
+          </span>
+        </div>
       </section>
 
       {plan.meals.map((meal) => (
         <MealCard
           key={meal.id}
           meal={meal}
+          summary={mealSummary(meal)}
           onAddFood={() => void openPicker(meal.id)}
           onRename={(name, time) => run(() => supabase.from('nutrition_meals').update({ name, meal_time: time }).eq('id', meal.id))}
           onDelete={() => setConfirm({ kind: 'meal', meal })}
           onSaveItem={(item, grams, portion) => run(() => supabase.from('nutrition_meal_items').update({ grams, portion_text: portion }).eq('id', item.id))}
-          onRemoveItem={(item) => run(() => supabase.from('nutrition_meal_items').delete().eq('id', item.id))}
+          onRemoveItem={(item) => {
+            optimistic((current) => ({ ...current, meals: current.meals.map((candidate) => (candidate.id === meal.id ? { ...candidate, items: candidate.items.filter((other) => other.id !== item.id) } : candidate)) }))
+            return run(() => supabase.from('nutrition_meal_items').delete().eq('id', item.id))
+          }}
         />
       ))}
 
@@ -385,11 +440,10 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         </form>
       </section>
 
-      <button type="button" onClick={() => setConfirm({ kind: 'plan' })} disabled={busy} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-line text-xs font-bold text-zinc-400 hover:border-danger/40 hover:text-danger">
-        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Apagar plano de {firstName}
-      </button>
-
       {planModal}
+      <Modal open={microsOpen} onClose={() => setMicrosOpen(false)} title="Vitaminas e minerais" description={`Plano de ${firstName}, o dia todo`}>
+        <NutrientDetails items={plan.meals.flatMap((meal) => meal.items)} variant="coach" />
+      </Modal>
       <FoodPicker
         open={pickerMeal !== null && foods !== null}
         onClose={() => setPickerMeal(null)}
@@ -418,7 +472,10 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         onConfirm={async () => {
           const current = confirm
           setConfirm(null)
-          if (current?.kind === 'meal') await run(() => supabase.from('nutrition_meals').delete().eq('id', current.meal.id))
+          if (current?.kind === 'meal') {
+            optimistic((plan) => ({ ...plan, meals: plan.meals.filter((meal) => meal.id !== current.meal.id) }))
+            await run(() => supabase.from('nutrition_meals').delete().eq('id', current.meal.id))
+          }
           else if (current?.kind === 'plan') await run(() => supabase.from('nutrition_plans').delete().eq('id', plan.id))
         }}
       />
@@ -428,6 +485,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
 
 function MealCard({
   meal,
+  summary,
   onAddFood,
   onRename,
   onDelete,
@@ -435,6 +493,7 @@ function MealCard({
   onRemoveItem,
 }: {
   meal: PlanMeal
+  summary: string
   onAddFood: () => void
   onRename: (name: string, time: string | null) => Promise<boolean>
   onDelete: () => void
@@ -465,19 +524,24 @@ function MealCard({
   }
 
   return (
-    <section aria-label={meal.name} className="rounded-2xl border border-line">
-      <div className="flex items-center gap-2 border-b border-line p-3">
-        <input type="text" value={name} maxLength={40} onChange={(event) => setName(event.target.value)} onBlur={() => void save()} aria-label={`Nome da refeição ${meal.name}`} className={cn(smallInputClassName, 'min-w-0 flex-1 font-bold')} />
-        <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => void save()} aria-label={`Horário de ${meal.name}`} className={cn(smallInputClassName, 'w-28 shrink-0')} />
-        <button type="button" onClick={onDelete} aria-label={`Apagar a refeição ${meal.name}`} className={iconButton}>
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
-        </button>
+    <section aria-label={meal.name} className="rise-in rounded-2xl border border-line">
+      <div className="border-b border-line p-3">
+        <div className="flex items-center gap-2">
+          <input type="text" value={name} maxLength={40} onChange={(event) => setName(event.target.value)} onBlur={() => void save()} aria-label={`Nome da refeição ${meal.name}`} className={cn(smallInputClassName, 'min-w-0 flex-1 font-bold')} />
+          <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => void save()} aria-label={`Horário de ${meal.name}`} className={cn(smallInputClassName, 'w-28 shrink-0')} />
+          <button type="button" onClick={onDelete} aria-label={`Apagar a refeição ${meal.name}`} className={iconButton}>
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        {summary && <p className="mt-2 px-1 text-xs tabular-nums text-zinc-400">{summary}</p>}
       </div>
       {meal.items.length > 0 && (
         <ul className="divide-y divide-line">
-          {meal.items.map((item) => (
-            <ItemRow key={item.id} item={item} onSave={(grams, portion) => onSaveItem(item, grams, portion)} onRemove={() => onRemoveItem(item)} />
-          ))}
+          <AnimatePresence initial={false}>
+            {meal.items.map((item) => (
+              <ItemRow key={item.id} item={item} onSave={(grams, portion) => onSaveItem(item, grams, portion)} onRemove={() => onRemoveItem(item)} />
+            ))}
+          </AnimatePresence>
         </ul>
       )}
       <div className="p-3">
@@ -518,20 +582,29 @@ function ItemRow({ item, onSave, onRemove }: { item: MealItem; onSave: (grams: n
   }
 
   return (
-    <li className="space-y-2 p-3">
+    <m.li
+      layout="position"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+      className="space-y-2 p-3"
+    >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-snug text-white">{item.food.name}</p>
-          <p className="text-xs tabular-nums text-zinc-500">{kcal === null ? 'Sem calorias na tabela' : `${formatNutrient('kcal', kcal)} kcal`}</p>
+          <p className="text-xs tabular-nums text-zinc-500">{kcal === null ? 'sem kcal na tabela' : `${formatNutrient('kcal', kcal)} kcal`}</p>
         </div>
         <button type="button" onClick={() => void onRemove()} aria-label={`Tirar ${item.food.name}`} className={iconButton}>
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       <div className="grid grid-cols-[6rem_1fr] gap-2">
-        <input type="text" inputMode="decimal" value={grams} onChange={(event) => setGrams(event.target.value)} onBlur={() => void save()} aria-label={`Gramas de ${item.food.name}`} className={smallInputClassName} />
-        <input type="text" maxLength={60} value={portion} onChange={(event) => setPortion(event.target.value)} onBlur={() => void save()} placeholder="Ex.: 2 unidades" aria-label={`Medida caseira de ${item.food.name}`} className={smallInputClassName} />
+        <div className="relative">
+          <input type="text" inputMode="decimal" value={grams} onChange={(event) => setGrams(event.target.value)} onBlur={() => void save()} aria-label={`Gramas de ${item.food.name}`} className={cn(smallInputClassName, 'pr-7')} />
+          <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-500">g</span>
+        </div>
+        <input type="text" maxLength={60} value={portion} onChange={(event) => setPortion(event.target.value)} onBlur={() => void save()} placeholder="Medida caseira" aria-label={`Medida caseira de ${item.food.name}`} className={smallInputClassName} />
       </div>
-    </li>
+    </m.li>
   )
 }

@@ -250,6 +250,24 @@ input, select, textarea {
   .pr-pop {
     animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   }
+  /* Itens de lista que entram subindo (alimentos do plano, detalhes que abrem): só transform e opacity.
+     --i escalona os primeiros itens (40 ms cada, até 4); os demais entram juntos. */
+  .rise-in {
+    animation: rise 0.28s cubic-bezier(0.16, 1, 0.3, 1) calc(min(var(--i, 0), 4) * 40ms) backwards;
+  }
+  /* Selo que aparece uma vez (ex.: "Próxima" refeição). */
+  .pop-in {
+    animation: pop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  }
+}
+
+/* Seta que gira ao abrir/fechar (200 ms); com "reduzir movimento" troca na hora. */
+.chev {
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[aria-expanded='true'] > .chev,
+[aria-expanded='true'] .chev {
+  transform: rotate(180deg);
 }
 
 @keyframes pulse-ring {

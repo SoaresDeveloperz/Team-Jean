@@ -82,6 +82,23 @@ check('formato: kcal inteira, gramas com uma casa, vírgula brasileira', nutriti
 
 check('números digitados: vírgula e ponto valem; letras, "1e3", "0x10", negativo e vazio não', nutrition.parseAmount('12,5') === 12.5 && nutrition.parseAmount(' 150 ') === 150 && nutrition.parseAmount('12.5') === 12.5 && ['abc', '1e3', '0x10', '-5', '', '  ', '1,2,3', '12 g'].every((text) => nutrition.parseAmount(text) === null))
 
+// ------------------------------------------------ vitaminas e minerais
+const seedKeys = new Set(foods.flatMap((item) => Object.keys(item.micros)))
+check('todo campo de micro da tela existe nos dados da TACO', nutrition.DETAIL_FIELDS.filter((field) => !field.column).every((field) => seedKeys.has(field.id)), [...seedKeys].join(','))
+check('17 campos de detalhe (3 do rótulo, 8 minerais, 6 vitaminas)', nutrition.DETAIL_FIELDS.length === 17 && nutrition.DETAIL_FIELDS.filter((field) => field.group === 'mineral').length === 8 && nutrition.DETAIL_FIELDS.filter((field) => field.group === 'vitamin').length === 6)
+const withMicros = (food, micros) => ({ ...food, micros })
+const arrozM = withMicros(arroz, byName('Arroz, tipo 1, cozido').micros)
+const feijaoM = withMicros(byName('Feijão, carioca, cozido'), byName('Feijão, carioca, cozido').micros)
+const proprio = food({ id: 'meu', name: 'Marmita do Jean' })
+const detalhes = nutrition.sumDetails([{ food: arrozM, grams: 200 }, { food: feijaoM, grams: 120 }, { food: proprio, grams: 200 }])
+const campo = (id) => detalhes.find((entry) => entry.field.id === id)
+check('cálcio: arroz 200 g (8) + feijão 120 g (32,4) = 40,4 mg, dado em 2 de 3 itens', near(campo('ca_mg').value, 40.4, 1e-6) && campo('ca_mg').known === 2 && campo('ca_mg').total === 3)
+check('fibra vem da coluna do alimento (3,2 + 10,2), o alimento próprio tem fibra 2: soma 17,4', near(campo('fiber_g').value, 3.2 + 10.2 + 4, 1e-6) && campo('fiber_g').known === 3)
+check('vitamina A (RAE) ausente em todos: known = 0 (a tela do aluno esconde)', campo('rae_ug').known === 0 && campo('rae_ug').value === 0)
+check('vitamina C: o feijão tem 0 de verdade (conta como dado), o arroz não tem o dado', campo('c_mg').known === 1 && campo('c_mg').value === 0)
+check('sem itens: tudo 0 e known 0', nutrition.sumDetails([]).every((entry) => entry.value === 0 && entry.known === 0 && entry.total === 0))
+check('formato de micro: 0,63 | 12,4 | 1.234 (menos casas quanto maior)', nutrition.formatMicro(0.63) === '0,63' && nutrition.formatMicro(12.44) === '12,4' && nutrition.formatMicro(1234.4) === '1.234' && nutrition.formatMicro(163.4) === '163')
+
 const nomes = foods.map((item) => ({ name: item.name, n: item.n }))
 check('busca sem acento e sem maiúscula: "pao frances" acha "Pão, trigo, francês"', nutrition.searchFoods(nomes, 'pao frances').some((item) => /Pão, trigo, francês/.test(item.name)), JSON.stringify(nutrition.searchFoods(nomes, 'pao frances')))
 check('busca: quem começa com o texto vem primeiro', nutrition.searchFoods(nomes, 'arroz')[0].name.startsWith('Arroz'))

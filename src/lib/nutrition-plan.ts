@@ -7,6 +7,8 @@ import { sumItems, type Food, type Nutrient, type Totals } from './nutrition'
 type Supabase = ReturnType<typeof createClient>
 
 export const FOOD_COLUMNS = 'id, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg'
+// Nos itens de um plano vêm também os micronutrientes (vitaminas e minerais). Na lista de busca não: são ~600 alimentos.
+export const PLAN_FOOD_COLUMNS = `${FOOD_COLUMNS}, micros`
 
 export type MealItem = { id: string; food: Food; grams: number; portionText: string | null }
 export type PlanMeal = { id: string; name: string; time: string | null; items: MealItem[] }
@@ -55,6 +57,7 @@ export function toFood(row: Record<string, unknown>): Food {
     fiber_g: num(row.fiber_g),
     sodium_mg: num(row.sodium_mg),
     cholesterol_mg: num(row.cholesterol_mg),
+    ...(row.micros && typeof row.micros === 'object' ? { micros: row.micros as Record<string, number> } : {}),
   }
 }
 
@@ -79,7 +82,7 @@ export async function loadPlan(supabase: Supabase, studentId: string): Promise<P
   const { data: items, error: itemsError } = mealRows.length
     ? await supabase
         .from('nutrition_meal_items')
-        .select(`id, meal_id, grams, portion_text, position, foods(${FOOD_COLUMNS})`)
+        .select(`id, meal_id, grams, portion_text, position, foods(${PLAN_FOOD_COLUMNS})`)
         .in('meal_id', mealRows.map((meal) => meal.id))
         .order('position', { ascending: true })
         .order('created_at', { ascending: true })

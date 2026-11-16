@@ -323,14 +323,20 @@ brasileira, e o app calcula calorias e macros sozinho.
 
 - **Treinador:** na ficha do aluno, aba **Nutrição**. Cria o plano (nutricionista responsável
   com CRN, metas do dia opcionais e observações), cria refeições com um toque (Café da manhã,
-  Almoço...), busca alimentos sem acento, informa as gramas e, se quiser, a medida caseira
-  ("4 colheres de servir"). Vê os totais contra as metas enquanto monta. O que não está na
+  Almoço...), busca alimentos sem acento, informa as gramas (atalhos de 50 a 200 g, com a conta
+  ao vivo da porção) e, se quiser, a medida caseira ("4 colheres de servir"). Vê os totais
+  contra as metas num resumo que fica preso no topo enquanto monta, o total de cada refeição,
+  "Salvando… / Salvo ✓" e as **vitaminas e minerais** do dia (com nomes técnicos e em quantos
+  alimentos o dado existe). O que não está na
   tabela ele cadastra à mão (valores por 100 g). Um plano por aluno: **criar o plano é o que
   liga a "Alimentação" para aquele aluno**; apagar o plano a desliga.
 - **Aluno:** link **Ver minha alimentação** na tela Hoje (só aparece com plano) e a tela
-  `/student/nutrition`: o dia em barras, as refeições com a medida caseira primeiro e as gramas
-  depois, só calorias por refeição, aviso de que não substitui nutricionista ou médico e o
-  responsável técnico. Abre **sem internet** pela cópia do aparelho, que sai ao sair da conta.
+  `/student/nutrition`: calorias do dia em número grande e macros em três números (com a meta do
+  plano ao lado), selo **Próxima** na refeição pelo horário, as refeições com a medida caseira
+  primeiro e as gramas depois, só calorias por refeição (nunca macros por refeição) e o
+  responsável técnico. Painel recolhido **Vitaminas e minerais do dia** (soma das refeições, sem
+  metas; "parcial" quando algum alimento não tem o dado). Abre **sem internet** pela cópia do
+  aparelho, que sai ao sair da conta.
 - **Banco:** rode, nesta ordem, [`supabase/nutricao.sql`](supabase/nutricao.sql),
   [`supabase/nutricao-taco.sql`](supabase/nutricao-taco.sql) e
   [`supabase/nutricao-plano.sql`](supabase/nutricao-plano.sql) (idempotentes). O aluno lê só o

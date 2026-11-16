@@ -230,11 +230,11 @@ const SWAP_TABLES = ['assigned_workout_exercises', 'workout_template_exercises']
 // /__nutricao/off simula o banco sem o SQL; /__nutricao/seed cria o plano da Maria.
 let nutricaoEnabled = true
 const NUTRICAO_TABLES = ['foods', 'nutrition_plans', 'nutrition_meals', 'nutrition_meal_items']
-const taco = (n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg) => ({ id: `taco-${n}`, source: 'taco', taco_number: n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg, micros: {}, created_by: null, created_at: iso(-30) })
+const taco = (n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg, micros = {}) => ({ id: `taco-${n}`, source: 'taco', taco_number: n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg, micros, created_by: null, created_at: iso(-30) })
 const foods = [
-  taco(3, 'Arroz, tipo 1, cozido', 'Cereais e derivados', 128, 2.5, 0.2, 28.1, 1.6, 1, 0),
+  taco(3, 'Arroz, tipo 1, cozido', 'Cereais e derivados', 128, 2.5, 0.2, 28.1, 1.6, 1, 0, { moisture_pct: 69.1, ash_g: 0.1, ca_mg: 4, mg_mg: 2, mn_mg: 0.3, p_mg: 18, fe_mg: 0.1, k_mg: 15, cu_mg: 0.02, zn_mg: 0.5, retinol_ug: 0, b1_mg: 0, b2_mg: 0, b6_mg: 0, b3_mg: 0 }),
   taco(4, 'Arroz, tipo 1, cru', 'Cereais e derivados', 358, 7.2, 0.3, 78.8, 1.6, 1, 0),
-  taco(561, 'Feijão, carioca, cozido', 'Leguminosas e derivados', 76, 4.8, 0.5, 13.6, 8.5, 2, 0),
+  taco(561, 'Feijão, carioca, cozido', 'Leguminosas e derivados', 76, 4.8, 0.5, 13.6, 8.5, 2, 0, { moisture_pct: 80.4, ash_g: 0.7, ca_mg: 27, mg_mg: 42, mn_mg: 0.28, p_mg: 87, fe_mg: 1.3, k_mg: 255, cu_mg: 0.19, zn_mg: 0.7, retinol_ug: 0, b1_mg: 0.04, b2_mg: 0, b6_mg: 0, b3_mg: 0, c_mg: 0 }),
   taco(410, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 159, 32, 2.5, 0, 0, 50, 89),
   taco(488, 'Ovo, de galinha, inteiro, cozido/10minutos', 'Ovos e derivados', 146, 13.3, 9.5, 0.6, 0, 146, 397),
   taco(182, 'Banana, prata, crua', 'Frutas e derivados', 98, 1.3, 0.1, 26, 2, 0, 0),
@@ -242,7 +242,7 @@ const foods = [
   taco(7, 'Aveia, flocos, crua', 'Cereais e derivados', 394, 13.9, 8.5, 66.6, 9.1, 5, 0),
   taco(88, 'Batata, doce, cozida', 'Verduras, hortaliças e derivados', 77, 0.6, 0.1, 18.4, 2.2, 3, 0),
   taco(260, 'Azeite, de oliva, extra virgem', 'Gorduras e óleos', 884, 0, 100, 0, 0, null, 0),
-  taco(458, 'Leite, de vaca, integral', 'Leite e derivados', null, null, null, null, 0, 64, 10),
+  taco(458, 'Leite, de vaca, integral', 'Leite e derivados', null, null, null, null, 0, 64, 10, { ash_g: 0.8, ca_mg: 123, mg_mg: 10, mn_mg: 0, p_mg: 82, fe_mg: 0, k_mg: 133, cu_mg: 0.02, zn_mg: 0.4, retinol_ug: 21, b1_mg: 0.04, b2_mg: 0.24, b6_mg: 0, b3_mg: 1.52, c_mg: 0 }),
   taco(78, 'Alface, crespa, crua', 'Verduras, hortaliças e derivados', 11, 1.3, 0.2, 1.7, 1.8, 3, 0),
 ]
 const nutrition_plans = []

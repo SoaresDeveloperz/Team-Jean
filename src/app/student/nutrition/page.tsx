@@ -1,31 +1,45 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Salad } from 'lucide-react'
+import { Apple, Coffee, Dumbbell, Moon, Salad, Soup, UtensilsCrossed } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { formatNutrient, type Nutrient } from '@/lib/nutrition'
 import {
   NutritionLoadError,
-  TARGET_NUTRIENTS,
   forgetNutritionCopy,
   loadPlan,
   mealTotals,
   planTotals,
   readNutritionCopy,
   saveNutritionCopy,
-  targetRatio,
+  type MealItem,
   type Plan,
 } from '@/lib/nutrition-plan'
+import { cn } from '@/lib/cn'
 import { Alert } from '@/components/ui/alert'
-import { BarFill } from '@/components/ui/bar-fill'
+import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
+import { NutrientDetails } from '@/components/nutrition/NutrientDetails'
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+
 // Verdadeiro quando há itens e nenhum deles tem o dado: mostrar "sem dado" em vez de 0.
-const allMissing = (items: { food: Record<Nutrient, number | null> }[], nutrient: Nutrient) => items.length > 0 && items.every((item) => item.food[nutrient] === null)
-const nutrientLabel: Record<string, string> = { kcal: 'calorias', protein_g: 'proteína', carb_g: 'carboidrato', fat_g: 'gordura' }
+const allMissing = (items: MealItem[], nutrient: Nutrient) => items.length > 0 && items.every((item) => item.food[nutrient] === null)
+
+const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+
+// Ícone da refeição pelo nome (sem acento e sem maiúscula).
+function mealIcon(name: string) {
+  const text = name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  if (/lanche|fruta/.test(text)) return Apple
+  if (/cafe|desjejum/.test(text)) return Coffee
+  if (/ceia/.test(text)) return Moon
+  if (/pre|treino|pos/.test(text)) return Dumbbell
+  if (/jantar/.test(text)) return Soup
+  return UtensilsCrossed
+}
 
 // "Alimentação" do aluno: o plano que o nutricionista montou, em refeições. Só leitura.
 export default function StudentNutritionPage() {
@@ -34,6 +48,8 @@ export default function StudentNutritionPage() {
   const [fromCopy, setFromCopy] = useState(false)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  // Hora em que a tela abriu: marca a "próxima" refeição pelo horário que o nutricionista definiu.
+  const [now] = useState(() => new Date())
 
   useEffect(() => {
     let active = true
@@ -105,7 +121,7 @@ export default function StudentNutritionPage() {
       <div className="space-y-4">
         {header}
         <div className="space-y-3" role="status" aria-label="Carregando sua alimentação">
-          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-44 rounded-3xl" />
           <Skeleton className="h-40 rounded-3xl" />
           <Skeleton className="h-40 rounded-3xl" />
         </div>
@@ -128,15 +144,26 @@ export default function StudentNutritionPage() {
 
   const totals = planTotals(plan)
   const allItems = plan.meals.flatMap((meal) => meal.items)
-  const hasTargets = TARGET_NUTRIENTS.some(({ key }) => plan.targets[key] !== null)
+  const meals = plan.meals.filter((meal) => meal.items.length > 0)
+  const minutesNow = now.getHours() * 60 + now.getMinutes()
+  const nextMealId = meals.find((meal) => meal.time && minutesOf(meal.time) >= minutesNow)?.id
+  const macros: { nutrient: Nutrient; key: 'protein_g' | 'carb_g' | 'fat_g'; label: string }[] = [
+    { nutrient: 'protein_g', key: 'protein_g', label: 'Proteína' },
+    { nutrient: 'carb_g', key: 'carb_g', label: 'Carboidrato' },
+    { nutrient: 'fat_g', key: 'fat_g', label: 'Gordura' },
+  ]
+  const partial = (['kcal', 'protein_g', 'carb_g', 'fat_g'] as Nutrient[]).some((nutrient) => totals.incomplete.includes(nutrient) && !allMissing(allItems, nutrient))
+  const kcalMissing = allMissing(allItems, 'kcal')
 
   return (
     <div className="space-y-4">
       {header}
-      <Alert variant="info">Valores aproximados. Este plano não substitui a orientação do seu nutricionista ou médico.</Alert>
-      <p className="px-1 text-sm leading-relaxed text-zinc-300">
-        Plano elaborado por <span className="font-bold text-white">{plan.responsibleName}</span> ({plan.responsibleCrn}).
-      </p>
+      <div className="space-y-1 px-1 text-sm leading-relaxed">
+        <p className="text-zinc-300">
+          Plano de <span className="font-bold text-white">{plan.responsibleName}</span> · {plan.responsibleCrn}
+        </p>
+        <p className="text-zinc-500">Valores aproximados. Siga também as orientações do seu médico.</p>
+      </div>
       {fromCopy && (
         <Alert variant="info" onRetry={() => setAttempt((value) => value + 1)}>
           Sem internet agora. Mostrando a cópia deste aparelho, de {shortDate(plan.updatedAt)}.
@@ -144,104 +171,95 @@ export default function StudentNutritionPage() {
       )}
 
       <Stagger className="space-y-4">
-        <Tile>
+        <Tile className="glow-brand">
           <Eyebrow>O dia todo</Eyebrow>
-          {hasTargets ? (
-            <ul className="mt-3 space-y-3">
-              {TARGET_NUTRIENTS.filter(({ key }) => plan.targets[key] !== null).map(({ nutrient, key, label, unit }) => {
-                const target = plan.targets[key] as number
-                const value = totals.values[nutrient]
-                const noData = allMissing(allItems, nutrient)
-                return (
-                  <li key={key}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-sm font-semibold text-zinc-300">{label}</span>
-                      <span className="text-base font-bold tabular-nums text-white">
-                        {noData ? 'sem dado' : formatNutrient(nutrient, value)} <span className="text-sm font-medium text-zinc-500">de {formatNutrient(nutrient, target)} {unit}</span>
-                      </span>
-                    </div>
-                    <div
-                      role="progressbar"
-                      aria-label={`${label}: ${formatNutrient(nutrient, value)} de ${formatNutrient(nutrient, target)} ${unit}`}
-                      aria-valuemin={0}
-                      aria-valuemax={target}
-                      aria-valuenow={Math.min(value, target)}
-                      className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/[0.08]"
-                    >
-                      <BarFill value={targetRatio(value, target) ?? 0} className="bg-brand" />
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          ) : (
-            <p className="mt-2 text-base font-bold tabular-nums text-white">
-              {formatNutrient('kcal', totals.values.kcal)} kcal
-              <span className="text-sm font-medium text-zinc-500">
-                {' '}
-                · proteína {formatNutrient('protein_g', totals.values.protein_g)} g · carboidrato {formatNutrient('carb_g', totals.values.carb_g)} g · gordura{' '}
-                {formatNutrient('fat_g', totals.values.fat_g)} g
+          <p className="mt-2 flex items-end gap-2">
+            {kcalMissing ? (
+              <span className="font-display text-4xl font-bold leading-none text-zinc-400">sem dado</span>
+            ) : (
+              <span className="font-display text-6xl font-bold leading-none tabular-nums">
+                <AnimatedNumber value={totals.values.kcal} duration={0.4} format={(value) => formatNutrient('kcal', value)} />
               </span>
-            </p>
-          )}
-          {totals.incomplete.some((nutrient: Nutrient) => nutrient in nutrientLabel) && (
-            <p className="mt-3 text-xs text-zinc-500">
-              Total parcial: alguns alimentos não têm o dado de {totals.incomplete.filter((nutrient) => nutrient in nutrientLabel).map((nutrient) => nutrientLabel[nutrient]).join(', ')}.
-            </p>
-          )}
+            )}
+            <span className="pb-1 text-base font-semibold text-zinc-400">kcal</span>
+          </p>
+          {plan.targets.kcal !== null && <p className="mt-1 text-sm text-zinc-500">Meta do plano: {formatNutrient('kcal', plan.targets.kcal)} kcal</p>}
+          <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
+            {macros.map(({ nutrient, key, label }) => {
+              const target = plan.targets[key]
+              return (
+                <div key={key}>
+                  <dt className="text-xs font-bold text-zinc-400">{label}</dt>
+                  <dd className="mt-0.5 font-display text-3xl font-bold leading-none tabular-nums">
+                    {allMissing(allItems, nutrient) ? (
+                      <span className="text-lg text-zinc-500">sem dado</span>
+                    ) : (
+                      <>
+                        {formatNutrient(nutrient, totals.values[nutrient])}
+                        <span className="ml-0.5 text-sm font-semibold text-zinc-500">g</span>
+                      </>
+                    )}
+                  </dd>
+                  {target !== null && <dd className="mt-0.5 text-xs text-zinc-500">meta {formatNutrient(nutrient, target)} g</dd>}
+                </div>
+              )
+            })}
+          </dl>
+          {partial && <p className="mt-4 text-sm text-zinc-400">Alguns alimentos não têm todos os dados; o total real pode ser um pouco maior.</p>}
         </Tile>
-
-        {plan.meals.length === 0 && (
-          <p className="rounded-3xl border border-dashed border-line-strong p-6 text-center text-sm text-zinc-400">As refeições ainda não foram montadas.</p>
-        )}
-        {plan.meals.map((meal) => {
-          const kcal = mealTotals(meal)
-          return (
-            <Tile key={meal.id} aria-labelledby={`refeicao-${meal.id}`}>
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 id={`refeicao-${meal.id}`} className="font-display text-2xl font-bold uppercase leading-none">
-                  {meal.name}
-                  {meal.time && <span className="ml-2 text-base text-zinc-500">{meal.time}</span>}
-                </h2>
-                {meal.items.length > 0 && (
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-400">
-                    {allMissing(meal.items, 'kcal') ? 'sem dado de calorias' : `${formatNutrient('kcal', kcal.values.kcal)} kcal${kcal.incomplete.includes('kcal') ? '*' : ''}`}
-                  </span>
-                )}
-              </div>
-              {meal.items.length === 0 ? (
-                <p className="mt-3 text-sm text-zinc-500">Nada nesta refeição ainda.</p>
-              ) : (
-                <ul className="mt-3 divide-y divide-line">
-                  {meal.items.map((item) => (
-                    <li key={item.id} className="py-3">
-                      <p className="text-lg font-bold leading-snug text-white">{item.portionText ?? `${formatNutrient('fat_g', item.grams)} g`}</p>
-                      <p className="mt-0.5 text-sm text-zinc-400">
-                        {item.food.name}
-                        {item.portionText && <span className="text-zinc-500"> · {formatNutrient('fat_g', item.grams)} g</span>}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Tile>
-          )
-        })}
 
         {plan.notes && (
           <Tile>
-            <Eyebrow>Observações</Eyebrow>
+            <Eyebrow>Recado do seu nutricionista</Eyebrow>
             <p className="mt-2 whitespace-pre-line text-base leading-relaxed text-zinc-200">{plan.notes}</p>
           </Tile>
         )}
 
-        <p className="px-1 pb-2 text-xs leading-relaxed text-zinc-500">
-          Atualizado em {shortDate(plan.updatedAt)}.
-          {mealsHaveIncomplete(plan) && ' * Algum alimento desta refeição não tem o dado de calorias.'}
-        </p>
+        {meals.length === 0 && (
+          <p className="rounded-3xl border border-dashed border-line-strong p-6 text-center text-sm text-zinc-400">As refeições ainda não foram montadas.</p>
+        )}
+        {meals.map((meal) => {
+          const kcal = mealTotals(meal)
+          const Icon = mealIcon(meal.name)
+          const isNext = meal.id === nextMealId
+          return (
+            <Tile key={meal.id} aria-labelledby={`refeicao-${meal.id}`} className={cn(isNext && 'border-brand/40')}>
+              <div className="flex items-center gap-3">
+                <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl', isNext ? 'bg-brand-soft text-brand' : 'bg-white/[0.06] text-zinc-300')}>
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 id={`refeicao-${meal.id}`} className="font-display text-2xl font-bold uppercase leading-none">
+                    {meal.name}
+                  </h2>
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                    {meal.time && <span className={cn('font-bold tabular-nums', isNext ? 'text-brand' : 'text-zinc-400')}>{meal.time}</span>}
+                    {isNext && <span className="pop-in rounded-full bg-brand-soft px-2 py-0.5 text-xs font-black uppercase tracking-wide text-brand">Próxima</span>}
+                  </p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-400">
+                  {allMissing(meal.items, 'kcal') ? 'sem dado de calorias' : `${formatNutrient('kcal', kcal.values.kcal)} kcal${kcal.incomplete.includes('kcal') ? ' · parcial' : ''}`}
+                </span>
+              </div>
+              <ul className="mt-3 divide-y divide-line">
+                {meal.items.map((item, index) => (
+                  <li key={item.id} style={{ '--i': index } as React.CSSProperties} className="rise-in py-3">
+                    <p className="text-lg font-bold leading-snug text-white">{item.portionText ?? `${formatNutrient('fat_g', item.grams)} g`}</p>
+                    <p className="mt-0.5 text-sm text-zinc-400">
+                      {item.food.name}
+                      {item.portionText && <span className="text-zinc-500"> · {formatNutrient('fat_g', item.grams)} g</span>}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Tile>
+          )
+        })}
+
+        <NutrientDetails items={allItems} variant="student" />
+
+        <p className="px-1 pb-2 text-xs leading-relaxed text-zinc-500">Atualizado em {shortDate(plan.updatedAt)}.</p>
       </Stagger>
     </div>
   )
 }
-
-const mealsHaveIncomplete = (plan: Plan) => plan.meals.some((meal) => mealTotals(meal).incomplete.includes('kcal'))

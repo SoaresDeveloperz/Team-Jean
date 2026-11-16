@@ -83,6 +83,9 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const [customMeal, setCustomMeal] = useState('')
   const [microsOpen, setMicrosOpen] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [announcement, setAnnouncement] = useState('')
+  const summaryRef = useRef<HTMLElement>(null)
+  const announceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [confirm, setConfirm] = useState<{ kind: 'plan' } | { kind: 'meal'; meal: PlanMeal } | null>(null)
   const firstName = studentName.split(' ')[0]
   // Mudanças entram numa fila (uma por vez, na ordem em que o Jean mexeu) e o plano mais recente fica numa ref.
@@ -91,6 +94,9 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const planRef = useRef<Plan | null | undefined>(undefined)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const failed = useRef(false)
+  // Itens e refeições que o Jean acabou de tirar: ficam escondidos até o banco confirmar (uma resposta antiga não os traz de volta).
+  const hiddenItems = useRef(new Set<string>())
+  const hiddenMeals = useRef(new Set<string>())
 
   const fetchPlan = useCallback(async () => {
     try {
@@ -109,8 +115,17 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const apply = useCallback((result: Awaited<ReturnType<typeof fetchPlan>>) => {
     if (result.error) setLoadError(result.error)
     else {
-      planRef.current = result.plan
-      setPlan(result.plan)
+      const loaded = result.plan
+      const next = loaded
+        ? {
+            ...loaded,
+            meals: loaded.meals
+              .filter((meal) => !hiddenMeals.current.has(meal.id))
+              .map((meal) => ({ ...meal, items: meal.items.filter((item) => !hiddenItems.current.has(item.id)) })),
+          }
+        : loaded
+      planRef.current = next
+      setPlan(next)
       setLoadError(null)
     }
   }, [])
@@ -134,7 +149,25 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
     }
   }, [fetchPlan, apply])
 
-  useEffect(() => () => clearTimeout(savedTimer.current), [])
+  useEffect(
+    () => () => {
+      clearTimeout(savedTimer.current)
+      clearTimeout(announceTimer.current)
+    },
+    [],
+  )
+
+  // Frase curta para o leitor de tela (alguém removido, alimento adicionado...); some sozinha.
+  const announce = (text: string) => {
+    setAnnouncement(text)
+    clearTimeout(announceTimer.current)
+    announceTimer.current = setTimeout(() => setAnnouncement(''), 4000)
+  }
+  const flashSaved = () => {
+    clearTimeout(savedTimer.current)
+    setSaveState('saved')
+    savedTimer.current = setTimeout(() => setSaveState('idle'), 2000)
+  }
 
   // Mostra a mudança na hora (o item some com animação) e o banco confirma em seguida; se falhar, o recarregamento devolve.
   const optimistic = (change: (current: Plan) => Plan) => {
@@ -170,8 +203,8 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
       if (pending.current === 0) {
         setBusy(false)
         // "Salvo ✓" por 2 s; se algo falhou, o aviso de erro já diz o que houve.
-        setSaveState(failed.current ? 'idle' : 'saved')
-        savedTimer.current = setTimeout(() => setSaveState('idle'), 2000)
+        if (failed.current) setSaveState('idle')
+        else flashSaved()
       }
       return ok
     })
@@ -182,6 +215,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const openPicker = async (mealId: string) => {
     setPickerMeal(mealId)
     if (foods) return
+    announce('Carregando alimentos…')
     // shortcut: busca até 1000 alimentos de uma vez (TACO 597 + os do treinador); paginar se passar disso.
     const { data, error } = await supabase.from('foods').select(FOOD_COLUMNS).order('name', { ascending: true }).limit(1000)
     if (error) {
@@ -340,8 +374,6 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
 
   return (
     <div className="space-y-4">
-      {actionError && <Alert variant="error">{actionError}</Alert>}
-
       <div className="flex items-start justify-between gap-3 px-1">
         <p className="min-w-0 text-xs leading-relaxed text-zinc-400">
           Responsável: <span className="font-bold text-white">{plan.responsibleName}</span> ({plan.responsibleCrn})
@@ -351,7 +383,8 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         </button>
       </div>
 
-      <section aria-label="Resumo do plano" className="sticky top-0 z-10 space-y-2.5 rounded-2xl border border-line bg-surface p-3.5 shadow-lg shadow-black/50">
+      <section ref={summaryRef} tabIndex={-1} aria-label="Resumo do plano" className="sticky-summary z-10 space-y-2.5 rounded-2xl border border-line bg-surface p-3.5 shadow-lg shadow-black/50 focus:outline-none">
+        {actionError && <Alert variant="error">{actionError}</Alert>}
         {targetRows.length === 0 ? (
           <p className="text-sm font-bold tabular-nums text-white">
             {formatNutrient('kcal', totals.values.kcal)} kcal
@@ -367,9 +400,10 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
               const ratio = targetRatio(value, target) ?? 0
               return (
                 <li key={key}>
-                  <p className="text-xs font-semibold text-zinc-400">{label}</p>
-                  <p className={cn('text-sm font-bold tabular-nums', ratio > 1.05 ? 'text-gold' : 'text-white')}>
+                  <p aria-hidden="true" className="text-xs font-semibold text-zinc-400">{label}</p>
+                  <p aria-hidden="true" className={cn('text-sm font-bold tabular-nums', ratio > 1.05 ? 'text-gold' : 'text-white')}>
                     {formatNutrient(nutrient, value)} <span className="font-medium text-zinc-500">/ {formatNutrient(nutrient, target)} {unit}</span>
+                    {ratio > 1.05 && <span className="ml-1 text-xs font-semibold text-gold">acima</span>}
                   </p>
                   <div
                     role="progressbar"
@@ -377,6 +411,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
                     aria-valuemin={0}
                     aria-valuemax={target}
                     aria-valuenow={Math.min(value, target)}
+                    aria-valuetext={`${formatNutrient(nutrient, value)} de ${formatNutrient(nutrient, target)} ${unit}${ratio > 1.05 ? ', acima da meta' : ''}`}
                     className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/[0.08]"
                   >
                     <BarFill value={ratio} className={ratio > 1.05 ? 'bg-gold' : 'bg-brand'} />
@@ -395,7 +430,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
           <button type="button" onClick={() => setMicrosOpen(true)} className="flex min-h-11 items-center gap-1.5 rounded-xl px-1 text-xs font-bold text-brand hover:text-white">
             <Leaf className="h-3.5 w-3.5" aria-hidden="true" /> Vitaminas e minerais
           </button>
-          <span role="status" aria-live="polite" className={cn('text-xs font-semibold transition-opacity', saveState === 'idle' ? 'opacity-0' : 'opacity-100', saveState === 'saved' ? 'text-brand' : 'text-zinc-400')}>
+          <span role="status" className={cn('text-xs font-semibold transition-opacity', saveState === 'idle' ? 'opacity-0' : 'opacity-100', saveState === 'saved' ? 'text-brand' : 'text-zinc-400')}>
             {saveState === 'saving' ? 'Salvando…' : saveState === 'saved' ? 'Salvo ✓' : '\u00a0'}
           </span>
         </div>
@@ -410,9 +445,15 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
           onRename={(name, time) => run(() => supabase.from('nutrition_meals').update({ name, meal_time: time }).eq('id', meal.id))}
           onDelete={() => setConfirm({ kind: 'meal', meal })}
           onSaveItem={(item, grams, portion) => run(() => supabase.from('nutrition_meal_items').update({ grams, portion_text: portion }).eq('id', item.id))}
-          onRemoveItem={(item) => {
+          onRemoveItem={async (item) => {
+            hiddenItems.current.add(item.id)
+            announce(`${item.food.name} removido do ${meal.name}`)
             optimistic((current) => ({ ...current, meals: current.meals.map((candidate) => (candidate.id === meal.id ? { ...candidate, items: candidate.items.filter((other) => other.id !== item.id) } : candidate)) }))
-            return run(() => supabase.from('nutrition_meal_items').delete().eq('id', item.id))
+            const ok = await run(() => supabase.from('nutrition_meal_items').delete().eq('id', item.id))
+            hiddenItems.current.delete(item.id)
+            // Se o banco não apagou, o item volta para a lista (junto com o aviso de erro).
+            if (!ok) await reload()
+            return ok
           }}
         />
       ))}
@@ -440,6 +481,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         </form>
       </section>
 
+      <p role="status" className="sr-only">{announcement}</p>
       {planModal}
       <Modal open={microsOpen} onClose={() => setMicrosOpen(false)} title="Vitaminas e minerais" description={`Plano de ${firstName}, o dia todo`}>
         <NutrientDetails items={plan.meals.flatMap((meal) => meal.items)} variant="coach" />
@@ -455,6 +497,8 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
           const { error } = await supabase.from('nutrition_meal_items').insert({ id: itemId, meal_id: meal.id, food_id: food.id, grams, portion_text: portionText, position: Math.min(meal.items.length, 60) })
           // 23505: o item já tinha entrado numa tentativa anterior (a resposta se perdeu). Não duplica.
           if (error && error.code !== '23505') throw error
+          announce(`${food.name} adicionado ao ${meal.name}`)
+          flashSaved()
           await reload()
         }}
       />
@@ -473,8 +517,14 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
           const current = confirm
           setConfirm(null)
           if (current?.kind === 'meal') {
+            hiddenMeals.current.add(current.meal.id)
+            announce(`Refeição ${current.meal.name} apagada`)
+            // O botão que abriu a confirmação some junto com a refeição: o foco vai para o resumo.
+            setTimeout(() => summaryRef.current?.focus(), 80)
             optimistic((plan) => ({ ...plan, meals: plan.meals.filter((meal) => meal.id !== current.meal.id) }))
-            await run(() => supabase.from('nutrition_meals').delete().eq('id', current.meal.id))
+            const ok = await run(() => supabase.from('nutrition_meals').delete().eq('id', current.meal.id))
+            hiddenMeals.current.delete(current.meal.id)
+            if (!ok) await reload()
           }
           else if (current?.kind === 'plan') await run(() => supabase.from('nutrition_plans').delete().eq('id', plan.id))
         }}
@@ -513,39 +563,73 @@ function MealCard({
     setSeenTime(meal.time ?? '')
     setTime(meal.time ?? '')
   }
+  const [nameError, setNameError] = useState('')
+  const addRef = useRef<HTMLButtonElement>(null)
   const save = async () => {
     const clean = name.trim().slice(0, 40)
-    if (!clean) return setName(meal.name)
+    if (!clean) {
+      setNameError('A refeição precisa de um nome.')
+      return setName(meal.name)
+    }
+    setNameError('')
     if (clean === meal.name && (time || null) === meal.time) return
     if (!(await onRename(clean, time || null))) {
       setName(meal.name)
       setTime(meal.time ?? '')
     }
   }
+  const enterSaves = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') event.currentTarget.blur()
+  }
 
   return (
     <section aria-label={meal.name} className="rise-in rounded-2xl border border-line">
       <div className="border-b border-line p-3">
-        <div className="flex items-center gap-2">
-          <input type="text" value={name} maxLength={40} onChange={(event) => setName(event.target.value)} onBlur={() => void save()} aria-label={`Nome da refeição ${meal.name}`} className={cn(smallInputClassName, 'min-w-0 flex-1 font-bold')} />
-          <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => void save()} aria-label={`Horário de ${meal.name}`} className={cn(smallInputClassName, 'w-28 shrink-0')} />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={name}
+            maxLength={40}
+            onChange={(event) => setName(event.target.value)}
+            onBlur={() => void save()}
+            onKeyDown={enterSaves}
+            aria-label={`Nome da refeição ${meal.name}`}
+            aria-invalid={nameError ? true : undefined}
+            className={cn(smallInputClassName, 'min-w-[8rem] flex-1 font-bold')}
+          />
+          <input type="time" value={time} onChange={(event) => setTime(event.target.value)} onBlur={() => void save()} onKeyDown={enterSaves} aria-label={`Horário de ${meal.name}`} className={cn(smallInputClassName, 'w-28 shrink-0')} />
           <button type="button" onClick={onDelete} aria-label={`Apagar a refeição ${meal.name}`} className={iconButton}>
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
+        {nameError && (
+          <p role="alert" className="mt-2 px-1 text-xs font-semibold text-danger">
+            {nameError}
+          </p>
+        )}
         {summary && <p className="mt-2 px-1 text-xs tabular-nums text-zinc-400">{summary}</p>}
       </div>
       {meal.items.length > 0 && (
         <ul className="divide-y divide-line">
           <AnimatePresence initial={false}>
             {meal.items.map((item) => (
-              <ItemRow key={item.id} item={item} onSave={(grams, portion) => onSaveItem(item, grams, portion)} onRemove={() => onRemoveItem(item)} />
+              <ItemRow
+                key={item.id}
+                item={item}
+                mealName={meal.name}
+                onSave={(grams, portion) => onSaveItem(item, grams, portion)}
+                onRemove={() => {
+                  // O botão de tirar some com o item: o foco vai para um lugar que continua na tela.
+                  addRef.current?.focus()
+                  return onRemoveItem(item)
+                }}
+              />
             ))}
           </AnimatePresence>
         </ul>
       )}
       <div className="p-3">
-        <button type="button" onClick={onAddFood} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-xs font-bold text-zinc-300 hover:text-white">
+        <button ref={addRef} type="button" onClick={onAddFood} className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-line-strong text-xs font-bold text-zinc-300 hover:text-white">
           <Plus className="h-4 w-4" aria-hidden="true" /> Adicionar alimento
         </button>
       </div>
@@ -553,7 +637,7 @@ function MealCard({
   )
 }
 
-function ItemRow({ item, onSave, onRemove }: { item: MealItem; onSave: (grams: number, portion: string | null) => Promise<boolean>; onRemove: () => unknown }) {
+function ItemRow({ item, mealName, onSave, onRemove }: { item: MealItem; mealName: string; onSave: (grams: number, portion: string | null) => Promise<boolean>; onRemove: () => unknown }) {
   const savedGrams = String(item.grams).replace('.', ',')
   const savedPortion = item.portionText ?? ''
   const [grams, setGrams] = useState(savedGrams)
@@ -568,17 +652,27 @@ function ItemRow({ item, onSave, onRemove }: { item: MealItem; onSave: (grams: n
     setSeenPortion(savedPortion)
     setPortion(savedPortion)
   }
+  const [error, setError] = useState('')
   const kcal = nutrientIn(item.food, 'kcal', parseAmount(grams) ?? item.grams)
+  // Nomes únicos: o mesmo alimento pode estar em duas refeições.
+  const where = `${item.food.name} (${mealName})`
 
   const save = async () => {
     const value = parseAmount(grams)
-    if (value === null || value <= 0 || value > 5000) return setGrams(savedGrams)
+    if (value === null || value <= 0 || value > 5000) {
+      setError('Use um número de 1 a 5000 gramas.')
+      return setGrams(savedGrams)
+    }
+    setError('')
     const nextPortion = portion.trim() || null
     if (value === item.grams && nextPortion === item.portionText) return
     if (!(await onSave(value, nextPortion))) {
       setGrams(savedGrams)
       setPortion(savedPortion)
     }
+  }
+  const enterSaves = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') event.currentTarget.blur()
   }
 
   return (
@@ -594,17 +688,38 @@ function ItemRow({ item, onSave, onRemove }: { item: MealItem; onSave: (grams: n
           <p className="text-sm font-semibold leading-snug text-white">{item.food.name}</p>
           <p className="text-xs tabular-nums text-zinc-500">{kcal === null ? 'sem kcal na tabela' : `${formatNutrient('kcal', kcal)} kcal`}</p>
         </div>
-        <button type="button" onClick={() => void onRemove()} aria-label={`Tirar ${item.food.name}`} className={iconButton}>
+        <button type="button" onClick={() => void onRemove()} aria-label={`Tirar ${where}`} className={iconButton}>
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       <div className="grid grid-cols-[6rem_1fr] gap-2">
-        <div className="relative">
-          <input type="text" inputMode="decimal" value={grams} onChange={(event) => setGrams(event.target.value)} onBlur={() => void save()} aria-label={`Gramas de ${item.food.name}`} className={cn(smallInputClassName, 'pr-7')} />
-          <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-500">g</span>
+        <div>
+          <span aria-hidden="true" className="mb-1 block text-xs font-semibold text-zinc-400">Gramas</span>
+          <div className="relative">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={grams}
+              onChange={(event) => setGrams(event.target.value)}
+              onBlur={() => void save()}
+              onKeyDown={enterSaves}
+              aria-label={`Gramas de ${where}`}
+              aria-invalid={error ? true : undefined}
+              className={cn(smallInputClassName, 'pr-7')}
+            />
+            <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-500">g</span>
+          </div>
         </div>
-        <input type="text" maxLength={60} value={portion} onChange={(event) => setPortion(event.target.value)} onBlur={() => void save()} placeholder="Medida caseira" aria-label={`Medida caseira de ${item.food.name}`} className={smallInputClassName} />
+        <div>
+          <span aria-hidden="true" className="mb-1 block text-xs font-semibold text-zinc-400">Medida caseira</span>
+          <input type="text" maxLength={60} value={portion} onChange={(event) => setPortion(event.target.value)} onBlur={() => void save()} onKeyDown={enterSaves} placeholder="Ex.: 2 unidades" aria-label={`Medida caseira de ${where}`} className={smallInputClassName} />
+        </div>
       </div>
+      {error && (
+        <p role="alert" className="text-xs font-semibold text-danger">
+          {error}
+        </p>
+      )}
     </m.li>
   )
 }

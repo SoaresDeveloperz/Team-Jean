@@ -19,6 +19,8 @@ export function NutrientDetails({ items, variant }: { items: MealItem[]; variant
   const panelId = useId()
   const totals = sumDetails(items.map((item) => ({ food: item.food, grams: item.grams })))
   const isStudent = variant === 'student'
+  // Na tela do aluno os grupos vêm depois dos títulos das refeições (h2); no modal do treinador, abaixo do título do modal.
+  const Heading = isStudent ? 'h2' : 'h3'
 
   const groups = GROUPS.map((group) => ({
     group,
@@ -30,8 +32,10 @@ export function NutrientDetails({ items, variant }: { items: MealItem[]; variant
   const list = (
     <div className="space-y-5">
       {groups.map(({ group, rows }) => (
-        <section key={group} aria-label={DETAIL_GROUP_LABELS[group]}>
-          <h3 className="mb-1.5 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">{DETAIL_GROUP_LABELS[group]}</h3>
+        <section key={group} aria-labelledby={`${panelId}-${group}`}>
+          <Heading id={`${panelId}-${group}`} className="mb-1.5 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
+            {DETAIL_GROUP_LABELS[group]}
+          </Heading>
           <ul className="divide-y divide-line">
             {rows.map((total, index) => {
               const partial = total.known > 0 && total.known < total.total
@@ -67,8 +71,14 @@ export function NutrientDetails({ items, variant }: { items: MealItem[]; variant
   )
 
   if (!isStudent) {
+    const noMicros = items.length > 0 && totals.filter((total) => !total.field.column).every((total) => total.known === 0)
     return (
       <div className="space-y-3">
+        {noMicros && (
+          <p className="rounded-xl border border-gold/30 bg-gold-soft p-3 text-xs leading-relaxed text-zinc-200">
+            Nenhum alimento deste plano tem vitaminas e minerais. Os da tabela têm; os cadastrados à mão não.
+          </p>
+        )}
         <p className="text-xs leading-relaxed text-zinc-400">
           Soma de todas as refeições. Sem metas de referência. &quot;Parcial&quot; mostra em quantos alimentos o dado existe (vem da tabela; alimentos cadastrados à mão não têm).
         </p>
@@ -82,7 +92,7 @@ export function NutrientDetails({ items, variant }: { items: MealItem[]; variant
       <button
         type="button"
         aria-expanded={open}
-        aria-controls={panelId}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-14 w-full items-center gap-3 px-5 py-3 text-left transition hover:bg-white/[0.03]"
       >

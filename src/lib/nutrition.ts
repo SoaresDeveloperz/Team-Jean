@@ -132,5 +132,7 @@ export function sumDetails(items: PlanItem[]): DetailTotal[] {
 // Número curto para vitaminas e minerais: quanto menor o valor, mais casas (0,63 mg; 12,4 mg; 1.234 mg).
 export function formatMicro(value: number): string {
   const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2
-  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: decimals }).format(value)
+  const text = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: decimals }).format(value)
+  // Pouco não é zero: um valor positivo que arredonda para 0 aparece como "< 0,01".
+  return value > 0 && Number(text.replace(',', '.')) === 0 ? '< 0,01' : text
 }

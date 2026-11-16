@@ -229,6 +229,9 @@ const SWAP_TABLES = ['assigned_workout_exercises', 'workout_template_exercises']
 // Alguns alimentos reais da TACO. O leite integral vem sem calorias (a própria TACO marca "*").
 // /__nutricao/off simula o banco sem o SQL; /__nutricao/seed cria o plano da Maria.
 let nutricaoEnabled = true
+// /__nutricao/delete?ms=1500&fail=1: atrasa ou faz falhar a exclusão de itens do plano (testa a remoção instantânea).
+let nutricaoDeleteMs = 0
+let nutricaoDeleteFail = false
 const NUTRICAO_TABLES = ['foods', 'nutrition_plans', 'nutrition_meals', 'nutrition_meal_items']
 const taco = (n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg, micros = {}) => ({ id: `taco-${n}`, source: 'taco', taco_number: n, name, group_name, kcal, protein_g, fat_g, carb_g, fiber_g, sodium_mg, cholesterol_mg, micros, created_by: null, created_at: iso(-30) })
 const foods = [
@@ -237,7 +240,7 @@ const foods = [
   taco(561, 'Feijão, carioca, cozido', 'Leguminosas e derivados', 76, 4.8, 0.5, 13.6, 8.5, 2, 0, { moisture_pct: 80.4, ash_g: 0.7, ca_mg: 27, mg_mg: 42, mn_mg: 0.28, p_mg: 87, fe_mg: 1.3, k_mg: 255, cu_mg: 0.19, zn_mg: 0.7, retinol_ug: 0, b1_mg: 0.04, b2_mg: 0, b6_mg: 0, b3_mg: 0, c_mg: 0 }),
   taco(410, 'Frango, peito, sem pele, grelhado', 'Carnes e derivados', 159, 32, 2.5, 0, 0, 50, 89),
   taco(488, 'Ovo, de galinha, inteiro, cozido/10minutos', 'Ovos e derivados', 146, 13.3, 9.5, 0.6, 0, 146, 397),
-  taco(182, 'Banana, prata, crua', 'Frutas e derivados', 98, 1.3, 0.1, 26, 2, 0, 0),
+  taco(182, 'Banana, prata, crua', 'Frutas e derivados', 98, 1.3, 0.1, 26, 2, 0, 0, { moisture_pct: 71.9, ash_g: 0.8, ca_mg: 8, mg_mg: 26, mn_mg: 0.42, p_mg: 22, fe_mg: 0.4, k_mg: 358, cu_mg: 0.05, zn_mg: 0.1, retinol_ug: 0, re_ug: 32, rae_ug: 16, b1_mg: 0, b2_mg: 0.02, b6_mg: 0.1, b3_mg: 0, c_mg: 21.6 }),
   taco(53, 'Pão, trigo, francês', 'Cereais e derivados', 300, 8, 3.1, 58.6, 2.3, 648, 0),
   taco(7, 'Aveia, flocos, crua', 'Cereais e derivados', 394, 13.9, 8.5, 66.6, 9.1, 5, 0),
   taco(88, 'Batata, doce, cozida', 'Verduras, hortaliças e derivados', 77, 0.6, 0.1, 18.4, 2.2, 3, 0),
@@ -860,6 +863,11 @@ http
       nutricaoEnabled = url.pathname.endsWith('/on')
       return send(res, 200, { nutricaoEnabled })
     }
+    if (url.pathname === '/__nutricao/delete') {
+      nutricaoDeleteMs = Number(url.searchParams.get('ms') ?? 0)
+      nutricaoDeleteFail = url.searchParams.get('fail') === '1'
+      return send(res, 200, { nutricaoDeleteMs, nutricaoDeleteFail })
+    }
     if (url.pathname === '/__nutricao/seed') {
       // Plano da Maria: café da manhã e almoço, com metas.
       nutrition_plans.length = 0
@@ -1152,6 +1160,10 @@ http
         return send(res, 200, wantsObject ? matched[0] ?? null : matched)
       }
       if (req.method === 'DELETE') {
+        if (table === 'nutrition_meal_items') {
+          if (nutricaoDeleteMs > 0) await new Promise((resolve) => setTimeout(resolve, nutricaoDeleteMs))
+          if (nutricaoDeleteFail) return send(res, 500, { message: 'boom' })
+        }
         if (table === 'foods' && matched.some((row) => foodInUse(row.id))) return send(res, 409, { code: '23503', message: 'update or delete on table "foods" violates foreign key constraint' })
         for (const row of matched) {
           rows.splice(rows.indexOf(row), 1)

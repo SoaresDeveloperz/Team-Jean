@@ -96,7 +96,7 @@ async function login(page, who) {
     await jean.waitForSelector('#food-grams', { state: 'detached' })
   }
   await addFood('arroz cozido', /Arroz, tipo 1, cozido/, '150', '4 colheres de servir')
-  await jean.waitForSelector('input[aria-label="Gramas de Arroz, tipo 1, cozido"]')
+  await jean.waitForSelector('input[aria-label="Gramas de Arroz, tipo 1, cozido (Almoço)"]')
   check('arroz 150 g = 192 kcal no total', (await sheet.textContent()).includes('192'), await sheet.textContent())
   await addFood('feijao carioca', /Feijão, carioca, cozido/, '100', '')
   check('com o feijão: 268 kcal', (await sheet.textContent()).includes('268'), await sheet.textContent())
@@ -116,19 +116,23 @@ async function login(page, who) {
   await jean.fill('#new-food-carb', '4,6')
   await jean.fill('#new-food-fat', '3,3')
   await jean.getByRole('button', { name: 'Cadastrar e escolher' }).click()
+  await jean.waitForSelector('#food-grams')
+  await jean.waitForTimeout(200)
+  check('seletor: o foco vai para o campo de gramas ao escolher o alimento', await jean.evaluate(() => document.activeElement?.id === 'food-grams'))
   await jean.getByRole('button', { name: '100 g', exact: true }).click()
   check('atalho "100 g" preenche as gramas e mostra a conta ao vivo (61 kcal)', (await jean.locator('#food-grams').inputValue()) === '100' && (await top().textContent()).includes('100 g = 61 kcal'), await top().textContent())
+  check('atalho escolhido fica marcado (aria-pressed)', (await jean.getByRole('button', { name: '100 g', exact: true }).getAttribute('aria-pressed')) === 'true')
   await jean.fill('#food-grams', '0')
   await jean.getByRole('button', { name: 'Adicionar à refeição' }).click()
   await jean.waitForSelector('text=Informe as gramas, entre 1 e 5000.')
   check('0 g no seletor é recusado com aviso (e o seletor continua aberto)', (await jean.locator('#food-grams').count()) === 1)
   await jean.fill('#food-grams', '200')
   await jean.getByRole('button', { name: 'Adicionar à refeição' }).click()
-  await jean.waitForSelector('input[aria-label="Gramas de Leite integral (rótulo)"]')
+  await jean.waitForSelector('input[aria-label="Gramas de Leite integral (rótulo) (Almoço)"]')
   check('alimento cadastrado à mão entra no plano (200 g = 122 kcal, total 390)', (await sheet.textContent()).includes('390'), await sheet.textContent())
 
   // Edita as gramas direto na linha.
-  const grams = jean.locator('input[aria-label="Gramas de Arroz, tipo 1, cozido"]')
+  const grams = jean.locator('input[aria-label="Gramas de Arroz, tipo 1, cozido (Almoço)"]')
   await grams.fill('200')
   await grams.blur()
   await jean.waitForFunction(() => document.querySelector('section[aria-label="Resumo do plano"]')?.textContent?.includes('454'))
@@ -139,13 +143,14 @@ async function login(page, who) {
   await grams.fill('abc')
   await grams.blur()
   check('gramas inválidas ("abc") voltam ao valor salvo', (await grams.inputValue()) === '200', await grams.inputValue())
+  check('gramas inválidas: aviso visível "Use um número de 1 a 5000 gramas."', (await lunch.textContent()).includes('Use um número de 1 a 5000 gramas.'))
   await grams.fill('0')
   await grams.blur()
   check('0 g volta ao valor salvo', (await grams.inputValue()) === '200', await grams.inputValue())
 
   // Regressão: editar as gramas e tocar logo na medida caseira não pode perder o foco nem o texto digitado.
-  const beansGrams = jean.locator('input[aria-label="Gramas de Feijão, carioca, cozido"]')
-  const beansPortion = jean.locator('input[aria-label="Medida caseira de Feijão, carioca, cozido"]')
+  const beansGrams = jean.locator('input[aria-label="Gramas de Feijão, carioca, cozido (Almoço)"]')
+  const beansPortion = jean.locator('input[aria-label="Medida caseira de Feijão, carioca, cozido (Almoço)"]')
   await beansGrams.fill('120')
   await beansPortion.click()
   await beansPortion.pressSequentially('1 concha', { delay: 40 })
@@ -153,6 +158,15 @@ async function login(page, who) {
   await beansGrams.click()
   await jean.waitForTimeout(900)
   check('as duas edições (gramas e medida) foram salvas', (await beansGrams.inputValue()) === '120' && (await beansPortion.inputValue()) === '1 concha')
+
+  // Enter salva (não precisa sair do campo).
+  await beansGrams.fill('130')
+  await beansGrams.press('Enter')
+  await jean.waitForFunction(() => document.querySelector('section[aria-label="Resumo do plano"]')?.textContent?.includes('477'))
+  await beansGrams.fill('120')
+  await beansGrams.press('Enter')
+  await jean.waitForFunction(() => document.querySelector('section[aria-label="Resumo do plano"]')?.textContent?.includes('469'))
+  check('Enter salva as gramas (130 g = 477 kcal; de volta a 120 g = 469)', (await sheet.textContent()).includes('469'))
 
   // Toque duplo numa sugestão cria uma refeição só.
   await jean.locator('button:has-text("+ Jantar")').dblclick()
@@ -181,10 +195,38 @@ async function login(page, who) {
   // Tirar um alimento: some na hora (com animação) e o total volta.
   await addFood('banana prata', /Banana, prata, crua/, '100', '')
   await jean.waitForFunction(() => document.querySelector('section[aria-label="Resumo do plano"]')?.textContent?.includes('567'))
+  // Com a banana no plano, a vitamina A (RAE) passa a ter dado (16 µg), parcial em 1 de 5 itens.
+  await jean.getByRole('button', { name: 'Vitaminas e minerais' }).click()
+  await jean.waitForSelector(`${dialog} >> text=Soma de todas as refeições`)
+  const microsBanana = await top().textContent()
+  check('vitamina A (RAE) mostra 16 µg quando a banana entra (parcial 1/5)', /Vitamina A[^]*16\s*µg[^]*parcial[^]*1\/5/.test(microsBanana), microsBanana.slice(0, 500))
+  await jean.keyboard.press('Escape')
+  await jean.waitForTimeout(400)
+
+  // Tirar com o banco devagar: some na hora, o foco vai para um lugar que existe e o leitor de tela ouve o aviso.
+  await mock('/__nutricao/delete?ms=1500')
   await jean.getByRole('button', { name: 'Tirar Banana, prata, crua' }).click()
-  await jean.waitForSelector('input[aria-label="Gramas de Banana, prata, crua"]', { state: 'detached', timeout: 1500 })
+  await jean.waitForSelector('input[aria-label="Gramas de Banana, prata, crua (Almoço)"]', { state: 'detached', timeout: 700 })
+  check('tirar o alimento: a linha some na hora, mesmo com o banco demorando 1,5 s', true)
+  check('depois de tirar, o foco vai para "Adicionar alimento" (e não se perde no corpo da página)', await jean.evaluate(() => (document.activeElement?.textContent ?? '').includes('Adicionar alimento')))
+  check('o leitor de tela ouve "removido"', (await jean.locator('p.sr-only[role=status]').first().textContent()).includes('Banana, prata, crua removido do Almoço'))
+  await jean.waitForTimeout(2200)
+  check('e a linha não volta quando o banco confirma', (await jean.locator('input[aria-label="Gramas de Banana, prata, crua (Almoço)"]').count()) === 0)
+  await mock('/__nutricao/delete?ms=0')
+
+  // Se o banco falha ao apagar, o alimento volta para a lista e aparece o aviso.
+  await addFood('banana prata', /Banana, prata, crua/, '100', '')
+  await jean.waitForSelector('input[aria-label="Gramas de Banana, prata, crua (Almoço)"]')
+  await mock('/__nutricao/delete?fail=1')
+  await jean.getByRole('button', { name: 'Tirar Banana, prata, crua' }).click()
+  await jean.waitForSelector('section[aria-label="Resumo do plano"] [role=alert]', { timeout: 4000 })
+  await jean.waitForSelector('input[aria-label="Gramas de Banana, prata, crua (Almoço)"]', { timeout: 4000 })
+  check('exclusão que falha: o alimento volta para a lista e o aviso de erro aparece', (await jean.locator('input[aria-label="Gramas de Banana, prata, crua (Almoço)"]').count()) === 1)
+  await mock('/__nutricao/delete?fail=0')
+  await jean.getByRole('button', { name: 'Tirar Banana, prata, crua' }).click()
+  await jean.waitForSelector('input[aria-label="Gramas de Banana, prata, crua (Almoço)"]', { state: 'detached', timeout: 1500 })
   await jean.waitForFunction(() => document.querySelector('section[aria-label="Resumo do plano"]')?.textContent?.includes('469'))
-  check('tirar o alimento: a linha some e o total volta a 469 kcal', (await sheet.textContent()).includes('469') && (await jean.locator('input[aria-label="Gramas de Banana, prata, crua"]').count()) === 0)
+  check('tirar de verdade: a linha some e o total volta a 469 kcal', (await sheet.textContent()).includes('469'))
 
   // Alvos de toque do treinador: pelo menos 44 px.
   const coachTargets = Math.min(
@@ -253,6 +295,19 @@ async function login(page, who) {
   check('320 px: sem rolagem para o lado', !narrow.overflow)
   await maria.setViewportSize({ width: 390, height: 844 })
 
+  // Movimento reduzido: as entradas (rise/pop) viram troca imediata; com movimento normal, os itens entram animados.
+  await maria.emulateMedia({ reducedMotion: 'reduce' })
+  await maria.reload()
+  await maria.waitForSelector('section[aria-labelledby]')
+  await maria.waitForTimeout(200)
+  const slowEntrances = await maria.evaluate(() => document.getAnimations().filter((animation) => ['rise', 'pop'].includes(animation.animationName) && (animation.effect.getComputedTiming().duration > 1 || animation.effect.getComputedTiming().delay > 0)).length)
+  const looping = await maria.evaluate(() => document.getAnimations().filter((animation) => animation.effect.getComputedTiming().iterations === Infinity && !(animation.animationName ?? '').includes('spin') && !(animation.animationName ?? '').includes('shimmer')).length)
+  check('movimento reduzido: entradas sem duração nem atraso e nada em loop', slowEntrances === 0 && looping === 0, `${slowEntrances} lentas, ${looping} em loop`)
+  await maria.emulateMedia({ reducedMotion: 'no-preference' })
+  await maria.reload()
+  const entered = await maria.waitForFunction(() => document.getAnimations().some((animation) => animation.animationName === 'rise'), null, { timeout: 4000 }).then(() => true, () => false)
+  check('movimento normal: os itens da refeição entram animados (rise)', entered)
+
   // Sem internet (o servidor some): abre pela cópia do aparelho.
   await maria.route('**/rest/v1/nutrition_**', (route) => route.abort())
   await maria.reload()
@@ -289,6 +344,9 @@ async function login(page, who) {
   await maria.waitForSelector('h1:has-text("Fala,")')
   check('sem plano, o link da Hoje some', (await maria.getByRole('link', { name: 'Ver minha alimentação' }).count()) === 0)
 
+  // O único 500 esperado é o da exclusão que o roteiro faz falhar de propósito.
+  const expected500 = problems.findIndex((problem) => /status of 500/.test(problem))
+  if (expected500 >= 0) problems.splice(expected500, 1)
   check('sem erro de página', problems.length === 0, problems.join(' | '))
   await browser.close()
   console.log(results.join('\n'))
@@ -297,5 +355,5 @@ async function login(page, who) {
   if (failed > 0) process.exitCode = 1
 })().catch((error) => {
   console.error(error)
-  process.exitCode = 1
+  process.exit(1)
 })

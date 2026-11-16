@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { friendlyError } from '@/lib/errors'
@@ -47,6 +47,15 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
   const newFoodId = useRef('')
 
   const results = searchFoods(foods, query)
+
+  // A cada passo o foco vai para o primeiro campo (o botão tocado some e o foco cairia no corpo da página).
+  // 60 ms: depois do foco inicial que o próprio modal dá ao abrir.
+  const step = chosen ? 'food-grams' : creating ? 'new-food-name' : 'food-search'
+  useEffect(() => {
+    if (!open) return
+    const timer = setTimeout(() => document.getElementById(step)?.focus(), 60)
+    return () => clearTimeout(timer)
+  }, [open, step])
 
   const choose = (food: Food) => {
     itemId.current = crypto.randomUUID()
@@ -149,6 +158,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
                   key={amount}
                   type="button"
                   onClick={() => setGrams(String(amount))}
+                  aria-pressed={grams.trim() === String(amount)}
                   className={cn('min-h-11 rounded-full border px-4 text-xs font-bold transition', grams.trim() === String(amount) ? 'border-brand/50 bg-brand-soft text-brand' : 'border-line-strong bg-white/[0.04] text-zinc-300 hover:text-white')}
                 >
                   {amount} g
@@ -156,7 +166,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
               ))}
             </div>
             {portionPreview && (
-              <p aria-live="polite" className="mt-2 text-sm font-semibold tabular-nums text-white">
+              <p className="mt-2 text-sm font-semibold tabular-nums text-white">
                 {portionPreview}
               </p>
             )}
@@ -213,6 +223,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
       ) : (
         <div key="busca" className="space-y-3">
           <input
+            id="food-search"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -220,6 +231,7 @@ export function FoodPicker({ open, onClose, foods, onPick, onFoodCreated }: Prop
             aria-label="Buscar alimento"
             className={inputClassName}
           />
+          <p role="status" className="sr-only">{query.trim() === '' ? '' : results.length === 0 ? 'Nenhum alimento encontrado' : `${results.length} ${results.length === 1 ? 'alimento encontrado' : 'alimentos encontrados'}`}</p>
           {query.trim() !== '' && results.length === 0 && <p className="py-3 text-center text-xs text-zinc-500">Nenhum alimento com esse nome.</p>}
           {results.length > 0 && (
             <ul className="overflow-hidden rounded-2xl border border-line">

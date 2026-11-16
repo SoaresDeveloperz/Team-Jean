@@ -30,6 +30,13 @@ const allMissing = (items: MealItem[], nutrient: Nutrient) => items.length > 0 &
 
 const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
 
+// Minutos desde a meia-noite em São Paulo (o horário das refeições é o do Brasil, não o do aparelho).
+function nowInSaoPaulo() {
+  const parts = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date())
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value ?? 0)
+  return part('hour') * 60 + part('minute')
+}
+
 // Ícone da refeição pelo nome (sem acento e sem maiúscula).
 function mealIcon(name: string) {
   const text = name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
@@ -48,8 +55,17 @@ export default function StudentNutritionPage() {
   const [fromCopy, setFromCopy] = useState(false)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  // Hora em que a tela abriu: marca a "próxima" refeição pelo horário que o nutricionista definiu.
-  const [now] = useState(() => new Date())
+  // Marca a "próxima" refeição pelo horário que o nutricionista definiu; atualiza a cada minuto e ao voltar para a aba.
+  const [minutesNow, setMinutesNow] = useState(nowInSaoPaulo)
+  useEffect(() => {
+    const tick = () => setMinutesNow(nowInSaoPaulo())
+    const timer = setInterval(tick, 60_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -121,6 +137,7 @@ export default function StudentNutritionPage() {
       <div className="space-y-4">
         {header}
         <div className="space-y-3" role="status" aria-label="Carregando sua alimentação">
+          <span className="sr-only">Carregando sua alimentação…</span>
           <Skeleton className="h-44 rounded-3xl" />
           <Skeleton className="h-40 rounded-3xl" />
           <Skeleton className="h-40 rounded-3xl" />
@@ -145,7 +162,6 @@ export default function StudentNutritionPage() {
   const totals = planTotals(plan)
   const allItems = plan.meals.flatMap((meal) => meal.items)
   const meals = plan.meals.filter((meal) => meal.items.length > 0)
-  const minutesNow = now.getHours() * 60 + now.getMinutes()
   const nextMealId = meals.find((meal) => meal.time && minutesOf(meal.time) >= minutesNow)?.id
   const macros: { nutrient: Nutrient; key: 'protein_g' | 'carb_g' | 'fat_g'; label: string }[] = [
     { nutrient: 'protein_g', key: 'protein_g', label: 'Proteína' },
@@ -178,7 +194,11 @@ export default function StudentNutritionPage() {
               <span className="font-display text-4xl font-bold leading-none text-zinc-400">sem dado</span>
             ) : (
               <span className="font-display text-6xl font-bold leading-none tabular-nums">
-                <AnimatedNumber value={totals.values.kcal} duration={0.4} format={(value) => formatNutrient('kcal', value)} />
+                {/* A contagem é só visual; o leitor de tela lê o valor final desde o primeiro instante. */}
+                <span aria-hidden="true">
+                  <AnimatedNumber value={totals.values.kcal} duration={0.4} format={(value) => formatNutrient('kcal', value)} />
+                </span>
+                <span className="sr-only">{formatNutrient('kcal', totals.values.kcal)}</span>
               </span>
             )}
             <span className="pb-1 text-base font-semibold text-zinc-400">kcal</span>

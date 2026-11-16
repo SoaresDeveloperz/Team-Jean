@@ -261,7 +261,16 @@ input, select, textarea {
   }
 }
 
-/* Seta que gira ao abrir/fechar (200 ms); com "reduzir movimento" troca na hora. */
+/* Resumo do plano do treinador: preso no topo só em telas altas; com letra grande, zoom ou paisagem rola junto
+   (WCAG 1.4.10) e respeita o entalhe do celular. */
+@media (min-height: 700px) {
+  .sticky-summary {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Seta que gira ao abrir/fechar (200 ms); com "reduzir movimento" o giro é instantâneo (só cor e opacidade têm transição). */
 .chev {
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }

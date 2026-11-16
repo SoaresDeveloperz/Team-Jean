@@ -97,7 +97,7 @@ check('fibra vem da coluna do alimento (3,2 + 10,2), o alimento próprio tem fib
 check('vitamina A (RAE) ausente em todos: known = 0 (a tela do aluno esconde)', campo('rae_ug').known === 0 && campo('rae_ug').value === 0)
 check('vitamina C: o feijão tem 0 de verdade (conta como dado), o arroz não tem o dado', campo('c_mg').known === 1 && campo('c_mg').value === 0)
 check('sem itens: tudo 0 e known 0', nutrition.sumDetails([]).every((entry) => entry.value === 0 && entry.known === 0 && entry.total === 0))
-check('formato de micro: 0,63 | 12,4 | 1.234 (menos casas quanto maior)', nutrition.formatMicro(0.63) === '0,63' && nutrition.formatMicro(12.44) === '12,4' && nutrition.formatMicro(1234.4) === '1.234' && nutrition.formatMicro(163.4) === '163')
+check('formato de micro: 0,63 | 12,4 | 1.234 (menos casas quanto maior)', nutrition.formatMicro(0.63) === '0,63' && nutrition.formatMicro(12.44) === '12,4' && nutrition.formatMicro(1234.4) === '1.234' && nutrition.formatMicro(163.4) === '163' && nutrition.formatMicro(0.004) === '< 0,01' && nutrition.formatMicro(0) === '0')
 
 const nomes = foods.map((item) => ({ name: item.name, n: item.n }))
 check('busca sem acento e sem maiúscula: "pao frances" acha "Pão, trigo, francês"', nutrition.searchFoods(nomes, 'pao frances').some((item) => /Pão, trigo, francês/.test(item.name)), JSON.stringify(nutrition.searchFoods(nomes, 'pao frances')))

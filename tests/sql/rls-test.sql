@@ -7,7 +7,8 @@ insert into public.profiles (id, role, full_name, email) values
 update public.profiles set role = 'admin' where id = '00000000-0000-0000-0000-00000000000a';
 insert into public.workout_sessions (student_id, status, completed_at) values
   ('00000000-0000-0000-0000-000000000001', 'completed', now()),
-  ('00000000-0000-0000-0000-000000000001', 'completed', now() - interval '1 hour'),
+  -- No mesmo instante do anterior: "1 hora atrás" caía na semana passada na primeira hora de segunda (o ranking zera na virada).
+  ('00000000-0000-0000-0000-000000000001', 'completed', now()),
   ('00000000-0000-0000-0000-000000000001', 'completed', now() - interval '9 days'),
   ('00000000-0000-0000-0000-000000000001', 'in_progress', null);
 

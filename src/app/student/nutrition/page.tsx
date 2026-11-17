@@ -163,10 +163,10 @@ export default function StudentNutritionPage() {
   const allItems = plan.meals.flatMap((meal) => meal.items)
   const meals = plan.meals.filter((meal) => meal.items.length > 0)
   const nextMealId = meals.find((meal) => meal.time && minutesOf(meal.time) >= minutesNow)?.id
-  const macros: { nutrient: Nutrient; key: 'protein_g' | 'carb_g' | 'fat_g'; label: string }[] = [
-    { nutrient: 'protein_g', key: 'protein_g', label: 'Proteína' },
-    { nutrient: 'carb_g', key: 'carb_g', label: 'Carboidrato' },
-    { nutrient: 'fat_g', key: 'fat_g', label: 'Gordura' },
+  const macros: { nutrient: Nutrient; key: 'protein_g' | 'carb_g' | 'fat_g'; label: string; dot: string }[] = [
+    { nutrient: 'protein_g', key: 'protein_g', label: 'Proteína', dot: 'bg-brand' },
+    { nutrient: 'carb_g', key: 'carb_g', label: 'Carboidrato', dot: 'bg-gold' },
+    { nutrient: 'fat_g', key: 'fat_g', label: 'Gordura', dot: 'bg-sky-300' },
   ]
   const partial = (['kcal', 'protein_g', 'carb_g', 'fat_g'] as Nutrient[]).some((nutrient) => totals.incomplete.includes(nutrient) && !allMissing(allItems, nutrient))
   const kcalMissing = allMissing(allItems, 'kcal')
@@ -174,9 +174,12 @@ export default function StudentNutritionPage() {
   return (
     <div className="space-y-4">
       {header}
-      <div className="space-y-1 px-1 text-sm leading-relaxed">
-        <p className="text-zinc-300">
-          Plano de <span className="font-bold text-white">{plan.responsibleName}</span>
+      <div className="space-y-2 px-1 text-sm leading-relaxed">
+        <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-zinc-300">
+          <Salad className="h-3.5 w-3.5 text-brand" aria-hidden="true" />
+          <span>
+            Plano de <span className="font-bold text-white">{plan.responsibleName}</span>
+          </span>
         </p>
         <p className="text-zinc-500">Valores aproximados. Siga também as orientações do seu médico.</p>
       </div>
@@ -187,13 +190,15 @@ export default function StudentNutritionPage() {
       )}
 
       <Stagger className="space-y-4">
-        <Tile className="glow-brand">
+        <Tile className="glow-brand relative overflow-hidden">
+          {/* Marca d'água decorativa */}
+          <Salad aria-hidden="true" className="pointer-events-none absolute -right-5 -top-5 h-36 w-36 rotate-12 text-brand/[0.07]" />
           <Eyebrow>O dia todo</Eyebrow>
           <p className="mt-2 flex items-end gap-2">
             {kcalMissing ? (
               <span className="font-display text-4xl font-bold leading-none text-zinc-400">sem dado</span>
             ) : (
-              <span className="font-display text-6xl font-bold leading-none tabular-nums">
+              <span className="font-display text-7xl font-bold leading-none tabular-nums text-white">
                 {/* A contagem é só visual; o leitor de tela lê o valor final desde o primeiro instante. */}
                 <span aria-hidden="true">
                   <AnimatedNumber value={totals.values.kcal} duration={0.4} format={(value) => formatNutrient('kcal', value)} />
@@ -201,16 +206,19 @@ export default function StudentNutritionPage() {
                 <span className="sr-only">{formatNutrient('kcal', totals.values.kcal)}</span>
               </span>
             )}
-            <span className="pb-1 text-base font-semibold text-zinc-400">kcal</span>
+            <span className="pb-1.5 text-base font-semibold text-zinc-400">kcal</span>
           </p>
-          {plan.targets.kcal !== null && <p className="mt-1 text-sm text-zinc-500">Meta do plano: {formatNutrient('kcal', plan.targets.kcal)} kcal</p>}
-          <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
-            {macros.map(({ nutrient, key, label }) => {
+          {plan.targets.kcal !== null && <p className="mt-1.5 text-sm text-zinc-500">Meta do plano: {formatNutrient('kcal', plan.targets.kcal)} kcal</p>}
+          <dl className="mt-5 grid grid-cols-3 gap-2">
+            {macros.map(({ nutrient, key, label, dot }) => {
               const target = plan.targets[key]
               return (
-                <div key={key}>
-                  <dt className="text-xs font-bold text-zinc-400">{label}</dt>
-                  <dd className="mt-0.5 font-display text-3xl font-bold leading-none tabular-nums">
+                <div key={key} className="rounded-2xl border border-line bg-black/30 px-3 py-3">
+                  <dt className="flex items-center gap-1.5 text-xs font-bold text-zinc-400">
+                    <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', dot)} />
+                    {label}
+                  </dt>
+                  <dd className="mt-1.5 font-display text-3xl font-bold leading-none tabular-nums">
                     {allMissing(allItems, nutrient) ? (
                       <span className="text-lg text-zinc-500">sem dado</span>
                     ) : (
@@ -220,13 +228,34 @@ export default function StudentNutritionPage() {
                       </>
                     )}
                   </dd>
-                  {target !== null && <dd className="mt-0.5 text-xs text-zinc-500">meta {formatNutrient(nutrient, target)} g</dd>}
+                  {target !== null && <dd className="mt-1 text-xs text-zinc-500">meta {formatNutrient(nutrient, target)} g</dd>}
                 </div>
               )
             })}
           </dl>
           {partial && <p className="mt-4 text-sm text-zinc-400">Alguns alimentos não têm todos os dados; o total real pode ser um pouco maior.</p>}
         </Tile>
+
+        {/* Horários do dia: toque para ir à refeição */}
+        {meals.some((meal) => meal.time) && (
+          <nav aria-label="Horários das refeições" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+            {meals
+              .filter((meal) => meal.time)
+              .map((meal) => (
+                <a
+                  key={meal.id}
+                  href={`#refeicao-${meal.id}`}
+                  className={cn(
+                    'flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-xs font-bold transition',
+                    meal.id === nextMealId ? 'border-brand/40 bg-brand-soft text-brand' : 'border-line bg-surface text-zinc-300 hover:border-line-strong',
+                  )}
+                >
+                  <span className="tabular-nums">{meal.time}</span>
+                  <span className={meal.id === nextMealId ? 'text-brand/80' : 'text-zinc-500'}>{meal.name}</span>
+                </a>
+              ))}
+          </nav>
+        )}
 
         {plan.notes && (
           <Tile>
@@ -238,43 +267,57 @@ export default function StudentNutritionPage() {
         {meals.length === 0 && (
           <p className="rounded-3xl border border-dashed border-line-strong p-6 text-center text-sm text-zinc-400">As refeições ainda não foram montadas.</p>
         )}
-        {meals.map((meal) => {
-          const kcal = mealTotals(meal)
-          const Icon = mealIcon(meal.name)
-          const isNext = meal.id === nextMealId
-          return (
-            <Tile key={meal.id} aria-labelledby={`refeicao-${meal.id}`} className={cn(isNext && 'border-brand/40')}>
-              <div className="flex items-center gap-3">
-                <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl', isNext ? 'bg-brand-soft text-brand' : 'bg-white/[0.06] text-zinc-300')}>
-                  <Icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 id={`refeicao-${meal.id}`} className="font-display text-2xl font-bold uppercase leading-none">
-                    {meal.name}
-                  </h2>
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    {meal.time && <span className={cn('font-bold tabular-nums', isNext ? 'text-brand' : 'text-zinc-400')}>{meal.time}</span>}
-                    {isNext && <span className="pop-in rounded-full bg-brand-soft px-2 py-0.5 text-xs font-black uppercase tracking-wide text-brand">Próxima</span>}
-                  </p>
+        {meals.length > 0 && (
+          <div className="relative space-y-4 pl-8 before:absolute before:bottom-6 before:left-[11px] before:top-6 before:w-px before:bg-gradient-to-b before:from-brand/50 before:via-line-strong before:to-transparent">
+            {meals.map((meal) => {
+              const kcal = mealTotals(meal)
+              const Icon = mealIcon(meal.name)
+              const isNext = meal.id === nextMealId
+              return (
+                <div key={meal.id} className="relative">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute -left-8 top-7 h-[23px] w-[23px] rounded-full border-2',
+                      isNext ? 'border-brand bg-brand shadow-[0_0_0_5px_rgb(52_211_153/0.18)]' : 'border-line-strong bg-surface-2',
+                    )}
+                  />
+                  <Tile aria-labelledby={`refeicao-${meal.id}`} className={cn(isNext && 'border-brand/40 glow-brand')}>
+                    <div className="flex items-center gap-3">
+                      <span className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl', isNext ? 'bg-brand text-black' : 'bg-white/[0.06] text-zinc-300')}>
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 id={`refeicao-${meal.id}`} className="scroll-mt-24 font-display text-2xl font-bold uppercase leading-none">
+                          {meal.name}
+                        </h2>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                          {meal.time && <span className={cn('font-bold tabular-nums', isNext ? 'text-brand' : 'text-zinc-400')}>{meal.time}</span>}
+                          {isNext && <span className="pop-in rounded-full bg-brand-soft px-2 py-0.5 text-xs font-black uppercase tracking-wide text-brand">Próxima</span>}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-right text-sm font-semibold tabular-nums text-zinc-400">
+                        {allMissing(meal.items, 'kcal') ? 'sem dado de calorias' : `${formatNutrient('kcal', kcal.values.kcal)} kcal${kcal.incomplete.includes('kcal') ? ' · parcial' : ''}`}
+                      </span>
+                    </div>
+                    <ul className="mt-4 space-y-2">
+                      {meal.items.map((item, index) => (
+                        <li key={item.id} style={{ '--i': index } as React.CSSProperties} className="rise-in rounded-2xl border border-line bg-black/25 px-4 py-3">
+                          <p className="text-lg font-bold leading-snug text-white">{item.portionText ?? `${formatNutrient('fat_g', item.grams)} g`}</p>
+                          <p className="mt-0.5 text-sm text-zinc-300">
+                            {item.food.name}
+                            {item.portionText && <span className="text-zinc-500"> · {formatNutrient('fat_g', item.grams)} g</span>}
+                          </p>
+                          {item.food.group_name && <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">{item.food.group_name}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  </Tile>
                 </div>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-400">
-                  {allMissing(meal.items, 'kcal') ? 'sem dado de calorias' : `${formatNutrient('kcal', kcal.values.kcal)} kcal${kcal.incomplete.includes('kcal') ? ' · parcial' : ''}`}
-                </span>
-              </div>
-              <ul className="mt-3 divide-y divide-line">
-                {meal.items.map((item, index) => (
-                  <li key={item.id} style={{ '--i': index } as React.CSSProperties} className="rise-in py-3">
-                    <p className="text-lg font-bold leading-snug text-white">{item.portionText ?? `${formatNutrient('fat_g', item.grams)} g`}</p>
-                    <p className="mt-0.5 text-sm text-zinc-400">
-                      {item.food.name}
-                      {item.portionText && <span className="text-zinc-500"> · {formatNutrient('fat_g', item.grams)} g</span>}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Tile>
-          )
-        })}
+              )
+            })}
+          </div>
+        )}
 
         <NutrientDetails items={allItems} variant="student" />
 

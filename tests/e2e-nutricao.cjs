@@ -258,7 +258,7 @@ async function login(page, who) {
   await jean.waitForSelector('main button:has-text("Maria Souza")')
   const mariaRow = jean.locator('main button', { hasText: 'Maria Souza' })
   const carlosRow = jean.locator('main button', { hasText: 'Carlos Lima' })
-  check('lista: Maria aparece com a meta e as refeições do plano', (await mariaRow.textContent()).includes('1.800 kcal') && (await mariaRow.textContent()).includes('refeiç'))
+  check('lista: Maria aparece com a meta e as refeições do plano', (await mariaRow.textContent()).includes('1.800') && (await mariaRow.textContent()).includes('kcal de meta') && (await mariaRow.textContent()).includes('refeiç'))
   check('lista: Carlos aparece sem plano, com "Criar plano"', (await carlosRow.textContent()).includes('Ainda sem plano') && (await carlosRow.textContent()).includes('Criar plano'))
   await jean.click('main [role=radio]:has-text("Sem plano")')
   check('filtro "Sem plano" mostra só o Carlos', (await jean.locator('main button:has-text("Maria Souza")').count()) === 0 && (await carlosRow.count()) === 1)

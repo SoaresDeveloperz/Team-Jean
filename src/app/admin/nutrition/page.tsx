@@ -14,7 +14,8 @@ import { Alert } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
 import { Modal } from '@/components/ui/modal'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Eyebrow } from '@/components/ui/tile'
+import { ProgressRing } from '@/components/ui/progress-ring'
+import { Eyebrow, Tile } from '@/components/ui/tile'
 import { NutritionPlanEditor } from '@/components/coach/NutritionPlanEditor'
 
 type Filter = 'all' | 'with' | 'without'
@@ -99,6 +100,36 @@ export default function AdminNutritionPage() {
         <p className="mt-1.5 text-xs text-zinc-500">Planos alimentares dos alunos. Toque em um aluno para montar ou ajustar o plano.</p>
       </div>
 
+      {students !== null && plans !== null && students.length > 0 && (
+        <Tile className="glow-brand relative flex items-center gap-4 overflow-hidden">
+          <Salad aria-hidden="true" className="pointer-events-none absolute -right-4 -top-4 h-32 w-32 rotate-12 text-brand/[0.07]" />
+          <ProgressRing
+            value={counts.all === 0 ? 0 : counts.with / counts.all}
+            size={76}
+            stroke={7}
+            label={`${counts.with} de ${counts.all} alunos com plano`}
+          >
+            <span className="font-display text-2xl font-bold">{counts.all === 0 ? 0 : Math.round((counts.with / counts.all) * 100)}%</span>
+          </ProgressRing>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-white">Alunos com plano</p>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              {counts.without === 0 ? 'Todos os alunos já têm plano.' : `${plural(counts.without, 'aluno ainda sem plano', 'alunos ainda sem plano')}.`}
+            </p>
+            <dl className="mt-2.5 flex gap-4">
+              <div>
+                <dt className="text-xs font-semibold text-zinc-500">Com plano</dt>
+                <dd className="font-display text-2xl font-bold leading-none text-brand">{counts.with}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-zinc-500">Sem plano</dt>
+                <dd className="font-display text-2xl font-bold leading-none text-white">{counts.without}</dd>
+              </div>
+            </dl>
+          </div>
+        </Tile>
+      )}
+
       {loadError && (
         <Alert variant={loadError.missing ? 'info' : 'error'} onRetry={loadError.missing ? undefined : () => setReloadKey((key) => key + 1)}>
           {loadError.missing ? NUTRITION_SETUP_MESSAGE : loadError.message}
@@ -161,25 +192,44 @@ export default function AdminNutritionPage() {
                 <button
                   type="button"
                   onClick={() => setOpenId(student.id)}
-                  className="flex min-h-[4.5rem] w-full items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 text-left transition hover:border-line-strong"
+                  className={cn(
+                    'group flex min-h-[5rem] w-full items-center gap-3.5 rounded-3xl border p-4 text-left transition hover:border-line-strong active:scale-[0.99]',
+                    plan ? 'border-line bg-surface' : 'border-dashed border-line-strong bg-transparent',
+                  )}
                 >
-                  <Avatar name={name} seed={student.id} src={avatarUrlOf(student)} size="md" />
+                  <span className="relative shrink-0">
+                    <Avatar name={name} seed={student.id} src={avatarUrlOf(student)} size="md" />
+                    {plan && (
+                      <span aria-hidden="true" className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-surface bg-brand text-black">
+                        <Salad className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-white">{name}</span>
                     {plan ? (
-                      <span className="block truncate text-xs text-zinc-400">
-                        {plan.kcalTarget ? `Meta ${new Intl.NumberFormat('pt-BR').format(plan.kcalTarget)} kcal · ` : ''}
+                      <span className="mt-0.5 block truncate text-xs text-zinc-400">
                         {plural(plan.meals, 'refeição', 'refeições')}
                         {plan.updatedAt ? ` · mudou ${relativeDay(new Date(plan.updatedAt))}` : ''}
                       </span>
                     ) : (
-                      <span className="block text-xs text-zinc-500">{plans ? 'Ainda sem plano' : 'Plano indisponível'}</span>
+                      <span className="mt-0.5 block text-xs text-zinc-500">{plans ? 'Ainda sem plano' : 'Plano indisponível'}</span>
                     )}
                   </span>
                   {plan ? (
-                    <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600" aria-hidden="true" />
+                    <span className="flex shrink-0 items-center gap-2">
+                      {plan.kcalTarget ? (
+                        <span className="text-right">
+                          <span className="block font-display text-2xl font-bold leading-none tabular-nums text-white">{new Intl.NumberFormat('pt-BR').format(plan.kcalTarget)}</span>
+                          <span className="block text-xs font-semibold text-zinc-500">kcal de meta</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-zinc-500">sem meta</span>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-zinc-600 transition group-hover:translate-x-0.5" aria-hidden="true" />
+                    </span>
                   ) : plans ? (
-                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-bold text-brand">
+                    <span className="flex shrink-0 items-center gap-1 rounded-full bg-brand px-3 py-2 text-xs font-black text-black">
                       <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Criar plano
                     </span>
                   ) : null}

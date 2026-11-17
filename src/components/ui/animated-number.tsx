@@ -9,13 +9,13 @@ type AnimatedNumberProps = {
   className?: string
   // Conta a partir de zero na primeira renderização.
   fromZero?: boolean
-  // Duração da contagem em segundos (padrão 0,8).
+  // Duração da contagem em segundos (padrão 0,4).
   duration?: number
 }
 
 const defaultFormat = (value: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(value)
 
-export function AnimatedNumber({ value, format = defaultFormat, className, fromZero = true, duration = 0.8 }: AnimatedNumberProps) {
+export function AnimatedNumber({ value, format = defaultFormat, className, fromZero = true, duration = 0.4 }: AnimatedNumberProps) {
   const ref = useRef<HTMLSpanElement>(null)
   const previous = useRef(fromZero ? 0 : value)
   const reduceMotion = useReducedMotion()

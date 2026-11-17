@@ -36,8 +36,7 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => {
 export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onDone: () => void }) {
   const toast = useToast()
   const reduceMotion = useReducedMotion()
-  // Com "reduzir movimento" a informação aparece na hora (sem atrasos escalonados).
-  const wait = (seconds: number) => (reduceMotion ? 0 : seconds)
+  // O resumo aparece inteiro desde o primeiro instante (sem atrasos escalonados); só o confete e um deslize curto animam.
   const mapRef = useRef<SVGSVGElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const [generating, setGenerating] = useState(false)
@@ -150,9 +149,9 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
           </m.div>
         </div>
         <m.p
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 1, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: wait(0.15) }}
+          transition={{ delay: 0 }}
           className="mt-6 text-xs font-black uppercase tracking-[0.24em] text-brand"
         >
           Treino concluído
@@ -160,9 +159,9 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
         <m.h1
           ref={titleRef}
           tabIndex={-1}
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 1, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: wait(0.2) }}
+          transition={{ delay: 0 }}
           className="mt-2 font-display text-[2.6rem] font-bold uppercase leading-[0.9]"
         >
           {data.workoutName}
@@ -170,12 +169,12 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
       </div>
 
       <dl className="grid grid-cols-2 gap-3">
-        {stats.map((stat, index) => (
+        {stats.map((stat) => (
           <m.div
             key={stat.label}
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            initial={{ opacity: 1, y: 16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: wait(0.2 + Math.min(index, 6) * 0.05) }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0 }}
             className="rounded-3xl border border-line bg-surface p-4"
           >
             <dt className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.1em] text-zinc-500">
@@ -192,9 +191,9 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
 
       {data.prs.length > 0 && (
         <m.section
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 1, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: wait(0.35) }}
+          transition={{ delay: 0 }}
           className="rounded-3xl border border-gold/25 bg-gold-soft p-4"
           aria-label="Novos recordes"
         >
@@ -216,9 +215,9 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
       )}
 
       <m.section
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 1, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: wait(0.4) }}
+        transition={{ delay: 0 }}
         className="rounded-3xl border border-line bg-surface p-4"
         aria-label="Músculos trabalhados"
       >
@@ -228,7 +227,7 @@ export function WorkoutSummary({ data, onDone }: { data: WorkoutSummaryData; onD
         </div>
       </m.section>
 
-      <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: wait(0.45) }} className="space-y-2.5 pt-1">
+      <m.div initial={{ opacity: 1 }} animate={{ opacity: 1 }} transition={{ delay: 0 }} className="space-y-2.5 pt-1">
         {posted ? (
           <Link
             href="/student/community"

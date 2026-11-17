@@ -316,7 +316,7 @@ export default function StudentTodayPage() {
               >
                 {data.inProgress ? (
                   <>
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" /> Em andamento
+                    <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Em andamento
                   </>
                 ) : restPlan ? (
                   <>
@@ -386,7 +386,7 @@ export default function StudentTodayPage() {
                   'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-base font-bold transition',
                   softCta
                     ? 'border border-line-strong bg-white/5 text-white hover:bg-white/10'
-                    : 'bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,0.12)] hover:bg-zinc-200',
+                    : 'bg-brand text-black shadow-[0_8px_30px_rgba(52,211,153,0.22)] hover:brightness-110',
                 )}
               >
                 {data.inProgress ? (

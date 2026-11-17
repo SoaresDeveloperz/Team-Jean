@@ -18,6 +18,14 @@ Modelo:
 
 As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os agentes existirem, então nenhum agente foi consultado.
 
+## 2026-11-17 — Revisão do front do app inteiro (pedido do dono), primeira leva
+- **Pedido:** "veja o front de todo o aplicativo, remodele, organize e anime o que for necessário".
+- **Revisor visual:** nota por tela (melhores: treino, Histórico, Evolução, lista de alunos, Avisos; piores: Perfil 2,5, Exercícios 2,5, Hoje/Resumo/painel 3) e 12 mudanças em ordem.
+- **Feito nesta leva (pequenas e seguras):** fim das listas do treinador com espaço para o botão "+" (ele cobria o valor no Financeiro); menu do treinador hifeniza a palavra longa em vez de cortar "Exercício s"; "Team Jean" não quebra ao lado do selo "Treinador"; anel do descanso sem animação a cada segundo (era um loop na tela de treino) e 600 ms nos outros usos; frase "Respire e se prepare" removida do descanso (cobria a série seguinte); resumo do treino visível desde o primeiro instante (sem atrasos escalonados); nome do treino em até duas linhas; nada pulsando sem fim ("Em andamento" e o envio do treino salvo); contagem de números em 400 ms; gráfico em 600 ms; entrada do login em 300 ms; "Começar treino" em verde (a ação do dia).
+- **Não feito de propósito:** trocar todos os 76 botões brancos por verde (o verde hoje significa "concluído/ação do dia"; mudar tudo é decisão de marca para o dono) e renomear "Concluir" (o termo é usado em toda a tela e nos roteiros).
+- **Falta (levas seguintes, maiores):** reorganizar o Perfil (mensalidade no topo, "Ajustes" numa lista), enxugar a tela Hoje, painel e ficha do aluno no computador, detalhe de Exercícios (GIF primeiro, 3D recolhido), construtor de treinos (menu "⋯"), cabeçalho de tela único.
+- **Aviso de segurança do Next.js:** o build avisou que a versão instalada (16.4.3) tem uma vulnerabilidade conhecida e recomenda atualizar (`next upgrade`). Não atualizado nesta leva; decidir com o dono.
+
 ## 2026-11-14 — Aba de nutrição: base de alimentos agora, planos depois da resposta sobre o responsável técnico
 - **Pergunta:** o Jean pediu uma aba de nutrição com tabela de alimentos ligada a uma base (macro, micro e kcal sem digitar), podendo cadastrar à mão o que faltar. O dono vai cobrar o módulo à parte.
 - **Opções (fonte):** A) TACO embutida no banco + cadastro do treinador; B) TACO + API externa de produtos (Open Food Facts); C) TBCA/USP; D) USDA ou IBGE/POF.

@@ -129,7 +129,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-white py-4 text-sm font-black uppercase tracking-[0.2em] text-black shadow-[0_10px_40px_rgba(255,255,255,0.12)] transition-all hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-70"
+          className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-white py-4 text-sm font-black uppercase tracking-[0.2em] text-black shadow-[0_10px_40px_rgba(255,255,255,0.12)] transition-colors hover:bg-zinc-200 active:scale-[0.98] disabled:opacity-70"
         >
           {loading ? <LoaderCircle className="h-5 w-5 animate-spin" aria-label="Entrando" /> : 'Entrar no app'}
         </button>

@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   await requireAdmin()
 
   return (
-    <div className="min-h-dvh bg-black pb-32 text-white lg:pb-16 lg:pl-64">
+    <div className="min-h-dvh bg-black pb-44 text-white lg:pb-16 lg:pl-64">
       <AdminSidebar />
       <AppHeader
         badge="Treinador"

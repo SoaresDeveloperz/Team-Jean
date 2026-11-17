@@ -13,6 +13,8 @@ type ProgressRingProps = {
   className?: string
   children?: ReactNode
   label?: string
+  // false: o anel acompanha o valor sem animar (cronômetro do descanso: nada animando a cada segundo no treino).
+  animated?: boolean
 }
 
 export function ProgressRing({
@@ -24,6 +26,7 @@ export function ProgressRing({
   className,
   children,
   label,
+  animated = true,
 }: ProgressRingProps) {
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
@@ -47,9 +50,9 @@ export function ProgressRing({
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
+          initial={{ strokeDashoffset: animated ? circumference : circumference * (1 - clamped) }}
           animate={{ strokeDashoffset: circumference * (1 - clamped) }}
-          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          transition={animated ? { duration: 0.6, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }}
         />
       </svg>
       {children && <div className="absolute inset-0 grid place-items-center">{children}</div>}

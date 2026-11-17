@@ -21,7 +21,7 @@ export function AppHeader({ badge, actions, homeHref = '/', className }: AppHead
       <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-5 py-3">
         <Link href={homeHref} className="flex items-center gap-2.5" aria-label="Team Jean, ir para o início">
           <Logo className="h-7 w-7" />
-          <span className="font-display text-[22px] font-bold uppercase leading-none tracking-[0.16em]">Team Jean</span>
+          <span className={cn('whitespace-nowrap font-display font-bold uppercase leading-none', badge ? 'text-xl tracking-[0.06em]' : 'text-[22px] tracking-[0.16em]')}>Team Jean</span>
         </Link>
         {(badge || actions) && (
           <div className="flex items-center gap-1.5">

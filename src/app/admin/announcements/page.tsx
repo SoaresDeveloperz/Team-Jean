@@ -387,6 +387,7 @@ export default function AdminAnnouncementsPage() {
             />
           </div>
 
+          {(title.trim() || message.trim()) && (
           <section aria-label="Prévia do aviso" className="space-y-2">
             <Eyebrow>Como o aluno vê</Eyebrow>
             <div className="flex gap-3 rounded-2xl border border-brand/25 bg-brand-soft p-4">
@@ -413,6 +414,7 @@ export default function AdminAnnouncementsPage() {
               </div>
             </div>
           </section>
+          )}
 
           {formError && <Alert variant="error">{formError}</Alert>}
 

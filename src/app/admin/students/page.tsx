@@ -19,6 +19,7 @@ import {
   NotebookPen,
   Pencil,
   Scale,
+  Salad,
   Search,
   Send,
   ShieldAlert,
@@ -45,6 +46,7 @@ import { loadParqAlerts } from '@/lib/health'
 import { CoachNotes } from '@/components/coach/CoachNotes'
 import { MuscleWeek } from '@/components/coach/MuscleWeek'
 import { ProgressReport } from '@/components/coach/ProgressReport'
+import { NutritionPlanEditor } from '@/components/coach/NutritionPlanEditor'
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/tabs'
 import { FeedbackCard } from '@/components/coach/FeedbackCard'
 import { StudentPasswordReset } from '@/components/admin/StudentPasswordReset'
@@ -52,10 +54,11 @@ import { hasFeedback } from '@/lib/feedback'
 import { toFeedbackItem } from '@/lib/coach-feedback'
 import { createStudent } from './actions'
 
-type DetailTab = 'summary' | 'progress' | 'body' | 'measures' | 'health' | 'notes'
+type DetailTab = 'summary' | 'progress' | 'nutrition' | 'body' | 'measures' | 'health' | 'notes'
 const DETAIL_TABS: TabItem<DetailTab>[] = [
   { value: 'summary', label: 'Resumo', icon: LayoutList },
   { value: 'progress', label: 'Evolução', icon: ChartLine },
+  { value: 'nutrition', label: 'Nutrição', icon: Salad },
   { value: 'body', label: 'Corpo 3D', icon: Box },
   { value: 'measures', label: 'Medidas', icon: Scale },
   { value: 'health', label: 'Saúde', icon: HeartPulse },
@@ -689,6 +692,9 @@ export default function AdminStudentsPage() {
                   )}
                   {detailTab === 'progress' && (
                     <ProgressReport studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />
+                  )}
+                  {detailTab === 'nutrition' && (
+                    <NutritionPlanEditor studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />
                   )}
                   {detailTab === 'body' && <MuscleWeek studentId={detail.id} studentName={detail.full_name || detail.email || 'Aluno'} />}
                   {detailTab === 'measures' && (

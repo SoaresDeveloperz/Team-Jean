@@ -54,7 +54,7 @@ export function WorkoutSyncManager() {
             sync.offline ? 'border-gold/30 bg-black/90 text-gold' : 'border-line-strong bg-black/90 text-zinc-200',
           )}
         >
-          {sync.offline ? <CloudOff className="h-4 w-4 shrink-0" aria-hidden="true" /> : <CloudUpload className="h-4 w-4 shrink-0 animate-pulse" aria-hidden="true" />}
+          {sync.offline ? <CloudOff className="h-4 w-4 shrink-0" aria-hidden="true" /> : <CloudUpload className="h-4 w-4 shrink-0" aria-hidden="true" />}
           {sync.offline ? 'Sem internet · treino salvo no aparelho' : 'Enviando o treino salvo no aparelho…'}
         </m.div>
       )}

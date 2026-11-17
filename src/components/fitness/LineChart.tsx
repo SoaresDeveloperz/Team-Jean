@@ -109,7 +109,7 @@ export function LineChart({ points, format, title, noun = ['treino', 'treinos'] 
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           />
         )}
 

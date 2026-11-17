@@ -316,6 +316,49 @@ o dia). A tela Hoje do aluno segue uma regra só:
   e ordem. **Contas:** `src/lib/week-plan.ts` (`tests/contas-semana.mjs`); telas: roteiros
   `rotina` e `rotina-a11y`; banco: `tests/sql/rls-rotina.sql`.
 
+### Nutrição (plano alimentar)
+
+Pedido do Jean: o treinador monta o plano alimentar do aluno com alimentos de uma tabela
+brasileira, e o app calcula calorias e macros sozinho.
+
+- **Treinador:** na ficha do aluno, aba **Nutrição**. Cria o plano (nutricionista responsável
+  com CRN, metas do dia opcionais e observações), cria refeições com um toque (Café da manhã,
+  Almoço...), busca alimentos sem acento, informa as gramas (atalhos de 50 a 200 g, com a conta
+  ao vivo da porção) e, se quiser, a medida caseira ("4 colheres de servir"). Vê os totais
+  contra as metas num resumo que fica preso no topo enquanto monta, o total de cada refeição,
+  "Salvando… / Salvo ✓" e as **vitaminas e minerais** do dia (com nomes técnicos e em quantos
+  alimentos o dado existe). O que não está na
+  tabela ele cadastra à mão (valores por 100 g). Um plano por aluno: **criar o plano é o que
+  liga a "Alimentação" para aquele aluno**; apagar o plano a desliga.
+- **Aluno:** link **Ver minha alimentação** na tela Hoje (só aparece com plano) e a tela
+  `/student/nutrition`: calorias do dia em número grande e macros em três números (com a meta do
+  plano ao lado), selo **Próxima** na refeição pelo horário, as refeições com a medida caseira
+  primeiro e as gramas depois, só calorias por refeição (nunca macros por refeição) e o
+  responsável técnico. Painel recolhido **Vitaminas e minerais do dia** (soma das refeições, sem
+  metas; "parcial" quando algum alimento não tem o dado). Abre **sem internet** pela cópia do
+  aparelho, que sai ao sair da conta.
+- **Banco:** rode, nesta ordem, [`supabase/nutricao.sql`](supabase/nutricao.sql),
+  [`supabase/nutricao-taco.sql`](supabase/nutricao-taco.sql) e
+  [`supabase/nutricao-plano.sql`](supabase/nutricao-plano.sql) (idempotentes). O aluno lê só o
+  plano dele; só o treinador grava. Alimento que está num plano não é apagado, e o alimento
+  próprio em uso não muda de valores. Sem os arquivos, a aba do treinador pede para rodá-los e o
+  aluno só vê "ainda não foi montado".
+- **Pelo celular:** o SQL Editor do Supabase corta colagens grandes (o `nutricao-taco.sql` tem
+  173 KB). Use as 4 partes em [`supabase/nutricao-taco-partes/`](supabase/nutricao-taco-partes/): cada
+  uma roda sozinha, em qualquer ordem, e juntas dão o mesmo que o arquivo completo (um teste confere).
+- **Fonte:** Tabela Brasileira de Composição de Alimentos (TACO), 4ª edição revisada e
+  ampliada, NEPA/UNICAMP, Campinas, 2011 ("É permitida a reprodução parcial ou total desta
+  obra, desde que citada a fonte"). O crédito fica, bem pequeno, no fim do **Perfil** do aluno,
+  e não nas telas de nutrição. A TBCA (USP) não foi usada: o site proíbe a comercialização.
+- **Como a TACO virou dado:** "Tr" (traço) e "NA" (não aplicável: fibra na carne, colesterol
+  no vegetal) entram como **0**; só a célula em branco e o "\*" ("análises sendo
+  reavaliadas") ficam **vazios** (sem dado). Por isso leite de vaca integral e desnatado,
+  iogurte sabor abacaxi e coco verde estão sem calorias na TACO: o treinador cadastra à mão. Os
+  totais avisam "Total parcial" quando algum alimento não tem o dado, em vez de mostrar 0.
+- **Contas:** `src/lib/nutrition.ts` e `src/lib/nutrition-plan.ts` (`tests/contas-nutricao.mjs`);
+  telas: roteiro `nutricao` (com axe); banco: `tests/sql/rls-nutricao.sql` e
+  `tests/sql/rls-nutricao-plano.sql`.
+
 ## Testes e CI
 
 - `pnpm test:build && pnpm test:e2e`: sobe um Supabase falso
@@ -326,6 +369,9 @@ o dia). A tela Hoje do aluno segue uma regra só:
 - `node tests/contas-novidades.mjs`: confere, sem navegador, as contas do
   aquecimento e das anilhas (`src/lib/warmup.ts`) e a mensagem de WhatsApp
   (`src/lib/whatsapp.ts`). Também roda no roteiro `novidades`.
+- `node tests/contas-nutricao.mjs`: confere, sem navegador, os 597 alimentos da TACO em
+  `supabase/nutricao-taco.sql` e as contas de totais e busca (`src/lib/nutrition.ts`).
+  Também roda no roteiro `nutricao`.
 - `node tests/contas-exercicios.mjs`: confere, sem navegador, o endereço dos
   GIFs (com e sem a variável, e com `off`), a biblioteca gerada, a busca e o
   casamento. Também roda no roteiro `exercicios`; a auditoria axe das telas dos

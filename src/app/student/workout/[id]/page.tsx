@@ -914,7 +914,7 @@ export default function WorkoutExecutionPage() {
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </button>
           <div className="min-w-0 flex-1 text-center">
-            <h1 className="truncate font-display text-xl font-bold uppercase leading-tight">{workout?.name}</h1>
+            <h1 className="line-clamp-2 font-display text-xl font-bold uppercase leading-tight">{workout?.name}</h1>
             <p className="flex items-center justify-center gap-2 text-xs font-semibold text-zinc-400">
               <span className="flex items-center gap-1 text-brand">
                 <Timer className="h-3.5 w-3.5" aria-hidden="true" />

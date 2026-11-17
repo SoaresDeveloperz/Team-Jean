@@ -27,6 +27,7 @@ import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { ReadinessCard } from '@/components/fitness/ReadinessCard'
 import { AnamnesePrompt } from '@/components/health/AnamnesePrompt'
 import { FirstTimeTips } from '@/components/student/FirstTimeTips'
+import { NutritionLink } from '@/components/student/NutritionLink'
 
 type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null }
 
@@ -288,9 +289,12 @@ export default function StudentTodayPage() {
           Fala, {data.firstName}!
         </h1>
         <p className="mt-2 text-sm text-zinc-400">{subtitle}</p>
-        <Link href="/student/week" className="-ml-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-bold text-brand hover:text-white">
-          Ver minha semana
-        </Link>
+        <div className="flex flex-wrap gap-x-4">
+          <Link href="/student/week" className="-ml-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-bold text-brand hover:text-white">
+            Ver minha semana
+          </Link>
+          {userId && <NutritionLink userId={userId} />}
+        </div>
       </m.header>
 
       {data.completedDates.length === 0 && !data.inProgress && <FirstTimeTips userId={userId} />}
@@ -312,7 +316,7 @@ export default function StudentTodayPage() {
               >
                 {data.inProgress ? (
                   <>
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" /> Em andamento
+                    <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Em andamento
                   </>
                 ) : restPlan ? (
                   <>
@@ -382,7 +386,7 @@ export default function StudentTodayPage() {
                   'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl text-base font-bold transition',
                   softCta
                     ? 'border border-line-strong bg-white/5 text-white hover:bg-white/10'
-                    : 'bg-white text-black shadow-[0_8px_30px_rgba(255,255,255,0.12)] hover:bg-zinc-200',
+                    : 'bg-brand text-black shadow-[0_8px_30px_rgba(52,211,153,0.22)] hover:brightness-110',
                 )}
               >
                 {data.inProgress ? (

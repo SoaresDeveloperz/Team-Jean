@@ -12,7 +12,9 @@ concurrency:
 jobs:
   app:
     name: Lint, tipos, build e testes de ponta a ponta
-    runs-on: ubuntu-latest
+    # Fixo em 24.04: o Playwright do projeto (1.56) não instala o Chromium no Ubuntu 26.04 (ubuntu-latest).
+    # Volte para ubuntu-latest quando atualizar o Playwright.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4

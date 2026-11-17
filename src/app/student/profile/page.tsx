@@ -416,6 +416,11 @@ export default function StudentProfilePage() {
         />
       </m.div>
 
+      {/* Crédito da tabela de alimentos (TACO): fica aqui, e não nas telas de nutrição. */}
+      <p className="px-2 pb-2 text-center text-xs leading-relaxed text-zinc-600">
+        Valores nutricionais: Tabela Brasileira de Composição de Alimentos (TACO), 4ª edição revisada e ampliada, NEPA/UNICAMP, 2011.
+      </p>
+
       <Modal open={selectedBadge !== null} onClose={closeBadge} title={selectedBadge?.title ?? ''}>
         {selectedBadge && (
           <div className="flex flex-col items-center pb-2 text-center">

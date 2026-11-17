@@ -17,7 +17,7 @@ export function AuthShell({ subtitle, children, footer }: { subtitle: string; ch
       <m.main
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="relative z-10 flex w-full max-w-sm flex-col items-center space-y-8"
       >
         <div className="flex flex-col items-center space-y-4">

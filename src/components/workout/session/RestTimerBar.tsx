@@ -69,12 +69,11 @@ export function RestTimerBar({ rest, nextHint, onAdjust, onTogglePause, onSkip, 
           className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-md rounded-[1.75rem] border border-line-strong bg-surface-2/95 p-3 pr-4 shadow-2xl shadow-black backdrop-blur-xl"
         >
           <div className="flex items-center gap-3">
-            <ProgressRing value={rest.total > 0 ? remaining / rest.total : 0} size={58} stroke={5}>
+            <ProgressRing animated={false} value={rest.total > 0 ? remaining / rest.total : 0} size={58} stroke={5}>
               <span className="font-display text-lg font-bold">{formatDuration(remaining)}</span>
             </ProgressRing>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-brand">{running ? 'Descanso' : 'Pausado'}</p>
-              <p className="text-sm font-semibold text-zinc-300">Respire e se prepare</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <button

@@ -27,7 +27,6 @@ import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { ReadinessCard } from '@/components/fitness/ReadinessCard'
 import { AnamnesePrompt } from '@/components/health/AnamnesePrompt'
 import { FirstTimeTips } from '@/components/student/FirstTimeTips'
-import { NutritionLink } from '@/components/student/NutritionLink'
 
 type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null }
 
@@ -293,7 +292,6 @@ export default function StudentTodayPage() {
           <Link href="/student/week" className="-ml-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-bold text-brand hover:text-white">
             Ver minha semana
           </Link>
-          {userId && <NutritionLink userId={userId} />}
         </div>
       </m.header>
 

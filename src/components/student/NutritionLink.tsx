@@ -1,17 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { forgetNutritionCopy, readNutritionCopy } from '@/lib/nutrition-plan'
 
-// "Ver minha alimentação": só aparece para quem tem plano montado pelo nutricionista.
+// Só quem tem plano montado pelo nutricionista vê o atalho da alimentação.
 // Com a cópia do plano no aparelho já aparece na hora (e também sem internet).
-export function NutritionLink({ userId }: { userId: string }) {
+export function useHasNutritionPlan(userId: string | null): boolean {
   const [supabase] = useState(() => createClient())
-  const [visible, setVisible] = useState(() => readNutritionCopy(userId) !== null)
+  const [visible, setVisible] = useState(() => (userId ? readNutritionCopy(userId) !== null : false))
 
   useEffect(() => {
+    if (!userId) return
     let active = true
     void supabase
       .from('nutrition_plans')
@@ -29,10 +29,5 @@ export function NutritionLink({ userId }: { userId: string }) {
     }
   }, [supabase, userId])
 
-  if (!visible) return null
-  return (
-    <Link href="/student/nutrition" className="-ml-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-bold text-brand hover:text-white">
-      Ver minha alimentação
-    </Link>
-  )
+  return userId ? visible : false
 }

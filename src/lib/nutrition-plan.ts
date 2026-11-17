@@ -16,7 +16,6 @@ export type Plan = {
   id: string
   studentId: string
   responsibleName: string
-  responsibleCrn: string
   // Metas do dia (opcionais).
   targets: { kcal: number | null; protein_g: number | null; carb_g: number | null; fat_g: number | null }
   notes: string | null
@@ -94,7 +93,6 @@ export async function loadPlan(supabase: Supabase, studentId: string): Promise<P
     id: plan.id,
     studentId: plan.student_id,
     responsibleName: plan.responsible_name,
-    responsibleCrn: plan.responsible_crn,
     targets: { kcal: num(plan.kcal_target), protein_g: num(plan.protein_target_g), carb_g: num(plan.carb_target_g), fat_g: num(plan.fat_target_g) },
     notes: plan.notes ?? null,
     updatedAt: plan.updated_at,

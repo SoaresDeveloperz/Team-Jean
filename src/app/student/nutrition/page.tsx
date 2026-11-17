@@ -176,7 +176,7 @@ export default function StudentNutritionPage() {
       {header}
       <div className="space-y-1 px-1 text-sm leading-relaxed">
         <p className="text-zinc-300">
-          Plano de <span className="font-bold text-white">{plan.responsibleName}</span> · {plan.responsibleCrn}
+          Plano de <span className="font-bold text-white">{plan.responsibleName}</span>
         </p>
         <p className="text-zinc-500">Valores aproximados. Siga também as orientações do seu médico.</p>
       </div>

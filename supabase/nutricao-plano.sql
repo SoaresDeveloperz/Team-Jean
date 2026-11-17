@@ -8,7 +8,7 @@
 --
 -- O que ele cria:
 --   - nutrition_plans: UM plano por aluno (a existência do plano é o que liga a
---     "Alimentação" para aquele aluno), com o responsável técnico (nome e CRN do
+--     "Alimentação" para aquele aluno), com o responsável técnico (nome do
 --     nutricionista), metas do dia (kcal e macros, opcionais) e observações.
 --   - nutrition_meals: as refeições do plano (Café da manhã, Almoço...), com horário opcional.
 --   - nutrition_meal_items: os alimentos de cada refeição, em gramas, com a medida
@@ -27,7 +27,7 @@ create table if not exists public.nutrition_plans (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null unique references public.profiles (id) on delete cascade,
   responsible_name text not null,
-  responsible_crn text not null,
+  responsible_crn text, -- não é mais usado pelo app (a coluna fica só pelos planos antigos)
   kcal_target integer,
   protein_target_g integer,
   carb_target_g integer,
@@ -65,10 +65,9 @@ create index if not exists nutrition_meal_items_food_idx on public.nutrition_mea
 -- "not valid": vale para o que for gravado daqui em diante.
 alter table public.nutrition_plans drop constraint if exists nutrition_plans_responsible_check;
 alter table public.nutrition_plans add constraint nutrition_plans_responsible_check
-  check (
-    char_length(responsible_name) <= 80 and char_length(btrim(responsible_name)) >= 3
-    and char_length(responsible_crn) <= 30 and char_length(btrim(responsible_crn)) >= 4
-  ) not valid;
+  check (char_length(responsible_name) <= 80 and char_length(btrim(responsible_name)) >= 3) not valid;
+-- Bancos que já tinham o CRN obrigatório: ele passa a ser opcional.
+alter table public.nutrition_plans alter column responsible_crn drop not null;
 alter table public.nutrition_plans drop constraint if exists nutrition_plans_targets_check;
 alter table public.nutrition_plans add constraint nutrition_plans_targets_check
   check (

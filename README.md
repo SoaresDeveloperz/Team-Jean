@@ -322,7 +322,7 @@ Pedido do Jean: o treinador monta o plano alimentar do aluno com alimentos de um
 brasileira, e o app calcula calorias e macros sozinho.
 
 - **Treinador:** na ficha do aluno, aba **Nutrição**. Cria o plano (nutricionista responsável
-  com CRN, metas do dia opcionais e observações), cria refeições com um toque (Café da manhã,
+  metas do dia opcionais e observações), cria refeições com um toque (Café da manhã,
   Almoço...), busca alimentos sem acento, informa as gramas (atalhos de 50 a 200 g, com a conta
   ao vivo da porção) e, se quiser, a medida caseira ("4 colheres de servir"). Vê os totais
   contra as metas num resumo que fica preso no topo enquanto monta, o total de cada refeição,

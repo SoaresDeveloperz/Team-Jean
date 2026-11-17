@@ -181,3 +181,7 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - **Exercícios (treinador):** no detalhe, GIF e vídeo vêm primeiro; o 3D (WebGL, pesado) fica recolhido e só monta ao abrir (abre sozinho se não houver GIF nem vídeo).
 - **Animação:** molas trocadas por curvas curtas (≤ 320 ms) nos cartões de exercícios, no pódio e nas barras da semana do painel (agora `scaleY`, não `height`).
 - **Não feito, de propósito:** menu "⋯" e barra de salvar do construtor de treinos (a barra já é fixa; o menu pede decisão do dono); botão primário único (não recolorir tudo sem o dono decidir); cabeçalho de página único.
+
+## 2026-11-17 — CRN fora da nutrição
+- O dono pediu para tirar o CRN. O plano guarda só o nome do nutricionista responsável; o campo some do editor do treinador e da tela do aluno.
+- Banco: `supabase/nutricao-plano.sql` agora cria `responsible_crn` opcional e, em bancos que já a tinham obrigatória, faz `alter column ... drop not null`. **O dono precisa rodar esse arquivo de novo no Supabase**; até lá, criar plano novo falha com o aviso amigável (a coluna ainda é obrigatória). Planos antigos mantêm o CRN guardado, mas ele não aparece mais.

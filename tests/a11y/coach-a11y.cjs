@@ -62,6 +62,9 @@ const { runAxe } = require('./run-axe.cjs')
 
   await page.goto(BASE + '/admin/exercises', { waitUntil: 'networkidle' })
   await page.click('button:has-text("Supino Reto com Barra")')
+  // Com vídeo, o 3D vem recolhido: abre pelo botão.
+  await audit('exercício: vídeo primeiro, 3D recolhido')
+  await page.click('[role=dialog] button:has-text("Músculos trabalhados (3D)")')
   await page.waitForSelector('[role=dialog] canvas', { timeout: 30000 })
   await page.waitForTimeout(1500)
   await audit('modelo 3D do exercício')

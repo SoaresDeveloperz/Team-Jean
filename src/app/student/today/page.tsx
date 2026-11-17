@@ -490,30 +490,30 @@ export default function StudentTodayPage() {
               {derived.weekCount >= weeklyGoal ? 'Meta batida!' : derived.weekCount === 0 ? 'Um treino começa a semana' : 'Boa! Vem mais um.'}
             </p>
           </div>
-          <ol className="mt-3 flex justify-between border-t border-line pt-2.5" aria-label="Dias treinados nesta semana">
-            {WEEKDAY_INITIALS.map((initial, index) => {
-              const trained = derived.weekDays[index] > 0
-              const isToday = index === derived.todayIndex
-              return (
-                <li key={index}>
-                  <span
-                    className={cn(
-                      'grid h-5 w-5 place-items-center rounded-full text-xs font-black',
-                      trained
-                        ? 'bg-brand text-black'
-                        : isToday
-                          ? 'text-white ring-1 ring-white/40'
-                          : 'bg-white/[0.06] text-zinc-500',
-                    )}
-                  >
-                    {trained ? <Check className="h-3 w-3" aria-label="treinou" /> : initial}
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
         </Tile>
       </div>
+
+      {/* Dias da semana: faixa inteira, bolinhas de 32 px */}
+      <Tile className="py-3.5">
+        <ol className="flex justify-between gap-1" aria-label="Dias treinados nesta semana">
+          {WEEKDAY_INITIALS.map((initial, index) => {
+            const trained = derived.weekDays[index] > 0
+            const isToday = index === derived.todayIndex
+            return (
+              <li key={index}>
+                <span
+                  className={cn(
+                    'grid h-8 w-8 place-items-center rounded-full text-xs font-black',
+                    trained ? 'bg-brand text-black' : isToday ? 'text-white ring-1 ring-white/40' : 'bg-white/[0.06] text-zinc-500',
+                  )}
+                >
+                  {trained ? <Check className="h-4 w-4" aria-label="treinou" /> : initial}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      </Tile>
 
       {userId && <AnamnesePrompt studentId={userId} />}
 

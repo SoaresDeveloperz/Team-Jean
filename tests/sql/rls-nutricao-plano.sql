@@ -18,24 +18,22 @@ do $$
 declare n int; a timestamptz; b timestamptz; rice uuid; plan uuid; meal uuid;
 begin
   select id into rice from public.foods where name = 'Arroz, tipo 1, cozido';
-  insert into public.nutrition_plans (id, student_id, responsible_name, responsible_crn, kcal_target, protein_target_g)
-    values ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Jean Souza', 'CRN-3 12345', 2000, 120);
+  insert into public.nutrition_plans (id, student_id, responsible_name, kcal_target, protein_target_g)
+    values ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Jean Souza', 2000, 120);
   raise notice 'OK  o treinador cria o plano da Maria';
   plan := 'a0000000-0000-0000-0000-000000000001';
 
   begin
-    insert into public.nutrition_plans (student_id, responsible_name, responsible_crn) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza', 'CRN-3 12345');
-    insert into public.nutrition_plans (student_id, responsible_name, responsible_crn) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza', 'CRN-3 12345');
+    insert into public.nutrition_plans (student_id, responsible_name) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza');
+    insert into public.nutrition_plans (student_id, responsible_name) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza');
     raise notice 'FALHOU: criou dois planos para o mesmo aluno';
   exception when unique_violation then
     raise notice 'OK  só um plano por aluno';
   end;
   delete from public.nutrition_plans where student_id = '00000000-0000-0000-0000-000000000002';
-  begin insert into public.nutrition_plans (student_id, responsible_name) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza'); raise notice 'FALHOU: criou plano sem CRN';
-  exception when not_null_violation then raise notice 'OK  plano sem CRN do responsável é recusado'; end;
-  begin insert into public.nutrition_plans (student_id, responsible_name, responsible_crn) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza', '12'); raise notice 'FALHOU: aceitou CRN de 2 letras';
-  exception when check_violation then raise notice 'OK  CRN curto demais é recusado'; end;
-  begin insert into public.nutrition_plans (student_id, responsible_name, responsible_crn, kcal_target) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza', 'CRN-3 12345', 300); raise notice 'FALHOU: aceitou meta de 300 kcal';
+  begin insert into public.nutrition_plans (student_id, responsible_name) values ('00000000-0000-0000-0000-000000000002', 'Je'); raise notice 'FALHOU: aceitou nome de 2 letras';
+  exception when check_violation then raise notice 'OK  nome do responsável curto demais é recusado'; end;
+  begin insert into public.nutrition_plans (student_id, responsible_name, kcal_target) values ('00000000-0000-0000-0000-000000000002', 'Jean Souza', 300); raise notice 'FALHOU: aceitou meta de 300 kcal';
   exception when check_violation then raise notice 'OK  meta abaixo de 800 kcal é recusada'; end;
 
   insert into public.nutrition_meals (id, plan_id, name, meal_time, position) values ('b0000000-0000-0000-0000-000000000001', plan, 'Almoço', '12:30', 1);
@@ -89,7 +87,7 @@ begin
   if n = 1 then raise notice 'OK  a aluna lê as refeições do plano'; else raise notice 'FALHOU: % refeições', n; end if;
   select count(*) into n from public.nutrition_meal_items;
   if n = 2 then raise notice 'OK  a aluna lê os itens do plano'; else raise notice 'FALHOU: % itens', n; end if;
-  begin insert into public.nutrition_plans (student_id, responsible_name, responsible_crn) values ('00000000-0000-0000-0000-000000000002', 'Eu', 'CRN-1 0000'); raise notice 'FALHOU: a aluna criou plano';
+  begin insert into public.nutrition_plans (student_id, responsible_name) values ('00000000-0000-0000-0000-000000000002', 'Eu'); raise notice 'FALHOU: a aluna criou plano';
   exception when insufficient_privilege then raise notice 'OK  a aluna não cria plano'; end;
   update public.nutrition_plans set kcal_target = 5000;
   get diagnostics n = row_count;

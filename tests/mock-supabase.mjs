@@ -282,7 +282,7 @@ const SCHEMA = {
   payments: ['id', 'student_id', 'reference_month', 'amount', 'paid_on', 'method', 'note', 'created_by', 'created_at'],
   coach_settings: ['id', 'pix_key', 'pix_name', 'pix_city', 'billing_reminders', 'updated_at'],
   foods: ['id', 'source', 'taco_number', 'name', 'group_name', 'kcal', 'protein_g', 'fat_g', 'carb_g', 'fiber_g', 'sodium_mg', 'cholesterol_mg', 'micros', 'created_by', 'created_at'],
-  nutrition_plans: ['id', 'student_id', 'responsible_name', 'responsible_crn', 'kcal_target', 'protein_target_g', 'carb_target_g', 'fat_target_g', 'notes', 'created_by', 'created_at', 'updated_at'],
+  nutrition_plans: ['id', 'student_id', 'responsible_name', 'kcal_target', 'protein_target_g', 'carb_target_g', 'fat_target_g', 'notes', 'created_by', 'created_at', 'updated_at'],
   nutrition_meals: ['id', 'plan_id', 'name', 'meal_time', 'position', 'created_at'],
   nutrition_meal_items: ['id', 'meal_id', 'food_id', 'grams', 'portion_text', 'position', 'created_at'],
 }
@@ -873,7 +873,7 @@ http
       nutrition_plans.length = 0
       nutrition_meals.length = 0
       nutrition_meal_items.length = 0
-      nutrition_plans.push({ id: 'plan-maria', student_id: 'u-student', responsible_name: 'Jean Souza', responsible_crn: 'CRN-3 12345', kcal_target: 1800, protein_target_g: 110, carb_target_g: 200, fat_target_g: 55, notes: 'Beba 2 litros de água por dia.', created_by: 'u-admin', created_at: iso(-3), updated_at: iso(-1) })
+      nutrition_plans.push({ id: 'plan-maria', student_id: 'u-student', responsible_name: 'Jean Souza', kcal_target: 1800, protein_target_g: 110, carb_target_g: 200, fat_target_g: 55, notes: 'Beba 2 litros de água por dia.', created_by: 'u-admin', created_at: iso(-3), updated_at: iso(-1) })
       nutrition_meals.push(
         { id: 'meal-cafe', plan_id: 'plan-maria', name: 'Café da manhã', meal_time: '07:30', position: 0, created_at: iso(-3) },
         { id: 'meal-almoco', plan_id: 'plan-maria', name: 'Almoço', meal_time: '12:30', position: 1, created_at: iso(-3, 1) },
@@ -1099,7 +1099,6 @@ http
         }
         if (table === 'nutrition_plans') {
           if (chars(String(row.responsible_name ?? '').trim()) < 3 || chars(row.responsible_name) > 80) return 'nutrition_plans_responsible_check'
-          if (chars(String(row.responsible_crn ?? '').trim()) < 4 || chars(row.responsible_crn) > 30) return 'nutrition_plans_responsible_check'
           if (!inRange(row.kcal_target, 800, 10000) || !inRange(row.protein_target_g, 0, 1000) || !inRange(row.carb_target_g, 0, 1500) || !inRange(row.fat_target_g, 0, 600) || (row.notes != null && chars(row.notes) > 500)) return 'nutrition_plans_targets_check'
         }
         if (table === 'nutrition_meals') {

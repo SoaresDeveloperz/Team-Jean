@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { m } from 'framer-motion'
-import { Dumbbell, Images, LibraryBig, LoaderCircle, Pencil, Play, Plus, Search, X } from 'lucide-react'
+import { ChevronDown, Dumbbell, Images, LibraryBig, LoaderCircle, Pencil, Play, Plus, Search, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { Exercise } from '@/lib/types'
 import { MUSCLE_GROUPS } from '@/lib/workouts'
@@ -68,6 +68,29 @@ function roleDetails(fills: Partial<Record<MuscleRegion, string>>) {
     details[region] = alpha >= 0.99 ? 'principal' : 'secundário'
   }
   return details
+}
+
+// Modelo 3D dos músculos: só monta o WebGL quando aberto.
+function Muscles3D({ fills, label, startOpen }: { fills: Parameters<typeof roleDetails>[0]; label: string; startOpen: boolean }) {
+  const [open, setOpen] = useState(startOpen)
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex min-h-12 w-full items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 text-sm font-bold text-zinc-200"
+      >
+        Músculos trabalhados (3D)
+        <ChevronDown className="chev h-4 w-4" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="mt-3">
+          <Body3D fills={fills} details={roleDetails(fills)} label={label} heightClassName="h-[26rem]" />
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function AdminExercisesPage() {
@@ -406,7 +429,7 @@ export default function AdminExercisesPage() {
                 initial={{ opacity: 0, y: 14 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-24px' }}
-                transition={{ type: 'spring', stiffness: 300, damping: 28, delay: (index % 2) * 0.05 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1], delay: (index % 2) * 0.04 }}
               >
                 <button
                   type="button"
@@ -449,16 +472,17 @@ export default function AdminExercisesPage() {
       >
         {detail && (
           <div className="space-y-4">
-            <Body3D
-              fills={fillsById.get(detail.id) ?? {}}
-              details={roleDetails(fillsById.get(detail.id) ?? {})}
-              label={`Músculos trabalhados em ${detail.name}`}
-              heightClassName="h-[26rem]"
-            />
             {GIFS_ON && isValidMediaId(detail.media_id) && <ExerciseGif key={detail.media_id} mediaId={detail.media_id} name={detail.name} />}
             {detail.video_url && getExerciseMedia(detail.video_url) && (
               <ExerciseMedia muscleGroup={detail.muscle_group} videoUrl={detail.video_url} name={detail.name} />
             )}
+            <Muscles3D
+              key={detail.id}
+              // Com GIF ou vídeo, eles vêm primeiro e o 3D (pesado) fica recolhido.
+              startOpen={!(GIFS_ON && isValidMediaId(detail.media_id)) && !(detail.video_url && getExerciseMedia(detail.video_url))}
+              fills={fillsById.get(detail.id) ?? {}}
+              label={`Músculos trabalhados em ${detail.name}`}
+            />
             <m.button
               type="button"
               whileTap={{ scale: 0.97 }}

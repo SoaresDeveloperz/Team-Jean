@@ -45,21 +45,20 @@ type DbResult = PromiseLike<{ error: { code?: string; message?: string } | null 
 // Responsável técnico: o treinador digita uma vez e o app lembra neste aparelho (não é dado do aluno).
 function rememberedResponsible() {
   try {
-    const saved = JSON.parse(window.localStorage.getItem(RESPONSIBLE_KEY) ?? 'null') as { name?: string; crn?: string } | null
-    return { name: saved?.name ?? '', crn: saved?.crn ?? '' }
+    const saved = JSON.parse(window.localStorage.getItem(RESPONSIBLE_KEY) ?? 'null') as { name?: string } | null
+    return { name: saved?.name ?? '' }
   } catch {
-    return { name: '', crn: '' }
+    return { name: '' }
   }
 }
 
-type FormState = { name: string; crn: string; kcal: string; protein: string; carb: string; fat: string; notes: string }
+type FormState = { name: string; kcal: string; protein: string; carb: string; fat: string; notes: string }
 const emptyOr = (value: number | null) => (value === null ? '' : String(value))
 
 function formFor(plan: Plan | null): FormState {
   if (!plan) return { ...rememberedResponsible(), kcal: '', protein: '', carb: '', fat: '', notes: '' }
   return {
     name: plan.responsibleName,
-    crn: plan.responsibleCrn,
     kcal: emptyOr(plan.targets.kcal),
     protein: emptyOr(plan.targets.protein_g),
     carb: emptyOr(plan.targets.carb_g),
@@ -235,9 +234,8 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
   const submitForm = async () => {
     const targets = { kcal: parseAmount(form.kcal), protein: parseAmount(form.protein), carb: parseAmount(form.carb), fat: parseAmount(form.fat) }
     const name = form.name.trim()
-    const crn = form.crn.trim()
     const filled = (text: string, value: number | null) => text.trim() === '' || value !== null
-    if (name.length < 3 || crn.length < 4) return setFormError('Informe o nome e o CRN do nutricionista responsável.')
+    if (name.length < 3) return setFormError('Informe o nome do nutricionista responsável.')
     if (!filled(form.kcal, targets.kcal) || !filled(form.protein, targets.protein) || !filled(form.carb, targets.carb) || !filled(form.fat, targets.fat)) {
       return setFormError('Use só números nas metas.')
     }
@@ -246,7 +244,6 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
     if (form.notes.length > 500) return setFormError('As observações passam de 500 letras.')
     const row = {
       responsible_name: name,
-      responsible_crn: crn,
       kcal_target: targets.kcal === null ? null : Math.round(targets.kcal),
       protein_target_g: targets.protein === null ? null : Math.round(targets.protein),
       carb_target_g: targets.carb === null ? null : Math.round(targets.carb),
@@ -254,7 +251,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
       notes: form.notes.trim() || null,
     }
     try {
-      window.localStorage.setItem(RESPONSIBLE_KEY, JSON.stringify({ name, crn }))
+      window.localStorage.setItem(RESPONSIBLE_KEY, JSON.stringify({ name }))
     } catch {
       // Sem armazenamento: só não lembra do responsável da próxima vez.
     }
@@ -301,11 +298,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
           <label htmlFor="plan-resp-name" className={labelClassName}>Nutricionista responsável</label>
           <input id="plan-resp-name" type="text" maxLength={80} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={inputClassName} />
         </div>
-        <div>
-          <label htmlFor="plan-resp-crn" className={labelClassName}>CRN</label>
-          <input id="plan-resp-crn" type="text" maxLength={30} value={form.crn} onChange={(event) => setForm({ ...form, crn: event.target.value })} placeholder="Ex.: CRN-3 12345" className={inputClassName} />
-        </div>
-        <p className="text-xs text-zinc-500">O aluno vê este nome e o CRN no plano.</p>
+        <p className="text-xs text-zinc-500">O aluno vê este nome no plano.</p>
         <div className="grid grid-cols-2 gap-3">
           {(
             [
@@ -376,7 +369,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 px-1">
         <p className="min-w-0 text-xs leading-relaxed text-zinc-400">
-          Responsável: <span className="font-bold text-white">{plan.responsibleName}</span> ({plan.responsibleCrn})
+          Responsável: <span className="font-bold text-white">{plan.responsibleName}</span>
         </p>
         <button type="button" onClick={openForm} disabled={busy} className="flex min-h-11 shrink-0 items-center gap-1.5 px-2 text-xs font-bold text-brand hover:text-white">
           <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Editar

@@ -21,6 +21,8 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Marca que esta versão veio da atualização de segurança do `next upgrade`.
+  experimental: { agentUpgrade: 'security' },
   // Preview do Replit: o domínio é aninhado e não casa com um curinga simples.
   allowedDevOrigins: process.env.REPLIT_DEV_DOMAIN ? [process.env.REPLIT_DEV_DOMAIN] : [],
   async headers() {

@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { m } from 'framer-motion'
 import {
   Bell,
+  ChevronDown,
   ChevronRight,
   Download,
   MessageCircleHeart,
@@ -88,6 +89,7 @@ export default function StudentProfilePage() {
   const [editOpen, setEditOpen] = useState(false)
   const [editKey, setEditKey] = useState(0)
   const [levelsOpen, setLevelsOpen] = useState(false)
+  const [achievementsOpen, setAchievementsOpen] = useState(false)
   const preferences = usePreferences()
   const installState = useInstallState()
   const { items: notices, unseen } = useNotifications()
@@ -213,76 +215,81 @@ export default function StudentProfilePage() {
         />
       )}
 
-      {/* Medidas e fotos de evolução */}
-      {profile && <MeasurementsCard userId={data.userId} goal={profile.goal} profile={profile} />}
-
+      {/* Mensalidade logo abaixo do cartão: é o que o aluno mais procura aqui */}
       <BillingCard userId={data.userId} highlight={highlightBilling} />
 
       <AnamneseCard studentId={data.userId} autoOpen={openAnamnese} />
 
-      {/* Conquistas (sem os treinos carregados, não mostra progresso zerado) */}
+      {/* Medidas e fotos de evolução */}
+      {profile && <MeasurementsCard userId={data.userId} goal={profile.goal} profile={profile} />}
+
+      {/* Conquistas: recolhidas (sem os treinos carregados, não mostra progresso zerado) */}
       {statsLoaded && (
         <m.section variants={tileVariants} aria-labelledby="achievements-title">
-          <div className="mb-2.5 flex items-center justify-between px-1">
-            <h2 id="achievements-title">
+          <h2 id="achievements-title">
+            <button
+              type="button"
+              onClick={() => setAchievementsOpen((value) => !value)}
+              aria-expanded={achievementsOpen}
+              aria-controls="achievements-list"
+              className="flex min-h-11 w-full items-center justify-between px-1 text-left"
+            >
               <Eyebrow icon={Trophy} className="text-gold/80">
                 Conquistas
               </Eyebrow>
-            </h2>
-            <span className="text-xs font-bold text-zinc-500">
-              {unlockedCount} de {achievements.length}
-            </span>
-          </div>
-          <ul className="grid grid-cols-3 gap-2.5">
-            {achievements.map((badge, index) => {
-              const unlocked = badge.value >= badge.goal
-              return (
-                <m.li
-                  key={badge.title}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.15 + index * 0.04 }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBadge(badge)}
-                    className={cn(
-                      'flex h-full w-full flex-col items-center rounded-3xl border px-2 py-3.5 text-center transition',
-                      unlocked ? 'border-gold/25 bg-gold-soft/40' : 'border-line bg-surface',
-                  )}
-                >
-                  <ProgressRing
-                    value={unlocked ? 1 : badge.value / badge.goal}
-                    size={54}
-                    stroke={3.5}
-                    color={unlocked ? 'var(--color-gold)' : 'rgba(255,255,255,0.4)'}
-                  >
-                    <span
+              <span className="flex items-center gap-1.5 text-xs font-bold text-zinc-500">
+                {unlockedCount} de {achievements.length}
+                <ChevronDown className="chev h-4 w-4" aria-hidden="true" />
+              </span>
+            </button>
+          </h2>
+          {achievementsOpen && (
+            <ul id="achievements-list" className="mt-2.5 grid grid-cols-3 gap-2.5">
+              {achievements.map((badge, index) => {
+                const unlocked = badge.value >= badge.goal
+                return (
+                  <li key={badge.title} className="rise-in" style={{ '--i': index } as CSSProperties}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBadge(badge)}
                       className={cn(
-                        'grid h-10 w-10 place-items-center rounded-full',
-                        unlocked ? 'bg-gold text-black' : 'bg-white/[0.05] text-zinc-600',
+                        'flex h-full w-full flex-col items-center rounded-3xl border px-2 py-3.5 text-center transition',
+                        unlocked ? 'border-gold/25 bg-gold-soft/40' : 'border-line bg-surface',
                       )}
                     >
-                      <AchievementIcon icon={badge.icon} className="h-[18px] w-[18px]" />
-                    </span>
-                  </ProgressRing>
-                  <span className={cn('mt-2 text-xs font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
-                    {badge.title}
-                  </span>
-                  <span className="mt-0.5 text-xs tabular-nums text-zinc-500">
-                    {unlocked ? 'Conquistada' : `${Math.min(badge.value, badge.goal)}/${badge.goal}`}
-                  </span>
-                </button>
-              </m.li>
-            )
-          })}
-        </ul>
-      </m.section>
+                      <ProgressRing
+                        value={unlocked ? 1 : badge.value / badge.goal}
+                        size={54}
+                        stroke={3.5}
+                        color={unlocked ? 'var(--color-gold)' : 'rgba(255,255,255,0.4)'}
+                      >
+                        <span
+                          className={cn(
+                            'grid h-10 w-10 place-items-center rounded-full',
+                            unlocked ? 'bg-gold text-black' : 'bg-white/[0.05] text-zinc-600',
+                          )}
+                        >
+                          <AchievementIcon icon={badge.icon} className="h-[18px] w-[18px]" />
+                        </span>
+                      </ProgressRing>
+                      <span className={cn('mt-2 text-xs font-bold leading-tight', unlocked ? 'text-white' : 'text-zinc-400')}>
+                        {badge.title}
+                      </span>
+                      <span className="mt-0.5 text-xs tabular-nums text-zinc-500">
+                        {unlocked ? 'Conquistada' : `${Math.min(badge.value, badge.goal)}/${badge.goal}`}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </m.section>
       )}
 
       {/* Preferências */}
       <Tile className="space-y-5">
-        <Eyebrow>Preferências</Eyebrow>
+        <Eyebrow>Ajustes</Eyebrow>
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

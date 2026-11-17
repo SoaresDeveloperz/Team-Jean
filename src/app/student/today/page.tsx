@@ -25,6 +25,7 @@ import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { ReadinessCard } from '@/components/fitness/ReadinessCard'
+import { WaterTracker } from '@/components/student/WaterTracker'
 import { AnamnesePrompt } from '@/components/health/AnamnesePrompt'
 import { FirstTimeTips } from '@/components/student/FirstTimeTips'
 
@@ -571,6 +572,8 @@ export default function StudentTodayPage() {
           <ChevronDown className="h-4 w-4 transition-transform motion-reduce:transition-none group-open:rotate-180" aria-hidden="true" />
         </summary>
         <div className="space-y-4 pt-1">
+          <WaterTracker />
+
           {/* Recuperação muscular */}
           <Tile>
             <div className="flex gap-4">

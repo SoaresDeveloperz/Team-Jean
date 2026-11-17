@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, ClipboardList, Dumbbell, LayoutDashboard, MessageCircleHeart, Users, Wallet } from 'lucide-react'
+import { Bell, ClipboardList, Dumbbell, LayoutDashboard, MessageCircleHeart, Salad, Users, Wallet } from 'lucide-react'
 import { BottomNav, type NavItem } from './BottomNav'
 
 // Menu completo (barra lateral no computador).
@@ -9,14 +9,15 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: '/admin/students', label: 'Alunos', icon: Users },
   { href: '/admin/workouts', label: 'Treinos', icon: ClipboardList },
   { href: '/admin/exercises', label: 'Exercícios', icon: Dumbbell },
+  { href: '/admin/nutrition', label: 'Nutrição', icon: Salad },
   { href: '/admin/community', label: 'Equipe', icon: MessageCircleHeart },
   { href: '/admin/announcements', label: 'Avisos', icon: Bell },
   { href: '/admin/finance', label: 'Financeiro', icon: Wallet },
 ]
 
 // No celular cabem 5 com o nome inteiro: o Financeiro fica no painel e os Avisos
-// nos atalhos (+) e no painel; no computador o menu lateral tem tudo.
-const MOBILE_ITEMS = ADMIN_NAV_ITEMS.filter((item) => item.href !== '/admin/finance' && item.href !== '/admin/announcements')
+// nos atalhos (+) e no painel, e a Nutrição no ícone de salada do painel; no computador o menu lateral tem tudo.
+const MOBILE_ITEMS = ADMIN_NAV_ITEMS.filter((item) => item.href !== '/admin/finance' && item.href !== '/admin/announcements' && item.href !== '/admin/nutrition')
 
 export function AdminNav() {
   return <BottomNav items={MOBILE_ITEMS} label="Menu do treinador" className="lg:hidden" />

@@ -190,3 +190,8 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - **Alunos:** no celular o cartão do aluno mostra uma linha de texto ("2 na semana · Treinou ontem") em vez de três etiquetas coloridas; as etiquetas continuam nas colunas do computador. O alerta PAR-Q segue como selo vermelho (é o que pede ação).
 - **Avisos:** a prévia "Como o aluno vê" só aparece depois que o treinador começa a escrever (antes mostrava um texto de exemplo ocupando espaço).
 - **Ficha do aluno, Financeiro e Radar:** revistos e mantidos; a ficha já tem sete abas rolando, e o financeiro já mostra o que está em atraso primeiro.
+
+## 2026-11-17 — Tela "Nutrição" do treinador
+- Pedido do dono: uma tela só com todos os alunos, quem tem plano e quem não tem, para administrar os planos. A entrada é o botão de salada no painel (ao lado da foto) e, no computador, o item "Nutrição" do menu lateral. No menu inferior do celular não entra (já são 5 itens).
+- Tela `/admin/nutrition`: busca, filtros "Todos / Com plano / Sem plano" e uma linha por aluno (meta de kcal, número de refeições, última mudança; ou "Criar plano"). Tocar abre o mesmo editor da ficha do aluno (aba Nutrição) numa janela, então criar, ajustar e apagar plano continuam num lugar só. Ao fechar, a lista recarrega.
+- Sem o SQL da nutrição a lista de alunos aparece e um aviso diz quais arquivos rodar. Sem mudança de banco.

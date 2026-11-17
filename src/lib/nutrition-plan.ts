@@ -174,3 +174,39 @@ export function clearSavedNutrition() {
     // Sem armazenamento: nada a limpar.
   }
 }
+
+// Visão do treinador: um resumo por plano (quem tem plano, metas, refeições e última mudança).
+export type PlanSummary = {
+  studentId: string
+  responsibleName: string
+  kcalTarget: number | null
+  meals: number
+  updatedAt: string | null
+}
+
+export async function loadPlanSummaries(supabase: Supabase): Promise<Map<string, PlanSummary>> {
+  const fail = (error: NonNullable<DbError>) => {
+    throw new NutritionLoadError(friendlyError(error, 'Não foi possível carregar os planos'), isNutritionSetupMissing(error), { cause: error })
+  }
+  const { data: plans, error: plansError } = await supabase
+    .from('nutrition_plans')
+    .select('id, student_id, responsible_name, kcal_target, updated_at')
+  if (plansError) fail(plansError)
+  const { data: meals, error: mealsError } = await supabase.from('nutrition_meals').select('plan_id')
+  if (mealsError) fail(mealsError)
+
+  const mealsByPlan = new Map<string, number>()
+  for (const meal of (meals ?? []) as { plan_id: string }[]) mealsByPlan.set(meal.plan_id, (mealsByPlan.get(meal.plan_id) ?? 0) + 1)
+
+  const result = new Map<string, PlanSummary>()
+  for (const plan of (plans ?? []) as { id: string; student_id: string; responsible_name: string; kcal_target: number | null; updated_at: string | null }[]) {
+    result.set(plan.student_id, {
+      studentId: plan.student_id,
+      responsibleName: plan.responsible_name,
+      kcalTarget: plan.kcal_target === null ? null : Number(plan.kcal_target),
+      meals: mealsByPlan.get(plan.id) ?? 0,
+      updatedAt: plan.updated_at,
+    })
+  }
+  return result
+}

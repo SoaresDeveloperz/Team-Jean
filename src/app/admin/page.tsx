@@ -11,6 +11,7 @@ import {
   ClipboardList,
   LoaderCircle,
   Megaphone,
+  Salad,
   TimerOff,
   UserPlus,
 } from 'lucide-react'
@@ -219,13 +220,21 @@ export default function AdminDashboardPage() {
                 : `${derived.trainedThisWeek} de ${data.students.length} alunos já treinaram nesta semana.`}
             </p>
           </div>
+          <div className="mt-1 flex shrink-0 items-center gap-2">
+          <Link
+            href="/admin/nutrition"
+            aria-label="Nutrição dos alunos"
+            className="grid h-11 w-11 place-items-center rounded-2xl border border-brand/30 bg-brand-soft text-brand transition hover:brightness-110 active:scale-95"
+          >
+            <Salad className="h-5 w-5" aria-hidden="true" />
+          </Link>
           {/* Sua foto aparece nos posts e comentários da comunidade. */}
           <m.button
             type="button"
             whileTap={{ scale: 0.92 }}
             onClick={() => setPhotoMenuOpen(true)}
             disabled={uploadingPhoto}
-            className="relative mt-1 shrink-0 rounded-full"
+            className="relative shrink-0 rounded-full"
           >
             <Avatar
               name={data.coach.full_name ?? data.coach.email}
@@ -244,6 +253,7 @@ export default function AdminDashboardPage() {
             )}
             <span className="sr-only">{data.coach.avatar_path ? 'Trocar sua foto de perfil' : 'Adicionar sua foto de perfil'}</span>
           </m.button>
+          </div>
         </m.header>
 
         {/* Indicadores: um bloco só, quatro números */}

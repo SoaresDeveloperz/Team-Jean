@@ -130,7 +130,7 @@ export function LeaderboardCard({
                   aria-hidden="true"
                   initial={{ scaleY: 0 }}
                   animate={{ scaleY: 1 }}
-                  transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.1 + index * 0.08 }}
+                  transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1], delay: 0.05 + index * 0.06 }}
                   className={cn(
                     'mt-2 grid w-full origin-bottom place-items-start justify-center rounded-t-2xl bg-white/[0.06] pt-1.5',
                     slot.height,

@@ -272,10 +272,11 @@ export default function AdminDashboardPage() {
               {derived.lastSevenDays.map((count, index) => (
                 <m.span
                   key={index}
-                  className={cn('flex-1 rounded-sm', index === 6 ? 'bg-brand' : count > 0 ? 'bg-white/30' : 'bg-white/[0.07]')}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${count > 0 ? Math.max(20, (count / maxDay) * 100) : 12}%` }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 24, delay: 0.2 + index * 0.04 }}
+                  className={cn('flex-1 origin-bottom rounded-sm', index === 6 ? 'bg-brand' : count > 0 ? 'bg-white/30' : 'bg-white/[0.07]')}
+                  style={{ height: `${count > 0 ? Math.max(20, (count / maxDay) * 100) : 12}%` }}
+                  initial={{ scaleY: 0 }}
+                  animate={{ scaleY: 1 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1], delay: 0.1 + index * 0.03 }}
                 />
               ))}
             </div>

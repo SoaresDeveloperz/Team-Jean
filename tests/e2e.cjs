@@ -608,6 +608,8 @@ async function openShortcuts(page) {
   await page.click('button:has-text("Supino Reto com Barra")')
   await page.waitForSelector('iframe[title^="Demonstração"]')
   check('YouTube vira embed', true)
+  check('3D vem recolhido quando há vídeo', (await page.locator('[role=dialog] canvas').count()) === 0)
+  await page.click('[role=dialog] button:has-text("Músculos trabalhados (3D)")')
   await page.waitForSelector('[role=dialog] canvas', { timeout: 30000 })
   check('modelo 3D do exercício', (await page.locator('[role=dialog] canvas').count()) === 1)
   const peitoChip = page.locator('[role=dialog] ul[aria-label="Músculos em destaque"] button').first()

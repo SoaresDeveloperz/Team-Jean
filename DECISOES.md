@@ -174,3 +174,10 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - Feito: cartão "Primeira vez por aqui?" na tela Hoje (3 dicas, dispensável por aluno), no lugar do tour com tela por cima (ShowcaseView), que é mais código e mais barreira de acessibilidade.
 - Já existia: anel de progresso da semana na tela Hoje (`ProgressRing`).
 - Não feito: arrastar o cartão do aluno (a ação "WhatsApp" já é botão, gesto escondido briga com a rolagem e pede alternativa por botão) e puxar para atualizar (o PWA já atualiza ao abrir).
+
+## 2026-11-17 — Front geral, segunda leva
+- **Perfil:** mensalidade logo abaixo do cartão do atleta, depois ficha de saúde e medidas; "Conquistas" recolhidas (botão com contagem, 44 px); "Preferências" virou "Ajustes".
+- **Hoje:** dias da semana saíram do cartão pequeno da meta e viraram faixa própria, com bolinhas de 32 px (antes 20 px, apertadas em 320 px).
+- **Exercícios (treinador):** no detalhe, GIF e vídeo vêm primeiro; o 3D (WebGL, pesado) fica recolhido e só monta ao abrir (abre sozinho se não houver GIF nem vídeo).
+- **Animação:** molas trocadas por curvas curtas (≤ 320 ms) nos cartões de exercícios, no pódio e nas barras da semana do painel (agora `scaleY`, não `height`).
+- **Não feito, de propósito:** menu "⋯" e barra de salvar do construtor de treinos (a barra já é fixa; o menu pede decisão do dono); botão primário único (não recolorir tudo sem o dono decidir); cabeçalho de página único.

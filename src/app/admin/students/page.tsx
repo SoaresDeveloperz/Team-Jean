@@ -427,16 +427,20 @@ export default function AdminStudentsPage() {
                         <span className="block truncate text-sm font-bold text-white">{student.full_name || 'Aluno sem nome'}</span>
                         <span className="block truncate text-xs text-zinc-500">{student.email}</span>
                       </span>
-                      <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-bold lg:contents">
+                      {/* Celular: uma linha de texto só; computador: as colunas da tabela (etiquetas). */}
+                      <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-bold lg:contents">
                         <span
                           className={cn(
-                            'self-center justify-self-start rounded-full px-2 py-0.5',
-                            studentStats.week > 0 ? 'bg-brand-soft text-brand' : 'bg-white/[0.06] text-zinc-400',
+                            'self-center justify-self-start lg:rounded-full lg:px-2 lg:py-0.5',
+                            studentStats.week > 0 ? 'text-brand lg:bg-brand-soft' : 'text-zinc-400 lg:bg-white/[0.06]',
                           )}
                         >
                           {studentStats.week} na semana
                         </span>
-                        <span className="self-center justify-self-start rounded-full bg-white/[0.06] px-2 py-0.5 text-zinc-400">
+                        <span aria-hidden="true" className="text-zinc-600 lg:hidden">
+                          ·
+                        </span>
+                        <span className="self-center justify-self-start text-zinc-400 lg:rounded-full lg:bg-white/[0.06] lg:px-2 lg:py-0.5">
                           {studentStats.last ? `Treinou ${relativeDayPhrase(studentStats.last)}` : 'Sem treinos'}
                         </span>
                         {parqAlerts?.get(student.id) ? (

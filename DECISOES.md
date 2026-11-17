@@ -185,3 +185,8 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 ## 2026-11-17 — CRN fora da nutrição
 - O dono pediu para tirar o CRN. O plano guarda só o nome do nutricionista responsável; o campo some do editor do treinador e da tela do aluno.
 - Banco: `supabase/nutricao-plano.sql` agora cria `responsible_crn` opcional e, em bancos que já a tinham obrigatória, faz `alter column ... drop not null`. **O dono precisa rodar esse arquivo de novo no Supabase**; até lá, criar plano novo falha com o aviso amigável (a coluna ainda é obrigatória). Planos antigos mantêm o CRN guardado, mas ele não aparece mais.
+
+## 2026-11-17 — Telas do treinador: revisão
+- **Alunos:** no celular o cartão do aluno mostra uma linha de texto ("2 na semana · Treinou ontem") em vez de três etiquetas coloridas; as etiquetas continuam nas colunas do computador. O alerta PAR-Q segue como selo vermelho (é o que pede ação).
+- **Avisos:** a prévia "Como o aluno vê" só aparece depois que o treinador começa a escrever (antes mostrava um texto de exemplo ocupando espaço).
+- **Ficha do aluno, Financeiro e Radar:** revistos e mantidos; a ficha já tem sete abas rolando, e o financeiro já mostra o que está em atraso primeiro.

@@ -25,9 +25,9 @@ import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Eyebrow, Stagger, Tile } from '@/components/ui/tile'
 import { MuscleMap } from '@/components/fitness/MuscleMap'
 import { ReadinessCard } from '@/components/fitness/ReadinessCard'
+import { WaterTracker } from '@/components/student/WaterTracker'
 import { AnamnesePrompt } from '@/components/health/AnamnesePrompt'
 import { FirstTimeTips } from '@/components/student/FirstTimeTips'
-import { NutritionLink } from '@/components/student/NutritionLink'
 
 type ExerciseRow = PrescribedExercise & { exercises: (Partial<Exercise> & { secondary_muscle?: string | null }) | null }
 
@@ -293,7 +293,6 @@ export default function StudentTodayPage() {
           <Link href="/student/week" className="-ml-1 mt-1 inline-flex min-h-11 items-center px-1 text-sm font-bold text-brand hover:text-white">
             Ver minha semana
           </Link>
-          {userId && <NutritionLink userId={userId} />}
         </div>
       </m.header>
 
@@ -573,6 +572,8 @@ export default function StudentTodayPage() {
           <ChevronDown className="h-4 w-4 transition-transform motion-reduce:transition-none group-open:rotate-180" aria-hidden="true" />
         </summary>
         <div className="space-y-4 pt-1">
+          <WaterTracker />
+
           {/* Recuperação muscular */}
           <Tile>
             <div className="flex gap-4">

@@ -6,15 +6,13 @@ import { m } from 'framer-motion'
 import {
   BatteryLow,
   Camera,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   LoaderCircle,
   Megaphone,
   TimerOff,
-  TrendingUp,
   UserPlus,
-  Users,
-  Zap,
 } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
@@ -26,11 +24,11 @@ import { MISSING_SESSION, friendlyError } from '@/lib/errors'
 import { Alert } from '@/components/ui/alert'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 import { Avatar } from '@/components/ui/avatar'
-import { ProgressRing } from '@/components/ui/progress-ring'
 import { PageSkeleton } from '@/components/ui/skeleton'
 import { Eyebrow, Stagger, Tile, tileVariants } from '@/components/ui/tile'
 import { WeeklyTrainingInsights } from '@/components/workout/WeeklyTrainingInsights'
 import { ProfileImageEditor } from '@/components/profile/ProfileImageEditor'
+import { StudentQuickSearch } from '@/components/coach/StudentQuickSearch'
 import { CoachRadar } from '@/components/coach/CoachRadar'
 import { WhatsAppComeback } from '@/components/coach/WhatsAppComeback'
 import { FinanceSummaryTile } from '@/components/finance/FinanceSummaryTile'
@@ -195,7 +193,6 @@ export default function AdminDashboardPage() {
   if (!data || !derived) return <PageSkeleton label="Carregando painel" />
 
   const now = new Date()
-  const maxDay = Math.max(1, ...derived.lastSevenDays)
   const coachName = data.coach.full_name?.trim().split(' ')[0] || 'treinador'
   const readinessColor =
     derived.averageReadiness === null
@@ -249,58 +246,47 @@ export default function AdminDashboardPage() {
           </m.button>
         </m.header>
 
-        {/* Indicadores */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Tile className="flex flex-col justify-between p-4">
-            <Eyebrow icon={TrendingUp}>Adesão</Eyebrow>
-            <div className="mt-3 flex items-center gap-3">
-              <ProgressRing value={derived.adherence} size={64} stroke={6} label={`${Math.round(derived.adherence * 100)}% dos alunos treinaram`}>
-                <span className="font-display text-xl font-bold">{Math.round(derived.adherence * 100)}%</span>
-              </ProgressRing>
-              <p className="text-xs leading-snug text-zinc-400">
-                <span className="font-bold text-white">{derived.trainedThisWeek}</span> de {data.students.length} treinaram
-              </p>
+        {/* Indicadores: um bloco só, quatro números */}
+        <Tile className="p-4">
+          <dl className="grid grid-cols-4 gap-2 text-center">
+            <div>
+              <dt className="text-xs font-bold text-zinc-400">Adesão</dt>
+              <dd className="mt-1 font-display text-3xl font-bold leading-none">
+                <AnimatedNumber value={Math.round(derived.adherence * 100)} />
+                <span className="text-base">%</span>
+              </dd>
+              <dd className="mt-1 text-xs text-zinc-500">
+                {derived.trainedThisWeek} de {data.students.length}
+              </dd>
             </div>
-          </Tile>
-
-          <Tile className="flex flex-col justify-between p-4">
-            <Eyebrow icon={ClipboardList}>Treinos</Eyebrow>
-            <p className="mt-2 font-display text-5xl font-bold leading-none">
-              <AnimatedNumber value={derived.weekSessions} />
-            </p>
-            <div className="mt-2 flex h-8 items-end gap-1" aria-label="Treinos concluídos nos últimos 7 dias" role="img">
-              {derived.lastSevenDays.map((count, index) => (
-                <m.span
-                  key={index}
-                  className={cn('flex-1 origin-bottom rounded-sm', index === 6 ? 'bg-brand' : count > 0 ? 'bg-white/30' : 'bg-white/[0.07]')}
-                  style={{ height: `${count > 0 ? Math.max(20, (count / maxDay) * 100) : 12}%` }}
-                  initial={{ scaleY: 0 }}
-                  animate={{ scaleY: 1 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1], delay: 0.1 + index * 0.03 }}
-                />
-              ))}
+            <div>
+              <dt className="text-xs font-bold text-zinc-400">Treinos</dt>
+              <dd className="mt-1 font-display text-3xl font-bold leading-none">
+                <AnimatedNumber value={derived.weekSessions} />
+              </dd>
+              <dd className="mt-1 text-xs text-zinc-500">na semana</dd>
             </div>
-          </Tile>
+            <div>
+              <dt className="text-xs font-bold text-zinc-400">Alunos</dt>
+              <dd className="mt-1 font-display text-3xl font-bold leading-none">
+                <AnimatedNumber value={data.students.length} />
+              </dd>
+              <dd className="mt-1 text-xs text-zinc-500">ativos</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold text-zinc-400">Prontidão</dt>
+              <dd className={cn('mt-1 font-display text-3xl font-bold leading-none', readinessColor)}>
+                {derived.averageReadiness === null ? '—' : <AnimatedNumber value={derived.averageReadiness} />}
+                {derived.averageReadiness !== null && <span className="text-base">%</span>}
+              </dd>
+              <dd className="mt-1 text-xs text-zinc-500">média</dd>
+            </div>
+          </dl>
+        </Tile>
 
-          <Tile className="flex flex-col justify-between p-4">
-            <Eyebrow icon={Users}>Alunos</Eyebrow>
-            <p className="mt-2 font-display text-5xl font-bold leading-none">
-              <AnimatedNumber value={data.students.length} />
-            </p>
-            <Link href="/admin/students?novo=1" className="mt-2 flex items-center gap-1 text-xs font-bold text-brand">
-              <UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> Cadastrar aluno
-            </Link>
-          </Tile>
-
-          <Tile className="flex flex-col justify-between p-4">
-            <Eyebrow icon={Zap}>Prontidão média</Eyebrow>
-            <p className={cn('mt-2 font-display text-5xl font-bold leading-none', readinessColor)}>
-              {derived.averageReadiness === null ? '—' : <AnimatedNumber value={derived.averageReadiness} />}
-              {derived.averageReadiness !== null && <span className="text-xl">%</span>}
-            </p>
-            <p className="mt-2 text-xs text-zinc-500">Informada pelos alunos</p>
-          </Tile>
-        </div>
+        <m.div variants={tileVariants}>
+          <StudentQuickSearch students={data.students} />
+        </m.div>
 
         {/* Ações rápidas */}
         <m.div variants={tileVariants} className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
@@ -398,7 +384,13 @@ export default function AdminDashboardPage() {
               <CoachRadar students={data.students} />
             </div>
 
-            {/* Atividade recente */}
+            {/* Atividade recente: recolhida, o radar já traz o que pede ação */}
+            <details className="group">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 text-sm font-bold text-zinc-200 [&::-webkit-details-marker]:hidden">
+                Atividade recente
+                <ChevronDown className="h-4 w-4 transition-transform motion-reduce:transition-none group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="pt-3">
             <Tile className="p-0">
               <div className="flex items-center justify-between px-5 pb-1 pt-5">
                 <Eyebrow>Atividade recente</Eyebrow>
@@ -437,6 +429,8 @@ export default function AdminDashboardPage() {
                 </ul>
               )}
             </Tile>
+              </div>
+            </details>
           </div>
 
         </div>

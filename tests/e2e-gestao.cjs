@@ -546,7 +546,7 @@ const todayIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao
   check('computador: menu lateral visível', await page.isVisible('aside nav[aria-label="Menu do treinador"]'))
   check('computador: menu inferior escondido', !(await page.locator('nav[aria-label="Menu do treinador"]').last().isVisible()) || (await page.locator('nav[aria-label="Menu do treinador"]:visible').count()) === 1)
   await page.waitForTimeout(1500)
-  const kpis = await page.locator('main section.tile-spotlight').evaluateAll((tiles) => tiles.slice(0, 4).map((tile) => tile.getBoundingClientRect().top))
+  const kpis = await page.locator('main dl').first().locator('dt').evaluateAll((labels) => labels.map((label) => label.getBoundingClientRect().top))
   check('computador: indicadores em uma linha só', kpis.length === 4 && Math.max(...kpis) - Math.min(...kpis) < 2)
   check('computador: sem o botão flutuante (o menu lateral já tem tudo)', !(await page.isVisible('button[aria-label="Atalhos do treinador"]')))
   await shot(page, 'g09-painel-desktop')

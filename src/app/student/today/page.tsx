@@ -364,19 +364,6 @@ export default function StudentTodayPage() {
             ))}
           </dl>
 
-          {derived.muscles.length > 0 && (
-            <ul className="mx-5 mt-3 flex flex-wrap gap-1.5" aria-label="Grupos musculares">
-              {derived.muscles.slice(0, 5).map((muscle) => (
-                <li
-                  key={muscle}
-                  className="rounded-full bg-white/[0.06] px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-zinc-300"
-                >
-                  {muscle}
-                </li>
-              ))}
-            </ul>
-          )}
-
           <div className="p-5 pt-4">
             <m.div whileTap={{ scale: 0.97 }}>
               <Link
@@ -471,9 +458,6 @@ export default function StudentTodayPage() {
               {derived.streak === 1 ? 'semana seguida' : 'semanas seguidas'}
             </p>
           </div>
-          <p className="mt-3 border-t border-line pt-2.5 text-xs text-zinc-500">
-            <span className="font-bold text-zinc-300">{derived.monthCount}</span> treinos neste mês
-          </p>
         </Tile>
 
         <Tile className="flex flex-col justify-between">
@@ -485,9 +469,7 @@ export default function StudentTodayPage() {
                 <span className="text-sm text-zinc-500">/{weeklyGoal}</span>
               </span>
             </ProgressRing>
-            <p className="text-xs leading-snug text-zinc-400">
-              {derived.weekCount >= weeklyGoal ? 'Meta batida!' : derived.weekCount === 0 ? 'Um treino começa a semana' : 'Boa! Vem mais um.'}
-            </p>
+            {derived.weekCount >= weeklyGoal && <p className="text-xs font-bold text-brand">Meta batida!</p>}
           </div>
         </Tile>
       </div>
@@ -515,8 +497,6 @@ export default function StudentTodayPage() {
       </Tile>
 
       {userId && <AnamnesePrompt studentId={userId} />}
-
-      <ReadinessCard value={readiness} onChange={handleReadinessChange} status={readinessStatus} />
 
       {/* Rotina em carrossel */}
       {data.workouts.length > 1 && (
@@ -572,6 +552,8 @@ export default function StudentTodayPage() {
           <ChevronDown className="h-4 w-4 transition-transform motion-reduce:transition-none group-open:rotate-180" aria-hidden="true" />
         </summary>
         <div className="space-y-4 pt-1">
+          <ReadinessCard value={readiness} onChange={handleReadinessChange} status={readinessStatus} />
+
           <WaterTracker />
 
           {/* Recuperação muscular */}

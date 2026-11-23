@@ -101,8 +101,7 @@ export default function AdminNutritionPage() {
       </div>
 
       {students !== null && plans !== null && students.length > 0 && (
-        <Tile className="glow-brand relative flex items-center gap-4 overflow-hidden">
-          <Salad aria-hidden="true" className="pointer-events-none absolute -right-4 -top-4 h-32 w-32 rotate-12 text-brand/[0.07]" />
+        <Tile className="flex items-center gap-4">
           <ProgressRing
             value={counts.all === 0 ? 0 : counts.with / counts.all}
             size={76}
@@ -197,14 +196,7 @@ export default function AdminNutritionPage() {
                     plan ? 'border-line bg-surface' : 'border-dashed border-line-strong bg-transparent',
                   )}
                 >
-                  <span className="relative shrink-0">
-                    <Avatar name={name} seed={student.id} src={avatarUrlOf(student)} size="md" />
-                    {plan && (
-                      <span aria-hidden="true" className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-surface bg-brand text-black">
-                        <Salad className="h-2.5 w-2.5" />
-                      </span>
-                    )}
-                  </span>
+                  <Avatar name={name} seed={student.id} src={avatarUrlOf(student)} size="md" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-bold text-white">{name}</span>
                     {plan ? (

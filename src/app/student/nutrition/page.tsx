@@ -163,10 +163,10 @@ export default function StudentNutritionPage() {
   const allItems = plan.meals.flatMap((meal) => meal.items)
   const meals = plan.meals.filter((meal) => meal.items.length > 0)
   const nextMealId = meals.find((meal) => meal.time && minutesOf(meal.time) >= minutesNow)?.id
-  const macros: { nutrient: Nutrient; key: 'protein_g' | 'carb_g' | 'fat_g'; label: string; dot: string }[] = [
-    { nutrient: 'protein_g', key: 'protein_g', label: 'Proteína', dot: 'bg-brand' },
-    { nutrient: 'carb_g', key: 'carb_g', label: 'Carboidrato', dot: 'bg-gold' },
-    { nutrient: 'fat_g', key: 'fat_g', label: 'Gordura', dot: 'bg-sky-300' },
+  const macros: { nutrient: Nutrient; key: 'protein_g' | 'carb_g' | 'fat_g'; label: string }[] = [
+    { nutrient: 'protein_g', key: 'protein_g', label: 'Proteína' },
+    { nutrient: 'carb_g', key: 'carb_g', label: 'Carboidrato' },
+    { nutrient: 'fat_g', key: 'fat_g', label: 'Gordura' },
   ]
   const partial = (['kcal', 'protein_g', 'carb_g', 'fat_g'] as Nutrient[]).some((nutrient) => totals.incomplete.includes(nutrient) && !allMissing(allItems, nutrient))
   const kcalMissing = allMissing(allItems, 'kcal')
@@ -190,9 +190,7 @@ export default function StudentNutritionPage() {
       )}
 
       <Stagger className="space-y-4">
-        <Tile className="glow-brand relative overflow-hidden">
-          {/* Marca d'água decorativa */}
-          <Salad aria-hidden="true" className="pointer-events-none absolute -right-5 -top-5 h-36 w-36 rotate-12 text-brand/[0.07]" />
+        <Tile>
           <Eyebrow>O dia todo</Eyebrow>
           <p className="mt-2 flex items-end gap-2">
             {kcalMissing ? (
@@ -210,14 +208,11 @@ export default function StudentNutritionPage() {
           </p>
           {plan.targets.kcal !== null && <p className="mt-1.5 text-sm text-zinc-500">Meta do plano: {formatNutrient('kcal', plan.targets.kcal)} kcal</p>}
           <dl className="mt-5 grid grid-cols-3 gap-2">
-            {macros.map(({ nutrient, key, label, dot }) => {
+            {macros.map(({ nutrient, key, label }) => {
               const target = plan.targets[key]
               return (
                 <div key={key} className="rounded-2xl border border-line bg-black/30 px-3 py-3">
-                  <dt className="flex items-center gap-1.5 text-xs font-bold text-zinc-400">
-                    <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', dot)} />
-                    {label}
-                  </dt>
+                  <dt className="text-xs font-bold text-zinc-400">{label}</dt>
                   <dd className="mt-1.5 font-display text-3xl font-bold leading-none tabular-nums">
                     {allMissing(allItems, nutrient) ? (
                       <span className="text-lg text-zinc-500">sem dado</span>
@@ -235,27 +230,6 @@ export default function StudentNutritionPage() {
           </dl>
           {partial && <p className="mt-4 text-sm text-zinc-400">Alguns alimentos não têm todos os dados; o total real pode ser um pouco maior.</p>}
         </Tile>
-
-        {/* Horários do dia: toque para ir à refeição */}
-        {meals.some((meal) => meal.time) && (
-          <nav aria-label="Horários das refeições" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-            {meals
-              .filter((meal) => meal.time)
-              .map((meal) => (
-                <a
-                  key={meal.id}
-                  href={`#refeicao-${meal.id}`}
-                  className={cn(
-                    'flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-xs font-bold transition',
-                    meal.id === nextMealId ? 'border-brand/40 bg-brand-soft text-brand' : 'border-line bg-surface text-zinc-300 hover:border-line-strong',
-                  )}
-                >
-                  <span className="tabular-nums">{meal.time}</span>
-                  <span className={meal.id === nextMealId ? 'text-brand/80' : 'text-zinc-500'}>{meal.name}</span>
-                </a>
-              ))}
-          </nav>
-        )}
 
         {plan.notes && (
           <Tile>
@@ -282,7 +256,7 @@ export default function StudentNutritionPage() {
                       isNext ? 'border-brand bg-brand shadow-[0_0_0_5px_rgb(52_211_153/0.18)]' : 'border-line-strong bg-surface-2',
                     )}
                   />
-                  <Tile aria-labelledby={`refeicao-${meal.id}`} className={cn(isNext && 'border-brand/40 glow-brand')}>
+                  <Tile aria-labelledby={`refeicao-${meal.id}`} className={cn(isNext && 'border-brand/40')}>
                     <div className="flex items-center gap-3">
                       <span className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl', isNext ? 'bg-brand text-black' : 'bg-white/[0.06] text-zinc-300')}>
                         <Icon className="h-5 w-5" aria-hidden="true" />
@@ -308,7 +282,6 @@ export default function StudentNutritionPage() {
                             {item.food.name}
                             {item.portionText && <span className="text-zinc-500"> · {formatNutrient('fat_g', item.grams)} g</span>}
                           </p>
-                          {item.food.group_name && <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500">{item.food.group_name}</p>}
                         </li>
                       ))}
                     </ul>

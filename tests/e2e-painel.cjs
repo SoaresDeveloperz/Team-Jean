@@ -1,4 +1,4 @@
-// Roteiro do menu do aluno com 5 abas, do painel do treinador no celular (o que pede
+// Roteiro do menu do aluno com 4 abas, do painel do treinador no celular (o que pede
 // ação vem primeiro, filtros do radar sem se sobrepor) e da lista de alunos em
 // linhas com colunas no computador.
 const path = require('path')
@@ -41,7 +41,11 @@ async function login(page, who) {
   await student.waitForSelector('h1:has-text("Fala,")')
   check('aluna com treinos não vê as dicas da primeira vez', (await student.locator('text=Primeira vez por aqui?').count()) === 0)
   const links = student.locator('nav[aria-label="Menu do aluno"] a')
-  check('menu do aluno tem 5 abas', (await links.count()) === 5)
+  check('menu do aluno tem 4 abas (o Perfil fica no topo)', (await links.count()) === 4)
+  const tabOrder = await links.evaluateAll((items) => items.map((item) => item.getAttribute('href')))
+  check('Evolução fica ao lado do Hoje', tabOrder[0] === '/student/today' && tabOrder[1] === '/student/progress')
+  check('Perfil fica no topo, junto das notificações', (await student.locator('header a[aria-label="Meu perfil"]').count()) === 1 && (await student.locator('nav[aria-label="Menu do aluno"] a[href="/student/profile"]').count()) === 0)
+  check('cabeçalho do aluno não passa da largura em 360 px (logo, salada, avisos e perfil)', await student.evaluate(() => { const header = document.querySelector('header'); return header ? header.scrollWidth <= header.clientWidth + 1 : false }))
   check('menu do aluno não tem mais "Semana" (abre pelo Hoje)', (await student.locator('nav[aria-label="Menu do aluno"] a[href="/student/week"]').count()) === 0)
   const week = student.locator('a', { hasText: 'Ver minha semana' })
   check('Hoje tem "Ver minha semana" de 44 px ou mais', (await week.count()) === 1 && ((await week.boundingBox())?.height ?? 0) >= 43.5)

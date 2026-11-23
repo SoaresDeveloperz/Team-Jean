@@ -1,16 +1,16 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Dumbbell, History, MessageCircleHeart, TrendingUp, User } from 'lucide-react'
+import { Dumbbell, History, MessageCircleHeart, TrendingUp } from 'lucide-react'
 import { BottomNav, type NavItem } from './BottomNav'
 
-// 5 abas (cada uma com um trabalho só). A Semana abre pelo "Ver minha semana" da tela Hoje.
+// 4 abas (cada uma com um trabalho só). A Semana abre pelo "Ver minha semana" da tela Hoje e o
+// Perfil fica no topo, junto das notificações. A Evolução fica ao lado do treino (pedido do Jean).
 const items: NavItem[] = [
   { href: '/student/today', label: 'Hoje', icon: Dumbbell, alsoActive: ['/student/week'] },
-  { href: '/student/community', label: 'Equipe', icon: MessageCircleHeart },
-  { href: '/student/history', label: 'Histórico', icon: History },
   { href: '/student/progress', label: 'Evolução', icon: TrendingUp },
-  { href: '/student/profile', label: 'Perfil', icon: User },
+  { href: '/student/history', label: 'Histórico', icon: History },
+  { href: '/student/community', label: 'Equipe', icon: MessageCircleHeart },
 ]
 
 export function StudentNav() {

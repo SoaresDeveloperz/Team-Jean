@@ -202,3 +202,7 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - **Nutrição (aluno):** saíram a marca d'água, a faixa de horários (repetia as refeições), os pontos coloridos dos macros, o grupo do alimento em cada item e o brilho da refeição "Próxima".
 - **Nutrição (treinador):** saíram a marca d'água do painel de cobertura, o selo de salada no avatar e o brilho e os pontos do resumo do plano.
 - **Painel do treinador:** saiu a faixa "Ações rápidas" (o botão + e o menu já levam aos mesmos lugares) e o fundo decorativo do cabeçalho.
+
+## 2026-11-23 — Menu do aluno: Evolução ao lado do treino e Perfil no topo
+- Pedido do Jean (com captura de tela): a Evolução deve ficar do lado do treino na barra do aluno, e o Perfil junto das notificações.
+- Barra de baixo agora tem 4 abas: Hoje, Evolução, Histórico, Equipe. O Perfil virou um botão ao lado do sino, no cabeçalho. Para caber em celular estreito, o nome "Team Jean" encolhe e, abaixo de 340 px, vira só o logo (continua lido pelo leitor de tela).

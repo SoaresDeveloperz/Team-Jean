@@ -15,7 +15,7 @@
     - `trocar` (`tests/contas-trocar.mjs`, `tests/contas-curto.mjs` e `tests/e2e-trocar.cjs`): "Trocar exercício" e marca "Essencial" do Jean, com e sem o SQL;
     - `toque` (`tests/e2e-toque.cjs`): fluxo central do aluno em 320 px com letra grande (✓ à vista, toques de 44 px, foco ao finalizar, textos simples);
     - `movimento` (`tests/e2e-movimento.cjs`): animações em CSS e movimento reduzido (nada em loop, sem atraso, sem blur no painel);
-    - `painel` (`tests/e2e-painel.cjs`): menu do aluno com 5 abas, painel do treinador no celular (o que pede ação primeiro) e lista de alunos em colunas no computador;
+    - `painel` (`tests/e2e-painel.cjs`): menu do aluno com 4 abas e Perfil no topo, painel do treinador no celular (o que pede ação primeiro) e lista de alunos em colunas no computador;
     - `lento` (`tests/e2e-lento.cjs`): sinal fraco (servidor pendurado), o treino abre pela cópia do aparelho; `medir` (`tests/medir-treino.cjs`): números da tela de treino com CPU 4x e latência (não aprova nem reprova);
     - `rotina` (`tests/contas-semana.mjs` e `tests/e2e-rotina.cjs`): rotina da semana (dia de cada treino, reinício semanal pela ordem, descanso, dia e ordem no construtor), com e sem o SQL;
     - `evolucao` (`tests/contas-evolucao.mjs` e `tests/e2e-evolucao.cjs`): aba "Evolução" da ficha do aluno no painel do treinador (carga por exercício, percentual de progressão ou queda, gráfico de cada exercício e axe);

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Salad } from 'lucide-react'
+import { Salad, User } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
+import { cn } from '@/lib/cn'
 import { Logo } from '@/components/ui/logo'
 import { useHasNutritionPlan } from '@/components/student/NutritionLink'
 import { NotificationsButton } from './NotificationsButton'
@@ -33,7 +34,7 @@ export function StudentHeader() {
         <div className="flex min-w-0 items-center gap-2">
           <Link href="/student/today" className="flex items-center gap-2.5" aria-label="Team Jean, ir para Hoje">
             <Logo className="h-7 w-7" />
-            <span className="whitespace-nowrap font-display text-[19px] font-bold uppercase leading-none tracking-[0.12em] min-[360px]:text-[22px] min-[360px]:tracking-[0.16em]">
+            <span className="whitespace-nowrap font-display text-[18px] font-bold uppercase leading-none tracking-[0.1em] max-[339px]:sr-only min-[420px]:text-[22px] min-[420px]:tracking-[0.16em]">
               Team Jean
             </span>
           </Link>
@@ -48,7 +49,20 @@ export function StudentHeader() {
             </Link>
           )}
         </div>
-        <NotificationsButton />
+        <div className="flex shrink-0 items-center gap-2">
+          <NotificationsButton />
+          <Link
+            href="/student/profile"
+            aria-label="Meu perfil"
+            aria-current={pathname.startsWith('/student/profile') ? 'page' : undefined}
+            className={cn(
+              'grid h-11 w-11 place-items-center rounded-2xl border transition active:scale-95',
+              pathname.startsWith('/student/profile') ? 'border-brand/40 bg-brand-soft text-brand' : 'border-line bg-surface text-zinc-300 hover:text-white',
+            )}
+          >
+            <User className="h-5 w-5" aria-hidden="true" />
+          </Link>
+        </div>
       </div>
     </header>
   )

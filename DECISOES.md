@@ -195,3 +195,10 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 - Pedido do dono: uma tela só com todos os alunos, quem tem plano e quem não tem, para administrar os planos. A entrada é o botão de salada no painel (ao lado da foto) e, no computador, o item "Nutrição" do menu lateral. No menu inferior do celular não entra (já são 5 itens).
 - Tela `/admin/nutrition`: busca, filtros "Todos / Com plano / Sem plano" e uma linha por aluno (meta de kcal, número de refeições, última mudança; ou "Criar plano"). Tocar abre o mesmo editor da ficha do aluno (aba Nutrição) numa janela, então criar, ajustar e apagar plano continuam num lugar só. Ao fechar, a lista recarrega.
 - Sem o SQL da nutrição a lista de alunos aparece e um aviso diz quais arquivos rodar. Sem mudança de banco.
+
+## 2026-11-23 — Menos poluição visual no app
+- Pedido do Jean: o app está "poluído". Regra: cada tela mostra primeiro o que pede ação; enfeite e repetição saem.
+- **Hoje (aluno):** saíram as etiquetas de grupos musculares do cartão do treino (o boneco já mostra), a linha "treinos neste mês" e a frase motivacional do cartão da meta; "Como você está hoje" (prontidão) foi para dentro de "Ver mais do seu dia".
+- **Nutrição (aluno):** saíram a marca d'água, a faixa de horários (repetia as refeições), os pontos coloridos dos macros, o grupo do alimento em cada item e o brilho da refeição "Próxima".
+- **Nutrição (treinador):** saíram a marca d'água do painel de cobertura, o selo de salada no avatar e o brilho e os pontos do resumo do plano.
+- **Painel do treinador:** saiu a faixa "Ações rápidas" (o botão + e o menu já levam aos mesmos lugares) e o fundo decorativo do cabeçalho.

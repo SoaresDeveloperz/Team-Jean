@@ -22,7 +22,7 @@ const HINTS: Record<PushStatus, string> = {
 }
 
 // Liga/desliga as notificações push neste aparelho (aluno e treinador).
-export function PushNotificationsTile({ coach = false }: { coach?: boolean }) {
+export function PushNotificationsTile({ coach = false, className }: { coach?: boolean; className?: string }) {
   const toast = useToast()
   const [status, setStatus] = useState<PushStatus>('loading')
   const [busy, setBusy] = useState(false)
@@ -78,7 +78,7 @@ export function PushNotificationsTile({ coach = false }: { coach?: boolean }) {
       : HINTS[status]
 
   return (
-    <Tile className="space-y-3">
+    <Tile className={cn('space-y-3', className)}>
       <div className="flex items-center gap-3">
         <span
           className={cn(

@@ -8,11 +8,12 @@ import { MIN_PASSWORD, translatePasswordError } from '@/lib/password'
 import { Alert } from '@/components/ui/alert'
 import { NewPasswordFields } from './NewPasswordFields'
 import { Modal } from '@/components/ui/modal'
+import { cn } from '@/lib/cn'
 import { Tile } from '@/components/ui/tile'
 import { useToast } from '@/components/ui/toast'
 
 // Item do Perfil para o aluno trocar a senha provisória criada pelo treinador.
-export function ChangePasswordTile() {
+export function ChangePasswordTile({ className }: { className?: string }) {
   const [supabase] = useState(() => createClient())
   const toast = useToast()
   const [open, setOpen] = useState(false)
@@ -51,7 +52,7 @@ export function ChangePasswordTile() {
 
   return (
     <>
-      <Tile className="p-0">
+      <Tile className={cn('p-0', className)}>
         <button type="button" onClick={openModal} className="flex w-full items-center gap-3 p-5 text-left">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.05] text-zinc-300">
             <KeyRound className="h-5 w-5" aria-hidden="true" />

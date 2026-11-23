@@ -376,7 +376,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
         </button>
       </div>
 
-      <section ref={summaryRef} tabIndex={-1} aria-label="Resumo do plano" className="sticky-summary glow-brand z-10 space-y-2.5 rounded-2xl border border-brand/20 bg-surface p-3.5 shadow-lg shadow-black/50 focus:outline-none">
+      <section ref={summaryRef} tabIndex={-1} aria-label="Resumo do plano" className="sticky-summary z-10 space-y-2.5 rounded-2xl border border-line bg-surface p-3.5 shadow-lg shadow-black/50 focus:outline-none">
         {actionError && <Alert variant="error">{actionError}</Alert>}
         {targetRows.length === 0 ? (
           <p className="text-sm font-bold tabular-nums text-white">
@@ -393,10 +393,7 @@ export function NutritionPlanEditor({ studentId, studentName }: { studentId: str
               const ratio = targetRatio(value, target) ?? 0
               return (
                 <li key={key}>
-                  <p aria-hidden="true" className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
-                    <span className={cn('h-2 w-2 rounded-full', nutrient === 'kcal' ? 'bg-white' : nutrient === 'protein_g' ? 'bg-brand' : nutrient === 'carb_g' ? 'bg-gold' : 'bg-sky-300')} />
-                    {label}
-                  </p>
+                  <p aria-hidden="true" className="text-xs font-semibold text-zinc-400">{label}</p>
                   <p aria-hidden="true" className={cn('text-sm font-bold tabular-nums', ratio > 1.05 ? 'text-gold' : 'text-white')}>
                     {formatNutrient(nutrient, value)} <span className="font-medium text-zinc-500">/ {formatNutrient(nutrient, target)} {unit}</span>
                     {ratio > 1.05 && <span className="ml-1 text-xs font-semibold text-gold">acima</span>}

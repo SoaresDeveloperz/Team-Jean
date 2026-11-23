@@ -8,12 +8,9 @@ import {
   Camera,
   ChevronDown,
   ChevronRight,
-  ClipboardList,
   LoaderCircle,
-  Megaphone,
   Salad,
   TimerOff,
-  UserPlus,
 } from 'lucide-react'
 import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/types'
@@ -208,7 +205,6 @@ export default function AdminDashboardPage() {
     <div className="space-y-8">
       <Stagger className="space-y-4">
         <m.header variants={tileVariants} className="relative isolate flex items-start justify-between gap-3 px-1">
-          <div aria-hidden="true" className="aurora" />
           <div className="min-w-0">
             <Eyebrow>{now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</Eyebrow>
             <h1 className="mt-1.5 font-display text-[2.75rem] font-bold uppercase leading-[0.9]">
@@ -296,24 +292,6 @@ export default function AdminDashboardPage() {
 
         <m.div variants={tileVariants}>
           <StudentQuickSearch students={data.students} />
-        </m.div>
-
-        {/* Ações rápidas */}
-        <m.div variants={tileVariants} className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-          {[
-            { href: '/admin/workouts', label: 'Prescrever treino', icon: ClipboardList },
-            { href: '/admin/students?novo=1', label: 'Novo aluno', icon: UserPlus },
-            { href: '/admin/announcements', label: 'Avisos', icon: Megaphone },
-          ].map((action) => (
-            <Link
-              key={action.label}
-              href={action.href}
-              className="flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-4 text-xs font-bold text-zinc-200 transition hover:border-line-strong hover:text-white"
-            >
-              <action.icon className="h-4 w-4 text-brand" aria-hidden="true" />
-              {action.label}
-            </Link>
-          ))}
         </m.div>
 
         {/* No computador: radar e atividade à esquerda; dinheiro e alertas à direita. */}

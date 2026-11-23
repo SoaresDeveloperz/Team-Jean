@@ -365,8 +365,8 @@ export default function StudentProfilePage() {
         </div>
       </Tile>
 
-      {/* Avisos */}
-      <Tile className="p-0">
+      {/* Conta: avisos, notificações e senha num bloco só */}
+      <div className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface">
         <button type="button" onClick={openNotifications} className="flex w-full items-center gap-3 p-5 text-left">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.05] text-zinc-300">
             <Bell className="h-5 w-5" aria-hidden="true" />
@@ -379,11 +379,9 @@ export default function StudentProfilePage() {
           </span>
           <ChevronRight className="h-4 w-4 text-zinc-600" aria-hidden="true" />
         </button>
-      </Tile>
-
-      <PushNotificationsTile />
-
-      <ChangePasswordTile />
+        <PushNotificationsTile className="rounded-none border-0 bg-transparent" />
+        <ChangePasswordTile className="rounded-none border-0 bg-transparent" />
+      </div>
 
       {/* Instalar app */}
       {(installState === 'available' || installState === 'ios') && (

@@ -206,3 +206,4 @@ As decisões de 2026-10-21 são registros retroativos: foram tomadas antes de os
 ## 2026-11-23 — Menu do aluno: Evolução ao lado do treino e Perfil no topo
 - Pedido do Jean (com captura de tela): a Evolução deve ficar do lado do treino na barra do aluno, e o Perfil junto das notificações.
 - Barra de baixo agora tem 4 abas: Hoje, Evolução, Histórico, Equipe. O Perfil virou um botão ao lado do sino, no cabeçalho. Para caber em celular estreito, o nome "Team Jean" encolhe e, abaixo de 340 px, vira só o logo (continua lido pelo leitor de tela).
+- Complemento (mensagens seguintes do Jean): o ícone da alimentação saiu do topo e ocupa o lugar que o Perfil deixou na barra de baixo, como aba "Dieta" (só aparece para quem tem plano). O topo fica com o logo, o sino e o Perfil.

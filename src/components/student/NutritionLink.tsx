@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, getCurrentUser } from '@/lib/supabase/client'
 import { forgetNutritionCopy, readNutritionCopy } from '@/lib/nutrition-plan'
 
 // Só quem tem plano montado pelo nutricionista vê o atalho da alimentação.
@@ -30,4 +30,19 @@ export function useHasNutritionPlan(userId: string | null): boolean {
   }, [supabase, userId])
 
   return userId ? visible : false
+}
+
+// Para a barra do aluno: descobre quem está logado e se tem plano.
+export function useStudentHasNutritionPlan(): boolean {
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    void getCurrentUser(createClient()).then((user) => {
+      if (active) setUserId(user?.id ?? null)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+  return useHasNutritionPlan(userId)
 }

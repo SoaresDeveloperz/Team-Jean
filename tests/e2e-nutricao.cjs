@@ -290,9 +290,9 @@ async function login(page, who) {
   await login(maria, 'maria')
   await maria.goto(`${BASE}/student/today`)
   await maria.waitForSelector('h1:has-text("Fala,")')
-  const todayLink = maria.getByRole('link', { name: 'Ver minha alimentação' })
+  const todayLink = maria.locator('nav[aria-label="Menu do aluno"] a[href="/student/nutrition"]')
   const linkHeight = await todayLink.evaluate((el) => el.getBoundingClientRect().height)
-  check('o link "Ver minha alimentação" da Hoje tem 44 px ou mais de altura', linkHeight >= 43.5, String(linkHeight))
+  check('a aba "Dieta" da barra de baixo tem 44 px ou mais de altura', linkHeight >= 43.5, String(linkHeight))
   await todayLink.click()
   await maria.waitForSelector('h1:has-text("Alimentação")')
   await maria.waitForSelector('section[aria-labelledby]')
@@ -376,7 +376,7 @@ async function login(page, who) {
   check('sem plano, a aluna vê "ainda não foi montado" e nenhuma refeição', (await maria.textContent('main')).includes('ainda não foi montado') && (await maria.locator('section[aria-labelledby]').count()) === 0)
   await maria.goto(`${BASE}/student/today`)
   await maria.waitForSelector('h1:has-text("Fala,")')
-  check('sem plano, o link da Hoje some', (await maria.getByRole('link', { name: 'Ver minha alimentação' }).count()) === 0)
+  check('sem plano, a aba "Dieta" some da barra', (await maria.locator('nav[aria-label="Menu do aluno"] a[href="/student/nutrition"]').count()) === 0)
 
   // O único 500 esperado é o da exclusão que o roteiro faz falhar de propósito.
   const expected500 = problems.findIndex((problem) => /status of 500/.test(problem))

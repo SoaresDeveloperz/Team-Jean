@@ -92,7 +92,7 @@ async function login(page, email, password = '123456') {
   await more.locator('summary').click()
   await page.waitForSelector('text=Recuperação muscular')
   check('Hoje enxuta: ao abrir, aparecem recuperação muscular e "O que vem aí"', (await page.textContent('details')).includes('O que vem aí') && (await page.textContent('details')).includes('Recuperação muscular'))
-  check('Hoje enxuta: prontidão e recado continuam fora do bloco recolhido', (await more.locator('text=Como está sua energia hoje').count()) === 0)
+  check('Hoje enxuta: a prontidão fica dentro do "Ver mais do seu dia" (menos poluição)', (await more.locator('text=Como está sua energia hoje').count()) === 1)
   await shot(page, 'c01-hoje-longo')
 
   // ------------------------------------------------ painel: o que sai

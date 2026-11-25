@@ -25,8 +25,11 @@ import {
   readActiveSession,
   readSessionJournal,
   saveActiveSession,
+  readWorkoutDraft,
+  saveWorkoutDraft,
   saveSessionJournal,
   type JournalSet,
+  type WorkoutDraft,
 } from '@/lib/active-session'
 import {
   clearSyncIssue,
@@ -329,6 +332,23 @@ export default function WorkoutExecutionPage() {
       }
       originalSetsRef.current = originalSets
 
+      // Rascunho do aparelho: peso e repetições digitados antes do ✓, e o recado do fim do treino.
+      const draft = readWorkoutDraft(user.id, workoutId, localDay())
+      if (draft) {
+        for (const row of rows) {
+          const typed = draft.inputs[row.id]
+          if (!typed) continue
+          initialSets[row.id] = (initialSets[row.id] ?? []).map((entry, index) => {
+            const saved = typed[index]
+            if (entry.completed || !saved) return entry
+            return { ...entry, weight: entry.weight || saved.weight, reps: entry.reps || saved.reps }
+          })
+        }
+        if (draft.rpe !== null) setRpe(draft.rpe)
+        setFeedback(draft.feedback)
+        setFeedbackTags(draft.tags)
+      }
+
       if (resumedSets !== null && resumeCandidate) {
         sessionIdRef.current = resumeCandidate.sessionId
         setStartedAt(resumeCandidate.startedAt)
@@ -397,6 +417,27 @@ export default function WorkoutExecutionPage() {
     }
     saveSessionJournal(sessionId, journal)
   }, [sets, exercises, loadState.status, summary])
+
+  // Rascunho: guarda o que foi digitado e ainda não marcado, a cada mudança, só neste aparelho.
+  useEffect(() => {
+    if (!userId || loadState.status !== 'ready' || summary) return
+    const inputs: WorkoutDraft['inputs'] = {}
+    let any = false
+    for (const row of exercises) {
+      const list = (sets[row.id] ?? []).map((entry) => {
+        const typed = !entry.completed && (entry.weight.trim() !== '' || entry.reps.trim() !== '')
+        if (typed) any = true
+        return typed ? { weight: entry.weight, reps: entry.reps } : { weight: '', reps: '' }
+      })
+      inputs[row.id] = list
+    }
+    const note = feedback.trim()
+    if (!any && note === '' && feedbackTags.length === 0) {
+      saveWorkoutDraft(null)
+      return
+    }
+    saveWorkoutDraft({ userId, workoutId, day: localDay(), inputs, rpe, feedback, tags: feedbackTags })
+  }, [sets, exercises, feedback, feedbackTags, rpe, userId, workoutId, loadState.status, summary])
 
   const updateEntry = useCallback((rowId: string, index: number, patch: Partial<SetEntry>) => {
     setSets((previous) => ({

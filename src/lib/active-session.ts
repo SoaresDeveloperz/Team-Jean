@@ -46,6 +46,7 @@ export function clearActiveSession(keepShort = false) {
     window.localStorage.removeItem(STORAGE_KEY)
     window.localStorage.removeItem(JOURNAL_KEY)
     if (!keepShort) {
+      window.localStorage.removeItem(DRAFT_KEY)
       window.localStorage.removeItem(SHORT_STORAGE_KEY)
       window.localStorage.removeItem(SWAP_STORAGE_KEY)
       window.localStorage.removeItem(PAIN_STORAGE_KEY)
@@ -81,5 +82,51 @@ export function saveSessionJournal(sessionId: string, sets: JournalSet[]) {
     window.localStorage.setItem(JOURNAL_KEY, JSON.stringify({ sessionId, sets }))
   } catch {
     // Sem armazenamento: sem internet não dá para retomar, só isso.
+  }
+}
+
+// Rascunho do treino: o que o aluno digitou e ainda não confirmou (peso e repetições antes do ✓,
+// nota de esforço, recado e etiquetas do fim do treino). Salva sozinho a cada mudança, só neste aparelho,
+// para uma queda de internet, um recarregamento ou o sistema fechando o app não perderem nada.
+const DRAFT_KEY = 'team-jean:workout-draft'
+
+export type WorkoutDraft = {
+  userId: string
+  workoutId: string
+  // Dia local (aaaa-mm-dd): rascunho de ontem não vale hoje.
+  day: string
+  // Por linha do treino, peso e repetições de cada série ainda não marcada ('' = nada digitado).
+  inputs: Record<string, { weight: string; reps: string }[]>
+  rpe: number | null
+  feedback: string
+  tags: string[]
+}
+
+export function readWorkoutDraft(userId: string, workoutId: string, day: string): WorkoutDraft | null {
+  try {
+    const draft = JSON.parse(window.localStorage.getItem(DRAFT_KEY) ?? 'null') as Partial<WorkoutDraft> | null
+    if (!draft || draft.userId !== userId || draft.workoutId !== workoutId || draft.day !== day) return null
+    if (typeof draft.inputs !== 'object' || draft.inputs === null) return null
+    return {
+      userId,
+      workoutId,
+      day,
+      inputs: draft.inputs as WorkoutDraft['inputs'],
+      rpe: typeof draft.rpe === 'number' ? draft.rpe : null,
+      feedback: typeof draft.feedback === 'string' ? draft.feedback : '',
+      tags: Array.isArray(draft.tags) ? draft.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+    }
+  } catch {
+    return null
+  }
+}
+
+// draft = null (ou vazio) apaga o rascunho.
+export function saveWorkoutDraft(draft: WorkoutDraft | null) {
+  try {
+    if (!draft) window.localStorage.removeItem(DRAFT_KEY)
+    else window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    // Sem armazenamento (aba anônima): só não há rascunho.
   }
 }
